@@ -26,18 +26,29 @@ func main() {
 			continue
 		}
 
-		switch resource {
-		case "gateway":
-			handleGateway(verb, args)
-		case "monolith":
-			handleMonolith(verb, args)
-		case "nebula":
-			handleNebula(verb, args)
-		default:
-			fmt.Printf("aeons resource type issue: received unknown resource %s", resource)
-
+		handler, err := getResourceHandler(resource)
+		if err != nil {
+			fmt.Println(err)
+			continue
 		}
+		handler(verb,args)
 	}
+}
+
+func getResourceHandler(resource string) (func(v string, a string), error) {
+	resourceToHandler := map[string] func(v string, a string) {
+		"gateway": handleGateway,
+		"monolith": handleMonolith,
+		"nebula": handleNebula,
+	}
+
+	handler, ok := resourceToHandler[resource]
+	if (ok){
+		return handler, nil
+	}else {
+		return nil, fmt.Errorf("received unknown resource type %s",resource)
+	}
+
 }
 
 func handleGateway(verb string, args string) {
