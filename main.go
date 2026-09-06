@@ -1,39 +1,44 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
-	"os"
+    "fmt"
+    "os"
 	"strings"
 	"cli/cli"
 )
 
 func main() {
-	inputReader := bufio.NewReader(os.Stdin)
-	fmt.Println("Echo of Aeons")
-	fmt.Println("---------------------")
-	for {
-		fmt.Print("<<< ")
-		text, err := inputReader.ReadString('\n')
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		fmt.Print(">>> ")
 
-		callReference, err := generateCommandReferenceFromInput(text)
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
+    args := os.Args[1:]
 
-		handler, err := getResourceHandler(callReference.Resource)
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
-		handler(callReference)
+	if len(args) < 3{
+		fmt.Println(fmt.Errorf("why u so bad at counting m8"))
+		return;
 	}
+
+	paramsBaseArray := args[2:]
+	params := map[string]string{}
+
+	if len(paramsBaseArray) != 0 {
+		err := fmt.Errorf("")
+		params, err = generateArgsMapFromArgs(paramsBaseArray)
+		if (err != nil){
+			fmt.Println(err)
+		}
+	}
+
+	ref := cli.CallReference{
+		Resource: args[0],
+		Verb: args[1],
+		Params: params,
+	}
+
+	handler, err := getResourceHandler(ref.Resource)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	handler(ref)
 }
 
 func getResourceHandler(resource string) (func(r cli.CallReference), error) {
@@ -45,7 +50,7 @@ func getResourceHandler(resource string) (func(r cli.CallReference), error) {
 
 	handler, ok := resourceToHandler[resource]
 	if ok {
-		return handler, nil
+		return handler, nil;
 	} else {
 		return nil, fmt.Errorf("received unknown resource type %s", resource)
 	}
@@ -61,82 +66,30 @@ func handleNebula(input cli.CallReference) {
 	fmt.Printf("handling nebula with verb %s and args %s\v", input.Verb, input.Params)
 }
 
-func generateCommandReferenceFromInput(input string) (cli.CallReference, error) {
-
-	cliName := ""
-	resource := ""
-	verb := ""
-	args := ""
+func generateArgsMapFromArgs(input []string) (map[string]string, error){
+	
 	argsMap := make(map[string]string)
+	for i := 0; i < len(input); i++ {
+		
+		currentArgument := input[i]
 
-	split := strings.Fields(input)
-
-	if len(split) == 0 {
-		return cli.CallReference{}, fmt.Errorf("no input provided")
-	} else {
-		//check if the leading command is actually the aeons cli
-		if split[0] != "aeons" {
-			return cli.CallReference{}, fmt.Errorf("the aeons have not been awakened")
-		}
-		cliName = split[0]
-	}
-
-	//catch if resource and verb were provided
-	if len(split) == 1 {
-		return cli.CallReference{}, fmt.Errorf("no resource provided")
-	} else if len(split) == 2 {
-		return cli.CallReference{}, fmt.Errorf("no verb provided")
-	}
-
-	resource = split[1]
-	verb = split[2]
-
-	//check if a param set was provided or not
-	if len(split) > 3 {
-		args = strings.Join(split[3:], "")
-		argsArray := strings.Split(args, "-")
-		//check if the params set actually starts on a -
-		if strings.HasPrefix(argsArray[0], "-") {
-			return cli.CallReference{}, fmt.Errorf("found input %s after verb, expected params declaration", split[3])
-		}
-		var err error
-
-
-		argsMap, err = generateArgsMapFromArgs(argsArray)
-		if (err != nil){
-			return cli.CallReference{}, err
+		if !strings.HasPrefix(currentArgument,"-") {
+			return nil, fmt.Errorf("expected arg starting on - or flag starting on --, got %s",currentArgument)
+		} else if strings.HasPrefix(currentArgument, "--"){
+			//found a flag
+			argsMap[currentArgument] = "YES"
+		} else if strings.HasPrefix(currentArgument, "-"){
+			//found and arg with value
+			if (i == len(input)-1) || strings.HasPrefix(input[i+1],"-"){
+				//found a flag with no value. ignore empty flag.
+				fmt.Printf("found parameter %s without value, skipping %s\n", currentArgument, currentArgument)
+			}else {
+				argsMap[currentArgument] =input[i+1]
+				i++ //the next item in the list is the value for this argument, skip evaluating it.
+			}
 		}
 	}
 
-	inputAsCallReference := cli.CallReference{
-		Name: cliName, 
-		Resource: resource, 
-		Verb: verb, 
-		Params: argsMap,
-	}
-	return inputAsCallReference, nil
-}
-
-func generateArgsMapFromArgs(input []string) (map[string]string, error) {
-	argsMap := make(map[string]string)
-
-
-
-		for _, v := range input {
-			fmt.Println(v)
-		}
-
-	for _, v := range input {
-		argSplit := strings.Split(v, " ")
-		if len(argSplit) > 2 {
-			return nil, fmt.Errorf("arg %s contains multiple values %v", argSplit[0], argSplit[1:])
-		}
-
-		if len(argSplit) == 1 {
-			argsMap[argSplit[0]] = ""
-		} else {
-			argsMap[argSplit[0]] = argSplit[1]
-		}
-	}
+	
 	return argsMap, nil
 }
