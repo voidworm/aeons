@@ -87,9 +87,9 @@ func main() {
 	router := gin.Default()
 	router.GET("/investigators", getInvestigators)
 	router.GET("/investigators/:id", getInvestigatorByID)
-	router.POST("/investigators/", addInvestigator)
+	router.POST("/investigators", addInvestigator)
 
-	router.GET("ping", ping)
+	router.GET("/ping", ping)
 
 	router.Run("localhost:8080")
 }
