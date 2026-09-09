@@ -2,9 +2,31 @@ package main
 
 import (
 	"net/http"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 )
+
+type investigatorStore struct {
+	mutex         sync.RWMutex
+	investigators []investigator
+}
+
+func (s *investigatorStore) add(gator investigator) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.investigators = append(s.investigators, gator)
+}
+
+func (s *investigatorStore) getAll() []investigator {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.investigators
+}
+
+var gatorStore = investigatorStore{
+	investigators: investigators,
+}
 
 type investigator struct {
 	ID    string `json:"id"`
@@ -20,7 +42,7 @@ var investigators = []investigator{
 
 /*
 Test: This should successfully add roland to the data
-curl http://localhost:8080/investigators/add \
+curl http://localhost:8080/investigators/ \
     --include \
     --header "Content-Type: application/json" \
     --request "POST" \
@@ -35,18 +57,18 @@ func addInvestigator(c *gin.Context) {
 		return
 	}
 
-	investigators = append(investigators, newInvestigator)
+	gatorStore.add(newInvestigator)
 	c.IndentedJSON(http.StatusCreated, newInvestigator)
 }
 
 func getInvestigators(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, investigators)
+	c.IndentedJSON(http.StatusOK, gatorStore.getAll())
 }
 
-func getInvestigatorById(c *gin.Context) {
+func getInvestigatorByID(c *gin.Context) {
 	id := c.Param("id")
 
-	for _, gator := range investigators {
+	for _, gator := range gatorStore.getAll() {
 		if gator.ID == id {
 			c.IndentedJSON(http.StatusOK, gator)
 			return
@@ -63,9 +85,9 @@ func ping(c *gin.Context) {
 
 func main() {
 	router := gin.Default()
-	router.GET("/investigators/get", getInvestigators)
-	router.GET("/investigators/get/:id", getInvestigatorById)
-	router.POST("/investigators/add", addInvestigator)
+	router.GET("/investigators", getInvestigators)
+	router.GET("/investigators/:id", getInvestigatorByID)
+	router.POST("/investigators/", addInvestigator)
 
 	router.GET("ping", ping)
 
