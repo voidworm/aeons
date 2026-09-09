@@ -1,95 +1,73 @@
 package main
 
 import (
-    "fmt"
-    "os"
-	"strings"
-	"cli/cli"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
-func main() {
+type investigator struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Class string `json:"class"`
+}
 
-    args := os.Args[1:]
+var investigators = []investigator{
+	{ID: "1", Name: "Luke Robinson", Class: "Mystic"},
+	{ID: "2", Name: "Daisy Walker", Class: "Seeker"},
+	{ID: "3", Name: "Norman Withers", Class: "Seeker"},
+}
 
-	if len(args) < 3{
-		fmt.Println(fmt.Errorf("why u so bad at counting m8"))
-		return;
-	}
+/*
+Test: This should successfully add roland to the data
+curl http://localhost:8080/investigators/add \
+    --include \
+    --header "Content-Type: application/json" \
+    --request "POST" \
+    --data '{"id": "4","Name": "Roland Banks","Class": "Guardian"}'
+*/
 
-	paramsBaseArray := args[2:]
-	params := map[string]string{}
+func addInvestigator(c *gin.Context) {
 
-	if len(paramsBaseArray) != 0 {
-		err := fmt.Errorf("")
-		params, err = generateArgsMapFromArgs(paramsBaseArray)
-		if (err != nil){
-			fmt.Println(err)
-		}
-	}
+	var newInvestigator investigator
 
-	ref := cli.CallReference{
-		Resource: args[0],
-		Verb: args[1],
-		Params: params,
-	}
-
-	handler, err := getResourceHandler(ref.Resource)
-	if err != nil {
-		fmt.Println(err)
+	if err := c.BindJSON(&newInvestigator); err != nil {
 		return
 	}
-	handler(ref)
+
+	investigators = append(investigators, newInvestigator)
+	c.IndentedJSON(http.StatusCreated, newInvestigator)
 }
 
-func getResourceHandler(resource string) (func(r cli.CallReference), error) {
-	resourceToHandler := map[string]func(f cli.CallReference){
-		"gateway":  handleGateway,
-		"monolith": handleMonolith,
-		"nebula":   handleNebula,
-	}
-
-	handler, ok := resourceToHandler[resource]
-	if ok {
-		return handler, nil;
-	} else {
-		return nil, fmt.Errorf("received unknown resource type %s", resource)
-	}
+func getInvestigators(c *gin.Context) {
+	c.IndentedJSON(http.StatusOK, investigators)
 }
 
-func handleGateway(input cli.CallReference) {
-	fmt.Printf("handling gateway with verb %s and args %v\n", input.Verb, input.Params)
-}
-func handleMonolith(input cli.CallReference) {
-	fmt.Printf("handling monolith with verb %s and args %v\n", input.Verb, input.Params)
-}
-func handleNebula(input cli.CallReference) {
-	fmt.Printf("handling nebula with verb %s and args %s\v", input.Verb, input.Params)
-}
+func getInvestigatorById(c *gin.Context) {
+	id := c.Param("id")
 
-func generateArgsMapFromArgs(input []string) (map[string]string, error){
-	
-	argsMap := make(map[string]string)
-	for i := 0; i < len(input); i++ {
-		
-		currentArgument := input[i]
-
-		if !strings.HasPrefix(currentArgument,"-") {
-			return nil, fmt.Errorf("expected arg starting on - or flag starting on --, got %s",currentArgument)
-		} else if strings.HasPrefix(currentArgument, "--"){
-			//found a flag
-			argsMap[currentArgument] = "YES"
-		} else if strings.HasPrefix(currentArgument, "-"){
-			//found and arg with value
-			if (i == len(input)-1) || strings.HasPrefix(input[i+1],"-"){
-				//found a flag with no value. ignore empty flag.
-				fmt.Printf("found parameter %s without value, skipping %s\n", currentArgument, currentArgument)
-			}else {
-				argsMap[currentArgument] =input[i+1]
-				i++ //the next item in the list is the value for this argument, skip evaluating it.
-			}
+	for _, gator := range investigators {
+		if gator.ID == id {
+			c.IndentedJSON(http.StatusOK, gator)
+			return
 		}
 	}
+	c.IndentedJSON(http.StatusNotFound, gin.H{"message": "investigator not found"})
+}
 
-	
-	return argsMap, nil
+func ping(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"message": "pong",
+	})
+}
+
+func main() {
+	router := gin.Default()
+	router.GET("/investigators/get", getInvestigators)
+	router.GET("/investigators/get/:id", getInvestigatorById)
+	router.POST("/investigators/add", addInvestigator)
+
+	router.GET("ping", ping)
+
+	router.Run("localhost:8080")
 }

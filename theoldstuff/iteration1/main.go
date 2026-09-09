@@ -2,10 +2,10 @@ package main
 
 import (
 	"bufio"
+	"cli/cli"
 	"fmt"
 	"os"
 	"strings"
-	"cli/cli"
 )
 
 func main() {
@@ -101,35 +101,31 @@ func generateCommandReferenceFromInput(input string) (cli.CallReference, error) 
 		}
 		var err error
 
-
 		argsMap, err = generateArgsMapFromArgs(argsArray)
-		if (err != nil){
+		if err != nil {
 			return cli.CallReference{}, err
 		}
 	}
 
 	inputAsCallReference := cli.CallReference{
-		Name: cliName, 
-		Resource: resource, 
-		Verb: verb, 
-		Params: argsMap,
+		Name:     cliName,
+		Resource: resource,
+		Verb:     verb,
+		Params:   argsMap,
 	}
 	return inputAsCallReference, nil
 }
 
 func generateArgsMapFromArgs(input []string) (map[string]string, error) {
 
-
 	//this is huge mess.
 	//i'll leave this here for now, to have a functioning reference for now that i can easily turn back on if I want to
 
-	
-
 	argsMap := make(map[string]string)
 
-		for _, v := range input {
-			fmt.Println(v)
-		}
+	for _, v := range input {
+		fmt.Println(v)
+	}
 
 	for _, v := range input {
 		argSplit := strings.Split(v, " ")
