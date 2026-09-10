@@ -1,8 +1,13 @@
 package main
 
 import (
+	"database/sql"
+	"fmt"
 	"net/http"
 	"sync"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/lib/pq"
 
 	"github.com/gin-gonic/gin"
 )
@@ -88,6 +93,30 @@ func ping(c *gin.Context) {
 }
 
 func main() {
+
+	dbConnStr := "user=gouser dbname=aeons password=gopassword sslmode=disable"
+	db, err := sql.Open("postgres", dbConnStr)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	rows, err := db.Query("SELECT * FROM investigators")
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int
+		var name string
+		var class string
+		if err := rows.Scan(&id, &name, &class); err != nil {
+			panic(err)
+		}
+		fmt.Printf("ID: %d, Name %s of class %s\n", id, name, class)
+	}
+
 	router := gin.Default()
 	router.GET("/investigators", getInvestigators)
 	router.GET("/investigators/:id", getInvestigatorByID)
