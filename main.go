@@ -21,7 +21,11 @@ func (s *investigatorStore) add(gator investigator) {
 func (s *investigatorStore) getAll() []investigator {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	return s.investigators
+	fullCopy := make([]investigator, 0, len(s.investigators))
+	for _, gator := range s.investigators {
+		fullCopy = append(fullCopy, gator)
+	}
+	return fullCopy
 }
 
 var gatorStore = investigatorStore{
