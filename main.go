@@ -2,9 +2,8 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
+	"log"
 	"net/http"
-	"sync"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/lib/pq"
@@ -12,29 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type investigatorStore struct {
-	mutex         sync.RWMutex
-	investigators []investigator
-}
-
-func (s *investigatorStore) add(gator investigator) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.investigators = append(s.investigators, gator)
-}
-
-func (s *investigatorStore) getAll() []investigator {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	fullCopy := make([]investigator, 0, len(s.investigators))
-	for _, gator := range s.investigators {
-		fullCopy = append(fullCopy, gator)
-	}
-	return fullCopy
-}
-
-var gatorStore = investigatorStore{
-	investigators: investigators,
+func add(gator investigator) {
+	//some boilerplate
 }
 
 type investigator struct {
@@ -43,10 +21,9 @@ type investigator struct {
 	Class string `json:"class"`
 }
 
-var investigators = []investigator{
-	{ID: "1", Name: "Luke Robinson", Class: "Mystic"},
-	{ID: "2", Name: "Daisy Walker", Class: "Seeker"},
-	{ID: "3", Name: "Norman Withers", Class: "Seeker"},
+type investigatorInput struct {
+	Name  string `json:"name" binding:"required"`
+	Class string `json:"class" binding:"required"`
 }
 
 /*
@@ -58,38 +35,80 @@ curl http://localhost:8080/investigators/ \
     --data '{"id": "4","Name": "Roland Banks","Class": "Guardian"}'
 */
 
-func addInvestigator(c *gin.Context) {
+func getAllInvestigators(db *sql.DB) []investigator {
 
-	var newInvestigator investigator
+	fullList := make([]investigator, 0)
 
-	if err := c.BindJSON(&newInvestigator); err != nil {
-		return
+	rows, err := db.Query("SELECT * FROM investigators")
+	if err != nil {
+		panic(err)
 	}
+	defer rows.Close()
 
-	gatorStore.add(newInvestigator)
-	c.IndentedJSON(http.StatusCreated, newInvestigator)
-}
-
-func getInvestigators(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, gatorStore.getAll())
-}
-
-func getInvestigatorByID(c *gin.Context) {
-	id := c.Param("id")
-
-	for _, gator := range gatorStore.getAll() {
-		if gator.ID == id {
-			c.IndentedJSON(http.StatusOK, gator)
-			return
+	for rows.Next() {
+		var id string
+		var name string
+		var class string
+		if err := rows.Scan(&id, &name, &class); err != nil {
+			panic(err)
 		}
+
+		newInvestigator := investigator{
+			ID:    id,
+			Name:  name,
+			Class: class,
+		}
+		fullList = append(fullList, newInvestigator)
 	}
-	c.IndentedJSON(http.StatusNotFound, gin.H{"message": "investigator not found"})
+
+	return fullList
 }
 
-func ping(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"message": "pong",
-	})
+func addNewInvestigator(db *sql.DB, gator investigatorInput) (int, error) {
+	id := 0
+	err := db.QueryRow("INSERT INTO investigators (name,class) VALUES ($1,$2) RETURNING id",
+		gator.Name, gator.Class,
+	).Scan(&id)
+
+	if err != nil {
+		return id, err
+	}
+	return id, nil
+}
+
+func getInvestigatorByID(db *sql.DB, id string) ([]investigator, error) {
+
+	fullList := make([]investigator, 0)
+
+	rows, err := db.Query("SELECT * FROM investigators WHERE id = $1", id)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id string
+		var name string
+		var class string
+		if err := rows.Scan(&id, &name, &class); err != nil {
+			panic(err)
+		}
+		newInvestigator := investigator{
+			ID:    id,
+			Name:  name,
+			Class: class,
+		}
+
+		fullList = append(fullList, newInvestigator)
+	}
+	if err := rows.Err(); err != nil {
+		log.Fatal(err)
+		panic(err)
+	}
+
+	return fullList, nil
+
 }
 
 func main() {
@@ -101,28 +120,36 @@ func main() {
 	}
 	defer db.Close()
 
-	rows, err := db.Query("SELECT * FROM investigators")
-	if err != nil {
-		panic(err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var id int
-		var name string
-		var class string
-		if err := rows.Scan(&id, &name, &class); err != nil {
-			panic(err)
-		}
-		fmt.Printf("ID: %d, Name %s of class %s\n", id, name, class)
-	}
-
 	router := gin.Default()
-	router.GET("/investigators", getInvestigators)
-	router.GET("/investigators/:id", getInvestigatorByID)
-	router.POST("/investigators", addInvestigator)
 
-	router.GET("/ping", ping)
+	router.GET("/investigators", func(c *gin.Context) {
+		c.JSON(http.StatusOK, getAllInvestigators(db))
+	})
+
+	router.GET("/investigators/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		found, err := getInvestigatorByID(db, id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "dabbing illegal"})
+		}
+		c.JSON(http.StatusOK, found)
+	})
+
+	router.POST("/investigators", func(c *gin.Context) {
+
+		var newGatorDTO investigatorInput
+
+		if err := c.BindJSON(&newGatorDTO); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		result, err := addNewInvestigator(db, newGatorDTO)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err})
+		}
+		c.JSON(http.StatusCreated, result)
+
+	})
 
 	router.Run("localhost:8080")
 }
