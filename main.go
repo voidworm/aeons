@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"net/http"
@@ -31,11 +32,11 @@ curl http://localhost:8080/investigators/ \
     --data '{"id": "4","Name": "Roland Banks","Class": "Guardian"}'
 */
 
-func getAllInvestigators(db *sql.DB) ([]investigator, error) {
+func getAllInvestigators(ctx context.Context, db *sql.DB) ([]investigator, error) {
 
 	fullList := make([]investigator, 0)
 
-	rows, err := db.Query("SELECT * FROM investigators")
+	rows, err := db.QueryContext(ctx, "SELECT id, name, class FROM investigators")
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -49,11 +50,11 @@ func getAllInvestigators(db *sql.DB) ([]investigator, error) {
 	return fullList, nil
 }
 
-func getInvestigatorByID(db *sql.DB, id string) ([]investigator, error) {
+func getInvestigatorByID(ctx context.Context, db *sql.DB, id string) ([]investigator, error) {
 
 	fullList := make([]investigator, 0)
 
-	rows, err := db.Query("SELECT * FROM investigators WHERE id = $1", id)
+	rows, err := db.QueryContext(ctx, "SELECT id, name, class FROM investigators WHERE id = $1", id)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -95,9 +96,9 @@ func parseRowsToGatorList(rows *sql.Rows) ([]investigator, error) {
 	return fullList, nil
 }
 
-func addNewInvestigator(db *sql.DB, gator investigatorInput) (int, error) {
+func addNewInvestigator(ctx context.Context, db *sql.DB, gator investigatorInput) (int, error) {
 	id := 0
-	err := db.QueryRow("INSERT INTO investigators (name,class) VALUES ($1,$2) RETURNING id",
+	err := db.QueryRowContext(ctx, "INSERT INTO investigators (name,class) VALUES ($1,$2) RETURNING id",
 		gator.Name, gator.Class,
 	).Scan(&id)
 
@@ -124,10 +125,10 @@ func main() {
 
 	router.GET("/investigators", func(c *gin.Context) {
 
-		allGators, err := getAllInvestigators(db)
+		allGators, err := getAllInvestigators(c, db)
 		if err != nil {
 			log.Println(err)
-			c.JSON(http.StatusOK, allGators)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, allGators)
@@ -135,9 +136,10 @@ func main() {
 
 	router.GET("/investigators/:id", func(c *gin.Context) {
 		id := c.Param("id")
-		foundGators, err := getInvestigatorByID(db, id)
+		foundGators, err := getInvestigatorByID(c, db, id)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			log.Println(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, foundGators)
@@ -148,12 +150,13 @@ func main() {
 		var newGatorDTO investigatorInput
 
 		if err := c.BindJSON(&newGatorDTO); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			log.Println(err)
 			return
 		}
-		result, err := addNewInvestigator(db, newGatorDTO)
+		result, err := addNewInvestigator(c, db, newGatorDTO)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			log.Println(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusCreated, result)
