@@ -11,10 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func add(gator investigator) {
-	//some boilerplate
-}
-
 type investigator struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
@@ -35,33 +31,68 @@ curl http://localhost:8080/investigators/ \
     --data '{"id": "4","Name": "Roland Banks","Class": "Guardian"}'
 */
 
-func getAllInvestigators(db *sql.DB) []investigator {
+func getAllInvestigators(db *sql.DB) ([]investigator, error) {
 
 	fullList := make([]investigator, 0)
 
 	rows, err := db.Query("SELECT * FROM investigators")
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return nil, err
 	}
 	defer rows.Close()
+
+	if fullList, err = parseRowsToGatorList(rows); err != nil {
+		log.Println(err)
+		return fullList, err
+	}
+	return fullList, nil
+}
+
+func getInvestigatorByID(db *sql.DB, id string) ([]investigator, error) {
+
+	fullList := make([]investigator, 0)
+
+	rows, err := db.Query("SELECT * FROM investigators WHERE id = $1", id)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	if fullList, err = parseRowsToGatorList(rows); err != nil {
+		log.Println(err)
+		return fullList, err
+	}
+	return fullList, nil
+}
+
+func parseRowsToGatorList(rows *sql.Rows) ([]investigator, error) {
+
+	fullList := make([]investigator, 0)
 
 	for rows.Next() {
 		var id string
 		var name string
 		var class string
 		if err := rows.Scan(&id, &name, &class); err != nil {
-			panic(err)
+			log.Println(err)
+			return fullList, err
 		}
-
 		newInvestigator := investigator{
 			ID:    id,
 			Name:  name,
 			Class: class,
 		}
+
 		fullList = append(fullList, newInvestigator)
 	}
+	if err := rows.Err(); err != nil {
+		log.Println(err)
+		return nil, err
+	}
 
-	return fullList
+	return fullList, nil
 }
 
 func addNewInvestigator(db *sql.DB, gator investigatorInput) (int, error) {
@@ -76,63 +107,40 @@ func addNewInvestigator(db *sql.DB, gator investigatorInput) (int, error) {
 	return id, nil
 }
 
-func getInvestigatorByID(db *sql.DB, id string) ([]investigator, error) {
-
-	fullList := make([]investigator, 0)
-
-	rows, err := db.Query("SELECT * FROM investigators WHERE id = $1", id)
-	if err != nil {
-		log.Println(err)
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var id string
-		var name string
-		var class string
-		if err := rows.Scan(&id, &name, &class); err != nil {
-			panic(err)
-		}
-		newInvestigator := investigator{
-			ID:    id,
-			Name:  name,
-			Class: class,
-		}
-
-		fullList = append(fullList, newInvestigator)
-	}
-	if err := rows.Err(); err != nil {
-		log.Fatal(err)
-		panic(err)
-	}
-
-	return fullList, nil
-
-}
-
 func main() {
 
 	dbConnStr := "user=gouser dbname=aeons password=gopassword sslmode=disable"
 	db, err := sql.Open("postgres", dbConnStr)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		log.Fatal(err)
+	}
 
 	router := gin.Default()
 
 	router.GET("/investigators", func(c *gin.Context) {
-		c.JSON(http.StatusOK, getAllInvestigators(db))
+
+		allGators, err := getAllInvestigators(db)
+		if err != nil {
+			log.Println(err)
+			c.JSON(http.StatusOK, allGators)
+			return
+		}
+		c.JSON(http.StatusOK, allGators)
 	})
 
 	router.GET("/investigators/:id", func(c *gin.Context) {
 		id := c.Param("id")
-		found, err := getInvestigatorByID(db, id)
+		foundGators, err := getInvestigatorByID(db, id)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "dabbing illegal"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
 		}
-		c.JSON(http.StatusOK, found)
+		c.JSON(http.StatusOK, foundGators)
 	})
 
 	router.POST("/investigators", func(c *gin.Context) {
@@ -145,10 +153,10 @@ func main() {
 		}
 		result, err := addNewInvestigator(db, newGatorDTO)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
 		}
 		c.JSON(http.StatusCreated, result)
-
 	})
 
 	router.Run("localhost:8080")
