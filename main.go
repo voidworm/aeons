@@ -13,7 +13,7 @@ import (
 )
 
 type investigator struct {
-	ID    string `json:"id"`
+	ID    int    `json:"id"`
 	Name  string `json:"name"`
 	Class string `json:"class"`
 }
@@ -24,12 +24,10 @@ type investigatorInput struct {
 }
 
 /*
-Test: This should successfully add roland to the data
-curl http://localhost:8080/investigators/ \
-    --include \
-    --header "Content-Type: application/json" \
-    --request "POST" \
-    --data '{"id": "4","Name": "Roland Banks","Class": "Guardian"}'
+Test: This should successfully add akachi to the data
+curl -X POST localhost:8080/investigators \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Akachi Onyele", "class": "Mystic"}'
 */
 
 func getAllInvestigators(ctx context.Context, db *sql.DB) ([]investigator, error) {
@@ -73,7 +71,7 @@ func parseRowsToGatorList(rows *sql.Rows) ([]investigator, error) {
 	fullList := make([]investigator, 0)
 
 	for rows.Next() {
-		var id string
+		var id int
 		var name string
 		var class string
 		if err := rows.Scan(&id, &name, &class); err != nil {
