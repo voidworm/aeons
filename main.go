@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/lib/pq"
 
 	"github.com/gin-gonic/gin"
@@ -77,13 +76,11 @@ func getAllInvestigators(ctx context.Context, db *sql.DB) ([]investigator, error
 	`)
 
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
 	defer rows.Close()
 
 	if fullList, err = parseRowsToGatorList(rows); err != nil {
-		log.Println(err)
 		return fullList, err
 	}
 	return fullList, nil
@@ -102,7 +99,6 @@ func parseRowsToGatorList(rows *sql.Rows) ([]investigator, error) {
 		fullList = append(fullList, gator)
 	}
 	if err := rows.Err(); err != nil {
-		log.Println(err)
 		return nil, err
 	}
 
@@ -111,21 +107,20 @@ func parseRowsToGatorList(rows *sql.Rows) ([]investigator, error) {
 
 func parseRowToGator(rows *sql.Rows) (investigator, error) {
 
-	var gator_id int
-	var gator_name string
-	var class_id int
-	var class_name string
+	var gatorID int
+	var gatorName string
+	var classID int
+	var className string
 
-	if err := rows.Scan(&gator_id, &gator_name, &class_id, &class_name); err != nil {
-		log.Println(err)
+	if err := rows.Scan(&gatorID, &gatorName, &classID, &className); err != nil {
 		return investigator{}, err
 	}
 	newInvestigator := investigator{
-		ID:   gator_id,
-		Name: gator_name,
+		ID:   gatorID,
+		Name: gatorName,
 		Class: class{
-			ID:   class_id,
-			Name: class_name,
+			ID:   classID,
+			Name: className,
 		},
 	}
 
@@ -134,10 +129,10 @@ func parseRowToGator(rows *sql.Rows) (investigator, error) {
 
 func getInvestigatorByID(ctx context.Context, db *sql.DB, id string) (investigator, error) {
 
-	var investigator_id int
-	var investigator_name string
-	var class_id int
-	var class_name string
+	var investigatorID int
+	var investigatorName string
+	var classID int
+	var className string
 
 	err := db.QueryRowContext(
 		ctx, `
@@ -146,19 +141,18 @@ func getInvestigatorByID(ctx context.Context, db *sql.DB, id string) (investigat
 		JOIN classes c
 		ON i.investigator_class = c.class_id
 		WHERE i.investigator_id = $1`,
-		id).Scan(&investigator_id, &investigator_name, &class_id, &class_name)
+		id).Scan(&investigatorID, &investigatorName, &classID, &className)
 
 	if err != nil {
-		log.Println(err)
 		return investigator{}, err
 	}
 
 	return investigator{
-			ID:   investigator_id,
-			Name: investigator_name,
+			ID:   investigatorID,
+			Name: investigatorName,
 			Class: class{
-				ID:   class_id,
-				Name: class_name,
+				ID:   classID,
+				Name: className,
 			},
 		},
 		nil
@@ -219,6 +213,7 @@ func getIDForClassName(ctx context.Context, db *sql.DB, className string) (int, 
 	return id, nil
 
 }
+
 func populateDatabase(ctx context.Context, db *sql.DB) error {
 
 	err := populateClasses(ctx, db)
@@ -335,6 +330,7 @@ func main() {
 
 		if err := c.BindJSON(&newGatorDTO); err != nil {
 			log.Println(err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		result, err := addNewInvestigator(c, db, newGatorDTO)
