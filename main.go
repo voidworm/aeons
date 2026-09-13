@@ -14,7 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var populateDB = flag.Bool("populateDB", false, "set flag if you want to populate the db on a first run after db reset")
+var populateDB = flag.String("populateDB", "", "set flag all if you have an empty db, set flag gator if you only want gators, set flag classes if you only want classes")
 
 type class struct {
 	ID   int    `json:"id"`
@@ -56,6 +56,12 @@ type play struct {
 	Session            session      `json:"session"`
 	PlayedInvestigator investigator `json:"investigator"`
 	SelfPlayed         bool         `json:"self_played"`
+}
+
+var seedFuncs = map[string]func(context.Context, *sql.DB) error{
+	"all":     populateDatabase,
+	"gators":  populateInvestigators,
+	"classes": populateClasses,
 }
 
 func getAllInvestigators(ctx context.Context, db *sql.DB) ([]investigator, error) {
@@ -213,42 +219,62 @@ func getIDForClassName(ctx context.Context, db *sql.DB, className string) (int, 
 	return id, nil
 
 }
-func populateDatabase(db *sql.DB) error {
+func populateDatabase(ctx context.Context, db *sql.DB) error {
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	_, err := addClass(ctx, db, "Guardian")
-
-	if err != nil {
-		return err
-	}
-	addClass(ctx, db, "Seeker")
-	addClass(ctx, db, "Rogue")
-	addClass(ctx, db, "Mystic")
-	addClass(ctx, db, "Survivor")
-	addClass(ctx, db, "Neutral")
-
-	_, err = addNewInvestigator(ctx, db, investigatorInput{Name: "Roland Banks", Class: "Guardian"})
+	err := populateClasses(ctx, db)
 	if err != nil {
 		return err
 	}
 
-	addNewInvestigator(ctx, db, investigatorInput{Name: "Daisy Walkers", Class: "Seeker"})
-	addNewInvestigator(ctx, db, investigatorInput{Name: "Skids O'Toole", Class: "Rogue"})
-	addNewInvestigator(ctx, db, investigatorInput{Name: "Agnes Baker", Class: "Mystic"})
-	addNewInvestigator(ctx, db, investigatorInput{Name: "Wendy Adams", Class: "Survivor"})
-	addNewInvestigator(ctx, db, investigatorInput{Name: "Zoey Samras", Class: "Guardian"})
-	addNewInvestigator(ctx, db, investigatorInput{Name: "Rex Murphy", Class: "Seeker"})
-	addNewInvestigator(ctx, db, investigatorInput{Name: "Jenny Barnes", Class: "Rogue"})
-	addNewInvestigator(ctx, db, investigatorInput{Name: "Jim Culver", Class: "Mystic"})
-	addNewInvestigator(ctx, db, investigatorInput{Name: `"Ashcan" Pete`, Class: "Survivor"})
-	addNewInvestigator(ctx, db, investigatorInput{Name: "Mark Harrigan", Class: "Guardian"})
-	addNewInvestigator(ctx, db, investigatorInput{Name: "Minh Thi Phan ", Class: "Seeker"})
-	addNewInvestigator(ctx, db, investigatorInput{Name: "Sefina Rousseau", Class: "Rogue"})
-	addNewInvestigator(ctx, db, investigatorInput{Name: "Akachi Onyele", Class: "Mystic"})
-	addNewInvestigator(ctx, db, investigatorInput{Name: "William Yorick", Class: "Survivor"})
-	addNewInvestigator(ctx, db, investigatorInput{Name: "Lola Hayes", Class: "Neutral"})
+	err = populateInvestigators(ctx, db)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func populateInvestigators(ctx context.Context, db *sql.DB) error {
+
+	seedInvestigators := []investigatorInput{
+		{Name: "Roland Banks", Class: "Guardian"},
+		{Name: "Daisy Walkers", Class: "Seeker"},
+		{Name: "Skids O'Toole", Class: "Rogue"},
+		{Name: "Agnes Baker", Class: "Mystic"},
+		{Name: "Wendy Adams", Class: "Survivor"},
+		{Name: "Zoey Samras", Class: "Guardian"},
+		{Name: "Rex Murphy", Class: "Seeker"},
+		{Name: "Jenny Barnes", Class: "Rogue"},
+		{Name: "Jim Culver", Class: "Mystic"},
+		{Name: `"Ashcan" Pete`, Class: "Survivor"},
+		{Name: "Mark Harrigan", Class: "Guardian"},
+		{Name: "Minh Thi Phan ", Class: "Seeker"},
+		{Name: "Sefina Rousseau", Class: "Rogue"},
+		{Name: "Akachi Onyele", Class: "Mystic"},
+		{Name: "William Yorick", Class: "Survivor"},
+		{Name: "Lola Hayes", Class: "Neutral"},
+	}
+
+	for _, v := range seedInvestigators {
+		_, err := addNewInvestigator(ctx, db, v)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func populateClasses(ctx context.Context, db *sql.DB) error {
+
+	classes := [6]string{"Guardian", "Seeker", "Rogue", "Mystic", "Survivor", "Neutral"}
+
+	for _, v := range classes {
+		_, err := addClass(ctx, db, v)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -267,11 +293,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if *populateDB {
-		if err = populateDatabase(db); err != nil {
-			log.Fatal(err)
+	seedFunc, ok := seedFuncs[*populateDB]
+	if !ok {
+		log.Println("Empty or unknown seeding. Continuing without seeding.")
+	} else {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := seedFunc(ctx, db); err != nil {
+			log.Print(err)
+			return
 		}
-
 	}
 
 	router := gin.Default()
