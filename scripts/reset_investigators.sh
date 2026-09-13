@@ -19,13 +19,13 @@ DROP TABLE IF EXISTS investigators;
 DROP TABLE IF EXISTS classes;
 
 CREATE TABLE classes (
-    class_id SERIAL PRIMARY KEY,
-    class_name TEXT NOT NULL
+    class_id    SERIAL PRIMARY KEY,
+    class_name  TEXT NOT NULL
 );
 
 CREATE TABLE campaigns (
-    campaign_id      SERIAL PRIMARY KEY,
-    campaign_name	 TEXT NOT NULL
+    campaign_id     SERIAL PRIMARY KEY,
+    campaign_name   TEXT NOT NULL
 );
 
 CREATE TABLE investigators (
@@ -54,7 +54,11 @@ CREATE TABLE plays (
     play_self_played    BOOLEAN DEFAULT TRUE
 );
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO gouser;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO gouser;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT USAGE, SELECT ON SEQUENCES TO gouser;
 
 COMMIT;
 SQL
