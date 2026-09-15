@@ -111,7 +111,11 @@ type EnemyEntity struct {
 	Damage int
 }
 
-type PlayerEntity struct {
+/*func (ee *EnemyEntity) GenerateMoveGoal() *LocationEntity {
+
+}*/
+
+type PlayerCharacterEntity struct {
 	MovingEntity
 	HealthPoolEntity
 	ID                 int
@@ -120,36 +124,52 @@ type PlayerEntity struct {
 	ResourcesAvailable int
 }
 
-func (pe *PlayerEntity) GenerateMoveGoal() *LocationEntity {
+type PlayerTurn struct {
+	ActionsRemaining         int
+	ReferencePlayerCharacter *PlayerCharacterEntity
+}
+
+func (pe *PlayerCharacterEntity) GenerateMoveGoal() *LocationEntity {
 	return pe.PromptMoveTargetSelection()
 }
 
 type GameState struct {
-	Locations []*LocationEntity
-	Players   []*PlayerEntity
-	Enemies   []*EnemyEntity
+	Locations   []*LocationEntity
+	Players     []*PlayerCharacterEntity
+	Enemies     []*EnemyEntity
+	PlayerTurns []*PlayerTurn
+	TurnCounter int
 }
 
-func presentPlayerSelect(gs *GameState) (*PlayerEntity, error) {
-	activeArray := []string{}
-	for _, v := range gs.Players {
-		activeArray = append(activeArray, fmt.Sprintf("%s (currently at %s)", v.Name, v.Location.Name))
+func (gs *GameState) PollNextTurn() (*PlayerTurn, error) {
+
+	selectable := []*PlayerTurn{}
+	for _, v := range gs.PlayerTurns {
+		if v.ActionsRemaining > 0 {
+			selectable = append(selectable, v)
+		}
 	}
 
+	activeArray := []string{}
+	for _, v := range selectable {
+		activeArray = append(activeArray, fmt.Sprintf("%s (currently at %s)", v.ReferencePlayerCharacter.Name, v.ReferencePlayerCharacter.Location.Name))
+	}
 	prompt := promptui.Select{
 		Label: ">>> --- Choose a player to act --- <<<",
 		Items: activeArray,
 	}
-	position, _, err := prompt.Run()
 
+	position, _, err := prompt.Run()
 	if err != nil {
-		return &PlayerEntity{}, err
+		return &PlayerTurn{}, err
 	} else {
-		return gs.Players[position], nil
+		nextTurn := selectable[position]
+		nextTurn.ActionsRemaining -= 1
+		return selectable[position], nil
 	}
 }
 
-func presentActionSelect(player string) (string, error) {
+func (gs *GameState) PollNextAction(player string) (string, error) {
 	activeArray := []string{"Move", "Draw", "Resource", "Attack", "Evade"}
 	label := fmt.Sprintf("<<< --- What will %s do? --- >>> ", player)
 
@@ -166,6 +186,76 @@ func presentActionSelect(player string) (string, error) {
 	}
 }
 
+func (gs *GameState) PlayerHaveActionsRemaining() bool {
+	for _, v := range gs.PlayerTurns {
+		if v.ActionsRemaining > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func (gs *GameState) ResolvePlayerPhaseStep(running *bool) {
+	playerToAct, err := gs.PollNextTurn()
+	if err != nil {
+		log.Println(err)
+		*running = false
+	}
+	fmt.Printf("%s selected to act!\n", playerToAct.ReferencePlayerCharacter.Name)
+
+	action, err := gs.PollNextAction(playerToAct.ReferencePlayerCharacter.Name)
+	if err != nil {
+		log.Println(err)
+		*running = false
+	}
+
+	fmt.Printf("%s will perform a %s action.\n", playerToAct.ReferencePlayerCharacter.Name, action)
+
+	switch action {
+	case "Move":
+		moveeffectctx := &MoveEffectContext{playerToAct.ReferencePlayerCharacter, 1}
+		moveeff := MoveEffect{moveeffectctx}
+		moveeff.Apply()
+	default:
+		fmt.Println("Targeted unimplemented action")
+	}
+}
+
+func (gs *GameState) ResolveEnemyPhase(running *bool) {
+	for _, v := range gs.Enemies {
+		gs.ResolveEnemyMovement(running, v)
+		gs.ResolveEnemyAttacks(running, v)
+	}
+}
+
+func (gs *GameState) ResolveEnemyMovement(running *bool, enemy *EnemyEntity) {
+	if enemy.Hunter {
+
+		moveeffectctx := &MoveEffectContext{enemy, 1}
+		moveeff := MoveEffect{moveeffectctx}
+		moveeff.Apply()
+		log.Printf("%s is hunter and moved to %s", enemy.Name, enemy.Location.Name)
+	} else {
+		log.Printf("%s is not a hunger and does not move.", enemy.Name)
+	}
+}
+
+func (gs *GameState) ResolveEnemyAttacks(running *bool, enemy *EnemyEntity) {
+	if !enemy.Aloof {
+		log.Printf("%s would attack now, but attacking isn't implemented yet.", enemy.Name)
+	} else {
+		log.Printf("%s is aloof and doesn't attack.", enemy.Name)
+	}
+}
+
+func (gs *GameState) StartNewTurn(running *bool) {
+	for _, v := range gs.PlayerTurns {
+		v.ActionsRemaining = 3
+	}
+	gs.TurnCounter += 1
+
+}
+
 func main() {
 
 	gs := &GameState{}
@@ -173,39 +263,21 @@ func main() {
 	running := true
 
 	for running {
-
-		playerToAct, err := presentPlayerSelect(gs)
-		if err != nil {
-			log.Println(err)
-			running = false
-			continue
-		}
-		fmt.Printf("%s selected to act!\n", playerToAct.Name)
-
-		action, err := presentActionSelect(playerToAct.Name)
-		if err != nil {
-			log.Println(err)
-			running = false
-			continue
+		log.Printf("Starting Turn %d", gs.TurnCounter)
+		for gs.PlayerHaveActionsRemaining() {
+			gs.ResolvePlayerPhaseStep(&running)
 		}
 
-		fmt.Printf("%s will perform a %s action.\n", playerToAct.Name, action)
-
-		switch action {
-		case "Move":
-			moveeffectctx := &MoveEffectContext{playerToAct, 1}
-			moveeff := MoveEffect{moveeffectctx}
-			moveeff.Apply()
-		default:
-			fmt.Println("Targeted unimplemented action")
-		}
-
+		gs.ResolveEnemyPhase(&running)
+		gs.StartNewTurn(&running)
 	}
 }
 
 func setupBasicLevel(gs *GameState) {
+
 	setupBasicLocations(gs)
 	setupBasicPlayers(gs)
+	setupBasicPlayerTurns(gs)
 	setupBasicEnemy(gs)
 }
 
@@ -234,7 +306,7 @@ func setupBasicLocations(gs *GameState) {
 
 func setupBasicPlayers(gs *GameState) {
 	log.Println("Setting up Jim...")
-	Jim := &PlayerEntity{
+	Jim := &PlayerCharacterEntity{
 		MovingEntity:       MovingEntity{Location: gs.Locations[0]},
 		HealthPoolEntity:   HealthPoolEntity{CurrentHealth: 10, MaxHealth: 10},
 		ID:                 1,
@@ -244,7 +316,7 @@ func setupBasicPlayers(gs *GameState) {
 	}
 
 	log.Println("Setting up Ivy...")
-	Ivy := &PlayerEntity{
+	Ivy := &PlayerCharacterEntity{
 		MovingEntity:       MovingEntity{Location: gs.Locations[0]},
 		HealthPoolEntity:   HealthPoolEntity{CurrentHealth: 8, MaxHealth: 8},
 		ID:                 1,
@@ -254,6 +326,13 @@ func setupBasicPlayers(gs *GameState) {
 	}
 
 	gs.Players = append(gs.Players, Jim, Ivy)
+}
+
+func setupBasicPlayerTurns(gs *GameState) {
+	for _, v := range gs.Players {
+		playerTurn := PlayerTurn{ActionsRemaining: 3, ReferencePlayerCharacter: v}
+		gs.PlayerTurns = append(gs.PlayerTurns, &playerTurn)
+	}
 }
 
 func setupBasicEnemy(gs *GameState) {
