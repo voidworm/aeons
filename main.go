@@ -6,24 +6,6 @@ import (
 	"math/rand/v2"
 )
 
-type LocationEntity struct {
-	ID                  int
-	Name                string
-	OutgoingConnections []*LocationEntity
-}
-
-type EnemyEntity struct {
-	Movable
-	ID     int
-	Name   string
-	Aloof  bool
-	Hunter bool
-	Damage int
-	Horror int
-	Health int
-	Sanity int
-}
-
 type Movable struct {
 	Location *LocationEntity
 }
@@ -41,6 +23,26 @@ type CanMove interface {
 	MoveTo(*LocationEntity)
 }
 
+type Damageable struct {
+	CurrentHealth int
+	MaxHealth     int
+}
+
+type CanBeDamaged interface {
+	TakeDamage(int) int
+	HealDamage(int) int
+}
+
+func (d *Damageable) TakeDamage(amount int) int {
+	d.CurrentHealth = max(d.CurrentHealth-amount, 0)
+	return d.CurrentHealth
+}
+
+func (d *Damageable) HealDamage(amount int) int {
+	d.CurrentHealth = min(d.CurrentHealth+amount, d.MaxHealth)
+	return d.CurrentHealth
+}
+
 type StaticObject struct {
 	ID   int
 	Name string
@@ -52,14 +54,29 @@ type MovingObject struct {
 	Name string
 }
 
+type LocationEntity struct {
+	ID                  int
+	Name                string
+	OutgoingConnections []*LocationEntity
+}
+
+type EnemyEntity struct {
+	Movable
+	Damageable
+	ID     int
+	Name   string
+	Aloof  bool
+	Hunter bool
+	Damage int
+}
+
 type PlayerEntity struct {
 	Movable
+	Damageable
 	ID                 int
 	Name               string
 	CardsInHand        int
 	ResourcesAvailable int
-	Health             int
-	Sanity             int
 }
 
 type AttachableEntity struct {
@@ -88,7 +105,49 @@ func (e *DealDamageToPlayerEffect) Apply(ectx *EffectContext) error {
 		return fmt.Errorf("TargetPlayer is required but was nil")
 	}
 
-	ectx.TargetPlayer.Health -= e.Damage
+	ectx.TargetPlayer.Damageable.TakeDamage(e.Damage)
+	return nil
+}
+
+type HealDamageOnPlayerEffect struct {
+	Amount int
+}
+
+func (e *HealDamageOnPlayerEffect) Apply(ectx *EffectContext) error {
+
+	if ectx.TargetPlayer == nil {
+		return fmt.Errorf("TargetPlayer is required but was nil")
+	}
+
+	ectx.TargetPlayer.Damageable.HealDamage(e.Amount)
+	return nil
+}
+
+type DealDamageToEnemyEffect struct {
+	Damage int
+}
+
+func (e *DealDamageToEnemyEffect) Apply(ectx *EffectContext) error {
+
+	if ectx.TargetEnemy == nil {
+		return fmt.Errorf("TargetEnemy is required but was nil")
+	}
+
+	ectx.TargetEnemy.Damageable.TakeDamage(e.Damage)
+	return nil
+}
+
+type HealDamageOnEnemyEffect struct {
+	Amount int
+}
+
+func (e *HealDamageOnEnemyEffect) Apply(ectx *EffectContext) error {
+
+	if ectx.TargetEnemy == nil {
+		return fmt.Errorf("TargetEnemy is required but was nil")
+	}
+
+	ectx.TargetEnemy.Damageable.HealDamage(e.Amount)
 	return nil
 }
 
@@ -100,9 +159,6 @@ func (e *MovePlayerEffect) Apply(ectx *EffectContext) error {
 	if ectx.TargetPlayer == nil {
 		return fmt.Errorf("TargetPlayer is required but was nil")
 	}
-
-	log.Printf("Will move %s %v times, starting in %s", ectx.TargetPlayer.Name, e.MoveAmount, ectx.TargetPlayer.Location.Name)
-
 	for i := 0; i < e.MoveAmount; i++ {
 
 		targets := ectx.TargetPlayer.PossibleMoveTargets()
@@ -110,7 +166,7 @@ func (e *MovePlayerEffect) Apply(ectx *EffectContext) error {
 		winner := AskPlayerForTargetSelection(targets)
 
 		ectx.TargetPlayer.MoveTo(winner)
-		log.Printf("Have moved player %s to location %s \n", ectx.TargetPlayer.Name, winner.Name)
+		log.Printf("%s has moved to %s \n", ectx.TargetPlayer.Name, winner.Name)
 
 	}
 	return nil
@@ -125,8 +181,6 @@ func (e *MoveEnemyEffect) Apply(ectx *EffectContext) error {
 		return fmt.Errorf("TarGET ENEMY is required but was nil")
 	}
 
-	log.Printf("Will move %s %v times, starting in %s", ectx.TargetEnemy.Name, e.MoveAmount, ectx.TargetEnemy.Location.Name)
-
 	for i := 0; i < e.MoveAmount; i++ {
 
 		targets := ectx.TargetEnemy.PossibleMoveTargets()
@@ -134,7 +188,7 @@ func (e *MoveEnemyEffect) Apply(ectx *EffectContext) error {
 		winner := AskPlayerForTargetSelection(targets)
 
 		ectx.TargetEnemy.MoveTo(winner)
-		log.Printf("Have moved enemy %s to location %s \n", ectx.TargetEnemy.Name, winner.Name)
+		log.Printf("%s has moved to %s \n", ectx.TargetEnemy.Name, winner.Name)
 
 	}
 	return nil
@@ -142,22 +196,7 @@ func (e *MoveEnemyEffect) Apply(ectx *EffectContext) error {
 
 func AskPlayerForTargetSelection(in []*LocationEntity) *LocationEntity {
 	winner := in[rand.IntN(len(in))]
-	log.Printf("Will move to location %s", winner.Name)
 	return winner
-}
-
-type DealDamageToEnemyEffect struct {
-	Damage int
-}
-
-func (e *DealDamageToEnemyEffect) Apply(ectx *EffectContext) error {
-
-	if ectx.TargetEnemy == nil {
-		return fmt.Errorf("TargetPlayer is required but was nil")
-	}
-
-	ectx.TargetEnemy.Health -= e.Damage
-	return nil
 }
 
 func main() {
@@ -183,36 +222,32 @@ func main() {
 	log.Println("Setting up Jim...")
 	jim := PlayerEntity{
 		Movable:            Movable{Location: Porch},
+		Damageable:         Damageable{CurrentHealth: 10, MaxHealth: 10},
 		ID:                 1,
 		Name:               "Jim Gordon",
 		CardsInHand:        7,
 		ResourcesAvailable: 5,
-		Health:             10,
-		Sanity:             7,
 	}
 
 	log.Println("Setting up Ivy...")
 	ivy := PlayerEntity{
 		Movable:            Movable{Location: Porch},
+		Damageable:         Damageable{CurrentHealth: 8, MaxHealth: 8},
 		ID:                 1,
 		Name:               "Poison Ivy",
 		CardsInHand:        7,
 		ResourcesAvailable: 5,
-		Health:             8,
-		Sanity:             9,
 	}
 
 	log.Println("Setting up Ghoul...")
 	ghoul := EnemyEntity{
-		Movable: Movable{Location: Attic},
-		ID:      1,
-		Name:    "Noxious Ghoul",
-		Aloof:   true,
-		Hunter:  true,
-		Damage:  1,
-		Horror:  1,
-		Health:  3,
-		Sanity:  2,
+		Movable:    Movable{Location: Attic},
+		Damageable: Damageable{CurrentHealth: 5, MaxHealth: 5},
+		ID:         1,
+		Name:       "Noxious Ghoul",
+		Aloof:      true,
+		Hunter:     true,
+		Damage:     1,
 	}
 
 	ectx := &EffectContext{
@@ -245,13 +280,47 @@ func main() {
 		log.Print("Ghoul laufen macht Krise")
 	}
 
-	if jim.Location.Name == ivy.Location.Name {
-		log.Printf("Hey, Jim and Ivy have met in %s!\n", jim.Location.Name)
-	}
 	if jim.Location.Name == ghoul.Location.Name {
-		log.Printf("Oh dear, Jim and and the Ghoul both are in %s!\n", jim.Location.Name)
+
+		ectx.TargetPlayer = &jim
+
+		log.Printf("%s and and %s both are in %s!\n", jim.Name, ghoul.Name, jim.Location.Name)
+		log.Printf("%s will deal %v damage to Jim.\n", ghoul.Name, ghoul.Damage)
+		ddtp := DealDamageToPlayerEffect{
+			Damage: ghoul.Damage,
+		}
+		ddtp.Apply(ectx)
+		log.Printf("%s's health dropped to %v\n", jim.Name, jim.CurrentHealth)
+		log.Println("<< --------------------------------------- >>")
 	}
 	if ivy.Location.Name == ghoul.Location.Name {
-		log.Printf("Oh dear, Ivy and and the Ghoul both are in %s!\n", jim.Location.Name)
+
+		ectx.TargetPlayer = &ivy
+
+		log.Printf("%s and and %s both are in %s!\n", ivy.Name, ghoul.Name, ivy.Location.Name)
+		log.Printf("%s will deal %v damage to %s.\n", ghoul.Name, ghoul.Damage, ivy.Name)
+		ddtp := DealDamageToPlayerEffect{
+			Damage: ghoul.Damage,
+		}
+		ddtp.Apply(ectx)
+		log.Printf("Ivy's health dropped to %v\n", ivy.CurrentHealth)
+		log.Println("<< --------------------------------------- >>")
+	}
+
+	if jim.Location.Name == ivy.Location.Name {
+		log.Printf("Hey, Jim and Ivy have met in %s!\n", jim.Location.Name)
+		log.Println("They both heal a damage.")
+
+		ectx.TargetPlayer = &jim
+		ddtp := HealDamageOnPlayerEffect{
+			Amount: 1,
+		}
+		ddtp.Apply(ectx)
+		log.Printf("Jim's health healed up to %v\n", jim.CurrentHealth)
+
+		ectx.TargetPlayer = &ivy
+		ddtp.Apply(ectx)
+		log.Printf("Ivy's health healed up to %v\n", ivy.CurrentHealth)
+		log.Println("<< --------------------------------------- >>")
 	}
 }
