@@ -1,10 +1,15 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"math/rand/v2"
+
+	"github.com/manifoldco/promptui"
 )
+
+var runHelper = flag.Bool("runhelper", false, "Set to run the default debug loop without user input")
 
 type Movable struct {
 	Location *LocationEntity
@@ -77,6 +82,15 @@ type PlayerEntity struct {
 	Name               string
 	CardsInHand        int
 	ResourcesAvailable int
+}
+
+type GameState struct {
+	Locations    []*LocationEntity
+	Players      []*PlayerEntity
+	Attached     []*AttachableEntity
+	Enemies      []*EnemyEntity
+	MovingObject []*MovingObject
+	StaticObject []*StaticObject
 }
 
 type AttachableEntity struct {
@@ -199,7 +213,144 @@ func AskPlayerForTargetSelection(in []*LocationEntity) *LocationEntity {
 	return winner
 }
 
+func presentPlayerSelect(gs *GameState) (*PlayerEntity, error) {
+	activeArray := []string{}
+	for _, v := range gs.Players {
+		activeArray = append(activeArray, fmt.Sprintf("%s (currently at %s)", v.Name, v.Location.Name))
+	}
+
+	prompt := promptui.Select{
+		Label: ">>> --- Choose a player to act --- <<<",
+		Items: activeArray,
+	}
+	position, _, err := prompt.Run()
+
+	if err != nil {
+		return &PlayerEntity{}, err
+	} else {
+		return gs.Players[position], nil
+	}
+}
+func presentActionSelect(player string) (string, error) {
+	activeArray := []string{"Move", "Draw", "Resource", "Attack", "Evade"}
+	label := fmt.Sprintf("<<< --- What will %s do? --- >>> ", player)
+
+	prompt := promptui.Select{
+		Label: label,
+		Items: activeArray,
+	}
+	_, action, err := prompt.Run()
+
+	if err != nil {
+		return "", err
+	} else {
+		return action, nil
+	}
+}
+
 func main() {
+	flag.Parse()
+	if *runHelper {
+		helper()
+		return
+	}
+
+	gs := &GameState{}
+	setupBasicLevel(gs)
+	running := true
+
+	for running {
+
+		playerToAct, err := presentPlayerSelect(gs)
+		if err != nil {
+			log.Println(err)
+			running = false
+			continue
+		}
+		fmt.Printf("%s selected to act!\n", playerToAct.Name)
+
+		action, err := presentActionSelect(playerToAct.Name)
+		if err != nil {
+			log.Println(err)
+			running = false
+			continue
+		}
+
+		fmt.Printf("%s will perform a %s action.\n", playerToAct.Name, action)
+
+	}
+}
+
+func setupBasicLevel(gs *GameState) {
+	setupBasicLocations(gs)
+	setupBasicPlayers(gs)
+	setupBasicEnemy(gs)
+}
+
+func setupBasicLocations(gs *GameState) {
+
+	log.Println("Setting up Locations...")
+	Porch := &LocationEntity{ID: 1, Name: "Porch"}
+	DownstairsHallway := &LocationEntity{ID: 1, Name: "Downstairs Hallway"}
+	Kitchen := &LocationEntity{ID: 1, Name: "Kitchen"}
+	LivingRoom := &LocationEntity{ID: 1, Name: "Living Room"}
+	UpstairsHallway := &LocationEntity{ID: 1, Name: "Upstairs Hallway"}
+	SleepingRoom := &LocationEntity{ID: 1, Name: "Sleeping Room"}
+	Attic := &LocationEntity{ID: 1, Name: "Attic"}
+
+	log.Println("Setting up Locations linking...")
+	Porch.OutgoingConnections = append(Porch.OutgoingConnections, DownstairsHallway)
+	DownstairsHallway.OutgoingConnections = append(DownstairsHallway.OutgoingConnections, Porch, Kitchen, LivingRoom, UpstairsHallway)
+	Kitchen.OutgoingConnections = append(Kitchen.OutgoingConnections, DownstairsHallway, LivingRoom)
+	LivingRoom.OutgoingConnections = append(LivingRoom.OutgoingConnections, DownstairsHallway, Kitchen)
+	UpstairsHallway.OutgoingConnections = append(UpstairsHallway.OutgoingConnections, DownstairsHallway, SleepingRoom, Attic)
+	SleepingRoom.OutgoingConnections = append(SleepingRoom.OutgoingConnections, UpstairsHallway, Porch)
+	Attic.OutgoingConnections = append(Attic.OutgoingConnections, UpstairsHallway)
+
+	gs.Locations = append(gs.Locations, Porch, DownstairsHallway, Kitchen, LivingRoom, UpstairsHallway, SleepingRoom, Attic)
+}
+
+func setupBasicPlayers(gs *GameState) {
+	log.Println("Setting up Jim...")
+	Jim := &PlayerEntity{
+		Movable:            Movable{Location: gs.Locations[0]},
+		Damageable:         Damageable{CurrentHealth: 10, MaxHealth: 10},
+		ID:                 1,
+		Name:               "Jim Gordon",
+		CardsInHand:        7,
+		ResourcesAvailable: 5,
+	}
+
+	log.Println("Setting up Ivy...")
+	Ivy := &PlayerEntity{
+		Movable:            Movable{Location: gs.Locations[0]},
+		Damageable:         Damageable{CurrentHealth: 8, MaxHealth: 8},
+		ID:                 1,
+		Name:               "Poison Ivy",
+		CardsInHand:        7,
+		ResourcesAvailable: 5,
+	}
+
+	gs.Players = append(gs.Players, Jim, Ivy)
+}
+
+func setupBasicEnemy(gs *GameState) {
+
+	log.Println("Setting up Ghoul...")
+	ghoul := &EnemyEntity{
+		Movable:    Movable{Location: gs.Locations[len(gs.Locations)-1]},
+		Damageable: Damageable{CurrentHealth: 5, MaxHealth: 5},
+		ID:         1,
+		Name:       "Noxious Ghoul",
+		Aloof:      true,
+		Hunter:     true,
+		Damage:     1,
+	}
+
+	gs.Enemies = append(gs.Enemies, ghoul)
+}
+
+func helper() {
 
 	log.Println("Setting up Locations...")
 	Porch := &LocationEntity{ID: 1, Name: "Porch"}
