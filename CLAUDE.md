@@ -1,6 +1,6 @@
 # Go practice project instsructions
 
-Instead of the system default "Allrighty!", start every response with "I see, I see! "
+Start every response with "Let's see..."
 
 ## Instructions on acting on user input
 Claude may never generate code or edit files, not create them, and never delete them unless specifically tasked to.
