@@ -1,10 +1,13 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"math/rand/v2"
+	"slices"
 
 	"github.com/manifoldco/promptui"
 )
@@ -17,9 +20,18 @@ type MovingEntity struct {
 
 type Movable interface {
 	GenerateMoveGoal() *LocationEntity
+	MoveStepsTowards(*LocationEntity) ([]string, error)
 	PossibleMoveTargets() []*LocationEntity
 	PromptMoveTargetSelection() *LocationEntity
 	MoveTo(*LocationEntity)
+}
+
+func (me *MovingEntity) MoveStepsTowards(target *LocationEntity) ([]string, error) {
+	path, err := me.Location.getShortestPathTo(target)
+	if err != nil {
+		return []string{}, err
+	}
+	return path, nil
 }
 
 func (me *MovingEntity) GenerateMoveGoal() *LocationEntity {
@@ -101,6 +113,58 @@ type LocationEntity struct {
 	OutgoingConnections []*LocationEntity
 }
 
+func (le *LocationEntity) getShortestPathTo(target *LocationEntity) ([]string, error) {
+
+	//stuff we need to check
+	queue := []*LocationEntity{le}
+
+	//stuff we have checked
+	visited := []*LocationEntity{le}
+
+	//the parents we took
+	parents := make(map[string]string)
+
+	found := false
+
+	for len(queue) != 0 {
+		current := queue[0]
+		queue = queue[1:]
+		if current.Name == target.Name {
+			found = true
+			break
+		}
+		for _, v := range current.OutgoingConnections {
+			alreadyVisited := slices.ContainsFunc(visited, func(location *LocationEntity) bool {
+				return location.Name == v.Name
+			})
+			if !alreadyVisited {
+				visited = append(visited, v)
+				queue = append(queue, v)
+				parents[v.Name] = current.Name
+			}
+		}
+	}
+
+	if found {
+		fmt.Println(parents)
+		path := []string{target.Name}
+		currentChild := target.Name
+		for {
+			parent := parents[currentChild]
+			if parent == "" {
+				break
+			}
+			path = append(path, parent)
+			currentChild = parent
+		}
+		slices.Reverse(path)
+		return path, nil
+	}
+
+	//since maps should be a graph this should never happen but you never know
+	return []string{}, errors.New("Locations are not connected")
+}
+
 type EnemyEntity struct {
 	MovingEntity
 	HealthPoolEntity
@@ -111,9 +175,41 @@ type EnemyEntity struct {
 	Damage int
 }
 
-/*func (ee *EnemyEntity) GenerateMoveGoal() *LocationEntity {
+func (ee *EnemyEntity) GenerateMoveGoal() *LocationEntity {
 
-}*/
+	return nil
+}
+
+func (ee *EnemyEntity) determineHuntingTarget(players []*PlayerCharacterEntity) (*PlayerCharacterEntity, []string) {
+	CurrentTargets := []*PlayerCharacterEntity{}
+	CurrentSteps := [][]string{}
+	CurrentMinDistance := math.MaxInt
+
+	for _, v := range players {
+		steps, err := ee.Location.getShortestPathTo(v.Location)
+		if err != nil {
+			log.Println(err)
+		}
+
+		if len(steps) == CurrentMinDistance {
+			CurrentTargets = append(CurrentTargets, v)
+			CurrentSteps = append(CurrentSteps, steps)
+		}
+
+		if len(steps) < CurrentMinDistance {
+			CurrentMinDistance = len(steps)
+			CurrentTargets = []*PlayerCharacterEntity{v}
+			CurrentSteps = [][]string{steps}
+		}
+	}
+
+	n := rand.IntN(len(CurrentTargets))
+	finalTarget := CurrentTargets[n]
+	finalSteps := CurrentSteps[n]
+	log.Println(finalSteps)
+	log.Println("ENDING DetermineHUntingTarget")
+	return finalTarget, finalSteps
+}
 
 type PlayerCharacterEntity struct {
 	MovingEntity
@@ -139,6 +235,17 @@ type GameState struct {
 	Enemies     []*EnemyEntity
 	PlayerTurns []*PlayerTurn
 	TurnCounter int
+}
+
+func (gs *GameState) GetLocationByName(name string) *LocationEntity {
+	//assumes locations are named uniquely!
+	for _, v := range gs.Locations {
+		if v.Name == name {
+			return v
+		}
+	}
+
+	return &LocationEntity{}
 }
 
 func (gs *GameState) PollNextTurn() (*PlayerTurn, error) {
@@ -229,14 +336,26 @@ func (gs *GameState) ResolveEnemyPhase(running *bool) {
 }
 
 func (gs *GameState) ResolveEnemyMovement(running *bool, enemy *EnemyEntity) {
+
 	if enemy.Hunter {
 
-		moveeffectctx := &MoveEffectContext{enemy, 1}
-		moveeff := MoveEffect{moveeffectctx}
-		moveeff.Apply()
-		log.Printf("%s is hunter and moved to %s", enemy.Name, enemy.Location.Name)
+		target, steps := enemy.determineHuntingTarget(gs.Players)
+
+		if len(steps) == 1 {
+			log.Printf("%s is already at its prey location and does not need to move.\n", enemy.Name)
+		} else {
+
+			for i, v := range steps {
+				log.Printf("[%d] = %v\n", i, v)
+			}
+
+			targetLocation := gs.GetLocationByName(steps[1])
+			enemy.MoveTo(targetLocation)
+			log.Printf("%s has %s as target and will move to %s to hunt its prey.\n", enemy.Name, target.Name, steps[1])
+		}
+
 	} else {
-		log.Printf("%s is not a hunger and does not move.", enemy.Name)
+		log.Printf("%s is not a hunter and does not move.", enemy.Name)
 	}
 }
 
@@ -250,15 +369,14 @@ func (gs *GameState) ResolveEnemyAttacks(running *bool, enemy *EnemyEntity) {
 
 func (gs *GameState) StartNewTurn(running *bool) {
 	for _, v := range gs.PlayerTurns {
-		v.ActionsRemaining = 3
+		v.ActionsRemaining = 1
 	}
 	gs.TurnCounter += 1
-
 }
 
 func main() {
 
-	gs := &GameState{}
+	gs := &GameState{TurnCounter: 1}
 	setupBasicLevel(gs)
 	running := true
 
@@ -330,7 +448,7 @@ func setupBasicPlayers(gs *GameState) {
 
 func setupBasicPlayerTurns(gs *GameState) {
 	for _, v := range gs.Players {
-		playerTurn := PlayerTurn{ActionsRemaining: 3, ReferencePlayerCharacter: v}
+		playerTurn := PlayerTurn{ActionsRemaining: 1, ReferencePlayerCharacter: v}
 		gs.PlayerTurns = append(gs.PlayerTurns, &playerTurn)
 	}
 }
@@ -348,5 +466,16 @@ func setupBasicEnemy(gs *GameState) {
 		Damage:           1,
 	}
 
-	gs.Enemies = append(gs.Enemies, ghoul)
+	log.Println("Setting up Rat...")
+	rat := &EnemyEntity{
+		MovingEntity:     MovingEntity{Location: gs.Locations[len(gs.Locations)-2]},
+		HealthPoolEntity: HealthPoolEntity{CurrentHealth: 2, MaxHealth: 2},
+		ID:               1,
+		Name:             "Chittering Rat",
+		Aloof:            false,
+		Hunter:           true,
+		Damage:           1,
+	}
+
+	gs.Enemies = append(gs.Enemies, ghoul, rat)
 }
