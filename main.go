@@ -13,15 +13,15 @@ type LocationEntity struct {
 }
 
 type EnemyEntity struct {
-	ID         int
-	Name       string
-	AtLocation *LocationEntity
-	Aloof      bool
-	Hunter     bool
-	Damage     int
-	Horror     int
-	Health     int
-	Sanity     int
+	Movable
+	ID     int
+	Name   string
+	Aloof  bool
+	Hunter bool
+	Damage int
+	Horror int
+	Health int
+	Sanity int
 }
 
 type Movable struct {
@@ -116,6 +116,30 @@ func (e *MovePlayerEffect) Apply(ectx *EffectContext) error {
 	return nil
 }
 
+type MoveEnemyEffect struct {
+	MoveAmount int
+}
+
+func (e *MoveEnemyEffect) Apply(ectx *EffectContext) error {
+	if ectx.TargetEnemy == nil {
+		return fmt.Errorf("TarGET ENEMY is required but was nil")
+	}
+
+	log.Printf("Will move %s %v times, starting in %s", ectx.TargetEnemy.Name, e.MoveAmount, ectx.TargetEnemy.Location.Name)
+
+	for i := 0; i < e.MoveAmount; i++ {
+
+		targets := ectx.TargetEnemy.PossibleMoveTargets()
+		//simulate hunting determination
+		winner := AskPlayerForTargetSelection(targets)
+
+		ectx.TargetEnemy.MoveTo(winner)
+		log.Printf("Have moved enemy %s to location %s \n", ectx.TargetEnemy.Name, winner.Name)
+
+	}
+	return nil
+}
+
 func AskPlayerForTargetSelection(in []*LocationEntity) *LocationEntity {
 	winner := in[rand.IntN(len(in))]
 	log.Printf("Will move to location %s", winner.Name)
@@ -178,8 +202,22 @@ func main() {
 		Sanity:             9,
 	}
 
-	ctx := &EffectContext{
+	log.Println("Setting up Ghoul...")
+	ghoul := EnemyEntity{
+		Movable: Movable{Location: Attic},
+		ID:      1,
+		Name:    "Noxious Ghoul",
+		Aloof:   true,
+		Hunter:  true,
+		Damage:  1,
+		Horror:  1,
+		Health:  3,
+		Sanity:  2,
+	}
+
+	ectx := &EffectContext{
 		TargetPlayer: &jim,
+		TargetEnemy:  &ghoul,
 		// TargetLocation and TargetEnemy are automatically nil
 	}
 
@@ -187,18 +225,33 @@ func main() {
 		MoveAmount: 4,
 	}
 
-	err := mpe.Apply(ctx)
-	if err != nil {
-		log.Println("wallah krise")
+	mee := &MoveEnemyEffect{
+		MoveAmount: 2,
 	}
 
-	ctx.TargetPlayer = &ivy
-	mpe.Apply(ctx)
+	err := mpe.Apply(ectx)
 	if err != nil {
-		log.Println("wallah krise")
+		log.Println("Jim laufen macht Krise")
+	}
+
+	ectx.TargetPlayer = &ivy
+	err = mpe.Apply(ectx)
+	if err != nil {
+		log.Println("Ivy laufen macht Krise")
+	}
+
+	err = mee.Apply(ectx)
+	if err != nil {
+		log.Print("Ghoul laufen macht Krise")
 	}
 
 	if jim.Location.Name == ivy.Location.Name {
 		log.Printf("Hey, Jim and Ivy have met in %s!\n", jim.Location.Name)
+	}
+	if jim.Location.Name == ghoul.Location.Name {
+		log.Printf("Oh dear, Jim and and the Ghoul both are in %s!\n", jim.Location.Name)
+	}
+	if ivy.Location.Name == ghoul.Location.Name {
+		log.Printf("Oh dear, Ivy and and the Ghoul both are in %s!\n", jim.Location.Name)
 	}
 }
