@@ -20,13 +20,13 @@ type MovingEntity struct {
 
 type Movable interface {
 	GenerateMoveGoal() *LocationEntity
-	MoveStepsTowards(*LocationEntity) ([]string, error)
+	MovementPathTowards(*LocationEntity) ([]string, error)
 	PossibleMoveTargets() []*LocationEntity
 	PromptMoveTargetSelection() *LocationEntity
 	MoveTo(*LocationEntity)
 }
 
-func (me *MovingEntity) MoveStepsTowards(target *LocationEntity) ([]string, error) {
+func (me *MovingEntity) MovementPathTowards(target *LocationEntity) ([]string, error) {
 	path, err := me.Location.getShortestPathTo(target)
 	if err != nil {
 		return []string{}, err
@@ -129,13 +129,13 @@ func (le *LocationEntity) getShortestPathTo(target *LocationEntity) ([]string, e
 	for len(queue) != 0 {
 		current := queue[0]
 		queue = queue[1:]
-		if current.Name == target.Name {
+		if current == target {
 			found = true
 			break
 		}
 		for _, v := range current.OutgoingConnections {
 			alreadyVisited := slices.ContainsFunc(visited, func(location *LocationEntity) bool {
-				return location.Name == v.Name
+				return (location == v)
 			})
 			if !alreadyVisited {
 				visited = append(visited, v)
@@ -146,7 +146,6 @@ func (le *LocationEntity) getShortestPathTo(target *LocationEntity) ([]string, e
 	}
 
 	if found {
-		fmt.Println(parents)
 		path := []string{target.Name}
 		currentChild := target.Name
 		for {
@@ -206,8 +205,6 @@ func (ee *EnemyEntity) determineHuntingTarget(players []*PlayerCharacterEntity) 
 	n := rand.IntN(len(CurrentTargets))
 	finalTarget := CurrentTargets[n]
 	finalSteps := CurrentSteps[n]
-	log.Println(finalSteps)
-	log.Println("ENDING DetermineHUntingTarget")
 	return finalTarget, finalSteps
 }
 
@@ -230,11 +227,135 @@ func (pe *PlayerCharacterEntity) GenerateMoveGoal() *LocationEntity {
 }
 
 type GameState struct {
-	Locations   []*LocationEntity
-	Players     []*PlayerCharacterEntity
-	Enemies     []*EnemyEntity
-	PlayerTurns []*PlayerTurn
-	TurnCounter int
+	Locations        []*LocationEntity
+	PlayerCharacters []*PlayerCharacterEntity
+	Enemies          []*EnemyEntity
+	PlayerTurns      []*PlayerTurn
+	TurnCounter      int
+}
+
+func (gs *GameState) ReconcileDefeats() {
+	alivePlayers := gs.PlayerTurns[:0]
+	alivePlayerCharacters := gs.PlayerCharacters[:0]
+
+	for _, v := range gs.PlayerTurns {
+		if v.ReferencePlayerCharacter.CurrentHealth > 0 {
+			alivePlayerCharacters = append(alivePlayerCharacters, v.ReferencePlayerCharacter)
+			alivePlayers = append(alivePlayers, v)
+		}
+	}
+
+	aliveEnemies := gs.Enemies[:0]
+	for _, v := range gs.Enemies {
+		if v.CurrentHealth > 0 {
+			aliveEnemies = append(aliveEnemies, v)
+		}
+	}
+
+	gs.Enemies = aliveEnemies
+	gs.PlayerCharacters = alivePlayerCharacters
+	gs.PlayerTurns = alivePlayers
+
+}
+
+func (gs *GameState) Init() {
+
+	gs.InitLocations()
+	gs.InitPlayers()
+	gs.InitPlayerTurns()
+	gs.InitEnemies()
+}
+
+func (gs *GameState) InitLocations() {
+
+	log.Println("Setting up Locations...")
+	Porch := &LocationEntity{ID: 1, Name: "Porch"}
+	DownstairsHallway := &LocationEntity{ID: 1, Name: "Downstairs Hallway"}
+	Kitchen := &LocationEntity{ID: 1, Name: "Kitchen"}
+	LivingRoom := &LocationEntity{ID: 1, Name: "Living Room"}
+	UpstairsHallway := &LocationEntity{ID: 1, Name: "Upstairs Hallway"}
+	SleepingRoom := &LocationEntity{ID: 1, Name: "Sleeping Room"}
+	Attic := &LocationEntity{ID: 1, Name: "Attic"}
+
+	log.Println("Setting up Locations linking...")
+	Porch.OutgoingConnections = append(Porch.OutgoingConnections, DownstairsHallway)
+	DownstairsHallway.OutgoingConnections = append(DownstairsHallway.OutgoingConnections, Porch, Kitchen, LivingRoom, UpstairsHallway)
+	Kitchen.OutgoingConnections = append(Kitchen.OutgoingConnections, DownstairsHallway, LivingRoom)
+	LivingRoom.OutgoingConnections = append(LivingRoom.OutgoingConnections, DownstairsHallway, Kitchen)
+	UpstairsHallway.OutgoingConnections = append(UpstairsHallway.OutgoingConnections, DownstairsHallway, SleepingRoom, Attic)
+	SleepingRoom.OutgoingConnections = append(SleepingRoom.OutgoingConnections, UpstairsHallway, Porch)
+	Attic.OutgoingConnections = append(Attic.OutgoingConnections, UpstairsHallway)
+
+	gs.Locations = append(gs.Locations, Porch, DownstairsHallway, Kitchen, LivingRoom, UpstairsHallway, SleepingRoom, Attic)
+}
+
+func (gs *GameState) InitPlayers() {
+	log.Println("Setting up Jim...")
+	Jim := &PlayerCharacterEntity{
+		MovingEntity:       MovingEntity{Location: gs.Locations[0]},
+		HealthPoolEntity:   HealthPoolEntity{CurrentHealth: 10, MaxHealth: 10},
+		ID:                 1,
+		Name:               "Jim Gordon",
+		CardsInHand:        7,
+		ResourcesAvailable: 5,
+	}
+
+	log.Println("Setting up Ivy...")
+	Ivy := &PlayerCharacterEntity{
+		MovingEntity:       MovingEntity{Location: gs.Locations[0]},
+		HealthPoolEntity:   HealthPoolEntity{CurrentHealth: 8, MaxHealth: 8},
+		ID:                 1,
+		Name:               "Poison Ivy",
+		CardsInHand:        7,
+		ResourcesAvailable: 5,
+	}
+
+	gs.PlayerCharacters = append(gs.PlayerCharacters, Jim, Ivy)
+}
+
+func (gs *GameState) InitPlayerTurns() {
+	for _, v := range gs.PlayerCharacters {
+		playerTurn := PlayerTurn{ActionsRemaining: 3, ReferencePlayerCharacter: v}
+		gs.PlayerTurns = append(gs.PlayerTurns, &playerTurn)
+	}
+}
+
+func (gs *GameState) InitEnemies() {
+
+	log.Println("Setting up Ghoul...")
+	ghoul := &EnemyEntity{
+		MovingEntity:     MovingEntity{Location: gs.Locations[len(gs.Locations)-1]},
+		HealthPoolEntity: HealthPoolEntity{CurrentHealth: 5, MaxHealth: 5},
+		ID:               1,
+		Name:             "Noxious Ghoul",
+		Aloof:            false,
+		Hunter:           true,
+		Damage:           2,
+	}
+
+	log.Println("Setting up Rat...")
+	rat := &EnemyEntity{
+		MovingEntity:     MovingEntity{Location: gs.Locations[3]},
+		HealthPoolEntity: HealthPoolEntity{CurrentHealth: 2, MaxHealth: 2},
+		ID:               1,
+		Name:             "Chittering Rat",
+		Aloof:            false,
+		Hunter:           false,
+		Damage:           1,
+	}
+
+	log.Println("Setting up Suspicious Plant...")
+	plant := &EnemyEntity{
+		MovingEntity:     MovingEntity{Location: gs.Locations[3]},
+		HealthPoolEntity: HealthPoolEntity{CurrentHealth: 2, MaxHealth: 2},
+		ID:               1,
+		Name:             "Suspicious Plant",
+		Aloof:            true,
+		Hunter:           false,
+		Damage:           1,
+	}
+
+	gs.Enemies = append(gs.Enemies, ghoul, rat, plant)
 }
 
 func (gs *GameState) GetLocationByName(name string) *LocationEntity {
@@ -271,14 +392,18 @@ func (gs *GameState) PollNextTurn() (*PlayerTurn, error) {
 		return &PlayerTurn{}, err
 	} else {
 		nextTurn := selectable[position]
-		nextTurn.ActionsRemaining -= 1
-		return selectable[position], nil
+		return nextTurn, nil
 	}
 }
 
-func (gs *GameState) PollNextAction(player string) (string, error) {
-	activeArray := []string{"Move", "Draw", "Resource", "Attack", "Evade"}
-	label := fmt.Sprintf("<<< --- What will %s do? --- >>> ", player)
+func (gs *GameState) PromptNextAction(player *PlayerCharacterEntity) (string, error) {
+	activeArray := []string{"Move", "Draw", "Resource"}
+
+	if gs.playerHasEnemiesInRange(player) {
+		activeArray = append(activeArray, "Attack", "Evade")
+	}
+
+	label := fmt.Sprintf("<<< --- What will %s do? --- >>> ", player.Name)
 
 	prompt := promptui.Select{
 		Label: label,
@@ -293,6 +418,49 @@ func (gs *GameState) PollNextAction(player string) (string, error) {
 	}
 }
 
+func (gs *GameState) playerHasEnemiesInRange(pce *PlayerCharacterEntity) bool {
+	for _, v := range gs.Enemies {
+		if pce.Location == v.Location {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (gs *GameState) enemiesAtSameLocationForPlayer(pce *PlayerCharacterEntity) []*EnemyEntity {
+
+	found := []*EnemyEntity{}
+	for _, v := range gs.Enemies {
+		if pce.Location == v.Location {
+			found = append(found, v)
+		}
+	}
+	return found
+}
+
+func (gs *GameState) enemyHasPlayersInRange(ee *EnemyEntity) bool {
+	for _, v := range gs.PlayerCharacters {
+		if ee.Location == v.Location {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (gs *GameState) playersAtSameLocationForEnemy(ee *EnemyEntity) []*PlayerCharacterEntity {
+
+	found := []*PlayerCharacterEntity{}
+	for _, v := range gs.PlayerCharacters {
+		if ee.Location == v.Location {
+			found = append(found, v)
+		}
+	}
+
+	return found
+}
+
 func (gs *GameState) PlayerHaveActionsRemaining() bool {
 	for _, v := range gs.PlayerTurns {
 		if v.ActionsRemaining > 0 {
@@ -303,28 +471,72 @@ func (gs *GameState) PlayerHaveActionsRemaining() bool {
 }
 
 func (gs *GameState) ResolvePlayerPhaseStep(running *bool) {
-	playerToAct, err := gs.PollNextTurn()
+	nextPlayerTurn, err := gs.PollNextTurn()
 	if err != nil {
 		log.Println(err)
 		*running = false
 	}
-	fmt.Printf("%s selected to act!\n", playerToAct.ReferencePlayerCharacter.Name)
+	fmt.Printf("%s selected to act!\n", nextPlayerTurn.ReferencePlayerCharacter.Name)
 
-	action, err := gs.PollNextAction(playerToAct.ReferencePlayerCharacter.Name)
+	action, err := gs.PromptNextAction(nextPlayerTurn.ReferencePlayerCharacter)
 	if err != nil {
 		log.Println(err)
 		*running = false
 	}
 
-	fmt.Printf("%s will perform a %s action.\n", playerToAct.ReferencePlayerCharacter.Name, action)
-
+	fmt.Printf("%s will perform a %s action.\n", nextPlayerTurn.ReferencePlayerCharacter.Name, action)
+	nextPlayerTurn.ActionsRemaining -= 1
 	switch action {
+
 	case "Move":
-		moveeffectctx := &MoveEffectContext{playerToAct.ReferencePlayerCharacter, 1}
-		moveeff := MoveEffect{moveeffectctx}
-		moveeff.Apply()
+		moveEffect := MoveEffect{&MoveEffectContext{nextPlayerTurn.ReferencePlayerCharacter, 1}}
+		moveEffect.Apply()
+	case "Attack":
+		gs.ResolveAttackForPlayer(nextPlayerTurn.ReferencePlayerCharacter)
 	default:
 		fmt.Println("Targeted unimplemented action")
+	}
+}
+
+func (gs *GameState) ResolveAttackForPlayer(player *PlayerCharacterEntity) {
+	inRange := gs.enemiesAtSameLocationForPlayer(player)
+	promptList := []string{}
+	for _, v := range inRange {
+		promptItem := fmt.Sprintf("%s (Remaining Health: %d/%d)", v.Name, v.CurrentHealth, v.MaxHealth)
+		promptList = append(promptList, promptItem)
+	}
+
+	prompt := promptui.Select{
+		Label: ">>> --- Choose a location to move to --- <<<",
+		Items: promptList,
+	}
+	position, _, err := prompt.Run()
+	if err != nil {
+		log.Println("The attack failed because the input was not an enemy.")
+	}
+	target := inRange[position]
+
+	target.TakeDamage(1)
+	log.Printf("%s attacks %s down to %d/%d health.\n", player.Name, target.Name, target.CurrentHealth, target.MaxHealth)
+	if target.CurrentHealth == 0 {
+		log.Printf("%s has defeated %s!", player.Name, target.Name)
+	}
+}
+
+func (gs *GameState) ResolveAttackForEnemy(enemy *EnemyEntity) {
+	inRange := gs.playersAtSameLocationForEnemy(enemy)
+
+	if len(inRange) == 0 {
+		log.Printf("%s has no targets for an attack and doesn't attack.\n", enemy.Name)
+		return
+	}
+
+	for _, target := range inRange {
+		target.TakeDamage(enemy.Damage)
+		log.Printf("%s attacks %s for %d damage down to %d/%d health.\n", enemy.Name, target.Name, enemy.Damage, target.CurrentHealth, target.MaxHealth)
+		if target.CurrentHealth == 0 {
+			log.Printf("%s has defeated %s!\n", target.Name, target.Name)
+		}
 	}
 }
 
@@ -339,16 +551,11 @@ func (gs *GameState) ResolveEnemyMovement(running *bool, enemy *EnemyEntity) {
 
 	if enemy.Hunter {
 
-		target, steps := enemy.determineHuntingTarget(gs.Players)
+		target, steps := enemy.determineHuntingTarget(gs.PlayerCharacters)
 
 		if len(steps) == 1 {
 			log.Printf("%s is already at its prey location and does not need to move.\n", enemy.Name)
 		} else {
-
-			for i, v := range steps {
-				log.Printf("[%d] = %v\n", i, v)
-			}
-
 			targetLocation := gs.GetLocationByName(steps[1])
 			enemy.MoveTo(targetLocation)
 			log.Printf("%s has %s as target and will move to %s to hunt its prey.\n", enemy.Name, target.Name, steps[1])
@@ -361,7 +568,7 @@ func (gs *GameState) ResolveEnemyMovement(running *bool, enemy *EnemyEntity) {
 
 func (gs *GameState) ResolveEnemyAttacks(running *bool, enemy *EnemyEntity) {
 	if !enemy.Aloof {
-		log.Printf("%s would attack now, but attacking isn't implemented yet.", enemy.Name)
+		gs.ResolveAttackForEnemy(enemy)
 	} else {
 		log.Printf("%s is aloof and doesn't attack.", enemy.Name)
 	}
@@ -377,105 +584,17 @@ func (gs *GameState) StartNewTurn(running *bool) {
 func main() {
 
 	gs := &GameState{TurnCounter: 1}
-	setupBasicLevel(gs)
+	gs.Init()
 	running := true
 
 	for running {
 		log.Printf("Starting Turn %d", gs.TurnCounter)
 		for gs.PlayerHaveActionsRemaining() {
 			gs.ResolvePlayerPhaseStep(&running)
+			gs.ReconcileDefeats()
 		}
 
 		gs.ResolveEnemyPhase(&running)
 		gs.StartNewTurn(&running)
 	}
-}
-
-func setupBasicLevel(gs *GameState) {
-
-	setupBasicLocations(gs)
-	setupBasicPlayers(gs)
-	setupBasicPlayerTurns(gs)
-	setupBasicEnemy(gs)
-}
-
-func setupBasicLocations(gs *GameState) {
-
-	log.Println("Setting up Locations...")
-	Porch := &LocationEntity{ID: 1, Name: "Porch"}
-	DownstairsHallway := &LocationEntity{ID: 1, Name: "Downstairs Hallway"}
-	Kitchen := &LocationEntity{ID: 1, Name: "Kitchen"}
-	LivingRoom := &LocationEntity{ID: 1, Name: "Living Room"}
-	UpstairsHallway := &LocationEntity{ID: 1, Name: "Upstairs Hallway"}
-	SleepingRoom := &LocationEntity{ID: 1, Name: "Sleeping Room"}
-	Attic := &LocationEntity{ID: 1, Name: "Attic"}
-
-	log.Println("Setting up Locations linking...")
-	Porch.OutgoingConnections = append(Porch.OutgoingConnections, DownstairsHallway)
-	DownstairsHallway.OutgoingConnections = append(DownstairsHallway.OutgoingConnections, Porch, Kitchen, LivingRoom, UpstairsHallway)
-	Kitchen.OutgoingConnections = append(Kitchen.OutgoingConnections, DownstairsHallway, LivingRoom)
-	LivingRoom.OutgoingConnections = append(LivingRoom.OutgoingConnections, DownstairsHallway, Kitchen)
-	UpstairsHallway.OutgoingConnections = append(UpstairsHallway.OutgoingConnections, DownstairsHallway, SleepingRoom, Attic)
-	SleepingRoom.OutgoingConnections = append(SleepingRoom.OutgoingConnections, UpstairsHallway, Porch)
-	Attic.OutgoingConnections = append(Attic.OutgoingConnections, UpstairsHallway)
-
-	gs.Locations = append(gs.Locations, Porch, DownstairsHallway, Kitchen, LivingRoom, UpstairsHallway, SleepingRoom, Attic)
-}
-
-func setupBasicPlayers(gs *GameState) {
-	log.Println("Setting up Jim...")
-	Jim := &PlayerCharacterEntity{
-		MovingEntity:       MovingEntity{Location: gs.Locations[0]},
-		HealthPoolEntity:   HealthPoolEntity{CurrentHealth: 10, MaxHealth: 10},
-		ID:                 1,
-		Name:               "Jim Gordon",
-		CardsInHand:        7,
-		ResourcesAvailable: 5,
-	}
-
-	log.Println("Setting up Ivy...")
-	Ivy := &PlayerCharacterEntity{
-		MovingEntity:       MovingEntity{Location: gs.Locations[0]},
-		HealthPoolEntity:   HealthPoolEntity{CurrentHealth: 8, MaxHealth: 8},
-		ID:                 1,
-		Name:               "Poison Ivy",
-		CardsInHand:        7,
-		ResourcesAvailable: 5,
-	}
-
-	gs.Players = append(gs.Players, Jim, Ivy)
-}
-
-func setupBasicPlayerTurns(gs *GameState) {
-	for _, v := range gs.Players {
-		playerTurn := PlayerTurn{ActionsRemaining: 1, ReferencePlayerCharacter: v}
-		gs.PlayerTurns = append(gs.PlayerTurns, &playerTurn)
-	}
-}
-
-func setupBasicEnemy(gs *GameState) {
-
-	log.Println("Setting up Ghoul...")
-	ghoul := &EnemyEntity{
-		MovingEntity:     MovingEntity{Location: gs.Locations[len(gs.Locations)-1]},
-		HealthPoolEntity: HealthPoolEntity{CurrentHealth: 5, MaxHealth: 5},
-		ID:               1,
-		Name:             "Noxious Ghoul",
-		Aloof:            true,
-		Hunter:           true,
-		Damage:           1,
-	}
-
-	log.Println("Setting up Rat...")
-	rat := &EnemyEntity{
-		MovingEntity:     MovingEntity{Location: gs.Locations[len(gs.Locations)-2]},
-		HealthPoolEntity: HealthPoolEntity{CurrentHealth: 2, MaxHealth: 2},
-		ID:               1,
-		Name:             "Chittering Rat",
-		Aloof:            false,
-		Hunter:           true,
-		Damage:           1,
-	}
-
-	gs.Enemies = append(gs.Enemies, ghoul, rat)
 }
