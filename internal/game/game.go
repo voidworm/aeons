@@ -12,6 +12,7 @@ import (
 	"aeons/internal/location"
 	"aeons/internal/moving"
 	"aeons/internal/player"
+	"aeons/internal/prompt"
 
 	"github.com/manifoldco/promptui"
 )
@@ -161,40 +162,37 @@ func (gs *GameState) PollNextTurn() (*player.Player, error) {
 	for _, v := range selectable {
 		activeArray = append(activeArray, fmt.Sprintf("%s (currently at %s)", v.Name, v.Location.Name))
 	}
-	prompt := promptui.Select{
-		Label: ">>> --- Choose a player to act --- <<<",
-		Items: activeArray,
-	}
 
-	position, _, err := prompt.Run()
+	label := ">>> --- Choose a player to act --- <<<"
+	index, err := prompt.PromptUser(label, activeArray, false)
 	if err != nil {
 		return &player.Player{}, err
-	} else {
-		nextTurn := selectable[position]
-		return nextTurn, nil
 	}
+
+	nextTurn := selectable[index]
+	fmt.Printf("%s selected to act!\n", nextTurn.Name)
+	return nextTurn, nil
+
 }
 
 func (gs *GameState) PromptNextAction(player *player.Player) (string, error) {
-	activeArray := []string{"Move", "Draw", "Resource"}
+	actionArray := []string{"Move", "Draw", "Resource"}
 
 	if gs.playerHasEnemiesInRange(player) {
-		activeArray = append(activeArray, "Attack", "Evade")
+		actionArray = append(actionArray, "Attack", "Evade")
 	}
 
 	label := fmt.Sprintf("<<< --- What will %s do? --- >>> ", player.Name)
 
-	prompt := promptui.Select{
-		Label: label,
-		Items: activeArray,
-	}
-	_, action, err := prompt.Run()
-
+	index, err := prompt.PromptUser(label, actionArray, true)
 	if err != nil {
 		return "", err
-	} else {
-		return action, nil
 	}
+	if index == len(actionArray) {
+		return "Cancel", nil
+	}
+
+	return actionArray[index], nil
 }
 
 func (gs *GameState) playerHasEnemiesInRange(pce *player.Player) bool {
@@ -249,32 +247,33 @@ func (gs *GameState) PlayerHaveActionsRemaining() bool {
 	return false
 }
 
-func (gs *GameState) ResolvePlayerPhaseStep(running *bool) {
+func (gs *GameState) ResolvePlayerPhaseStep() error {
 	nextPlayer, err := gs.PollNextTurn()
 	if err != nil {
-		log.Println(err)
-		*running = false
+		return err
 	}
-	fmt.Printf("%s selected to act!\n", nextPlayer.Name)
 
 	action, err := gs.PromptNextAction(nextPlayer)
 	if err != nil {
-		log.Println(err)
-		*running = false
+		return err
 	}
 
-	fmt.Printf("%s will perform a %s action.\n", nextPlayer.Name, action)
-	nextPlayer.RemainingActions -= 1
 	switch action {
-
 	case "Move":
+		nextPlayer.RemainingActions -= 1
 		moveEffect := effect.MoveEffect{&effect.MoveEffectContext{nextPlayer, 1}}
 		moveEffect.Apply()
 	case "Attack":
+		nextPlayer.RemainingActions -= 1
 		gs.ResolveAttackForPlayer(nextPlayer)
+	case "Cancel":
+		gs.ResolvePlayerPhaseStep()
 	default:
-		fmt.Println("Targeted unimplemented action")
+		fmt.Println("Selected unimplemented action")
 	}
+
+	gs.ReconcileDefeats()
+	return nil
 }
 
 func (gs *GameState) ResolveAttackForPlayer(player *player.Player) {
@@ -319,14 +318,16 @@ func (gs *GameState) ResolveAttackForEnemy(enemy *enemy.EnemyEntity) {
 	}
 }
 
-func (gs *GameState) ResolveEnemyPhase(running *bool) {
+func (gs *GameState) ResolveEnemyPhase() {
 	for _, v := range gs.Enemies {
-		gs.ResolveEnemyMovement(running, v)
-		gs.ResolveEnemyAttacks(running, v)
+		gs.ResolveEnemyMovement(v)
+		gs.ResolveEnemyAttacks(v)
+		gs.ReconcileDefeats()
 	}
+
 }
 
-func (gs *GameState) ResolveEnemyMovement(running *bool, enemy *enemy.EnemyEntity) {
+func (gs *GameState) ResolveEnemyMovement(enemy *enemy.EnemyEntity) {
 
 	if enemy.Hunter {
 
@@ -345,7 +346,7 @@ func (gs *GameState) ResolveEnemyMovement(running *bool, enemy *enemy.EnemyEntit
 	}
 }
 
-func (gs *GameState) ResolveEnemyAttacks(running *bool, enemy *enemy.EnemyEntity) {
+func (gs *GameState) ResolveEnemyAttacks(enemy *enemy.EnemyEntity) {
 	if !enemy.Aloof {
 		gs.ResolveAttackForEnemy(enemy)
 	} else {
@@ -353,7 +354,7 @@ func (gs *GameState) ResolveEnemyAttacks(running *bool, enemy *enemy.EnemyEntity
 	}
 }
 
-func (gs *GameState) StartNewTurn(running *bool) {
+func (gs *GameState) StartNewTurn() {
 	for _, v := range gs.Players {
 		v.RemainingActions = 3
 	}

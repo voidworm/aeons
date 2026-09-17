@@ -14,11 +14,13 @@ func main() {
 	for running {
 		log.Printf("Starting Turn %d", gs.TurnCounter)
 		for gs.PlayerHaveActionsRemaining() {
-			gs.ResolvePlayerPhaseStep(&running)
-			gs.ReconcileDefeats()
+			err := gs.ResolvePlayerPhaseStep()
+			if err != nil {
+				log.Println(err)
+				return
+			}
 		}
-
-		gs.ResolveEnemyPhase(&running)
-		gs.StartNewTurn(&running)
+		gs.ResolveEnemyPhase()
+		gs.StartNewTurn()
 	}
 }
