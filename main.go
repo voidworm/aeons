@@ -179,8 +179,8 @@ func (ee *EnemyEntity) GenerateMoveGoal() *LocationEntity {
 	return nil
 }
 
-func (ee *EnemyEntity) determineHuntingTarget(players []*PlayerCharacterEntity) (*PlayerCharacterEntity, []string) {
-	CurrentTargets := []*PlayerCharacterEntity{}
+func (ee *EnemyEntity) determineHuntingTarget(players []*Player) (*Player, []string) {
+	CurrentTargets := []*Player{}
 	CurrentSteps := [][]string{}
 	CurrentMinDistance := math.MaxInt
 
@@ -197,7 +197,7 @@ func (ee *EnemyEntity) determineHuntingTarget(players []*PlayerCharacterEntity) 
 
 		if len(steps) < CurrentMinDistance {
 			CurrentMinDistance = len(steps)
-			CurrentTargets = []*PlayerCharacterEntity{v}
+			CurrentTargets = []*Player{v}
 			CurrentSteps = [][]string{steps}
 		}
 	}
@@ -208,39 +208,32 @@ func (ee *EnemyEntity) determineHuntingTarget(players []*PlayerCharacterEntity) 
 	return finalTarget, finalSteps
 }
 
-type PlayerCharacterEntity struct {
+type Player struct {
 	MovingEntity
 	HealthPoolEntity
 	ID                 int
 	Name               string
 	CardsInHand        int
 	ResourcesAvailable int
+	RemainingActions   int
 }
 
-type PlayerTurn struct {
-	ActionsRemaining         int
-	ReferencePlayerCharacter *PlayerCharacterEntity
-}
-
-func (pe *PlayerCharacterEntity) GenerateMoveGoal() *LocationEntity {
+func (pe *Player) GenerateMoveGoal() *LocationEntity {
 	return pe.PromptMoveTargetSelection()
 }
 
 type GameState struct {
-	Locations        []*LocationEntity
-	PlayerCharacters []*PlayerCharacterEntity
-	Enemies          []*EnemyEntity
-	PlayerTurns      []*PlayerTurn
-	TurnCounter      int
+	Locations   []*LocationEntity
+	Players     []*Player
+	Enemies     []*EnemyEntity
+	TurnCounter int
 }
 
 func (gs *GameState) ReconcileDefeats() {
-	alivePlayers := gs.PlayerTurns[:0]
-	alivePlayerCharacters := gs.PlayerCharacters[:0]
+	alivePlayers := gs.Players[:0]
 
-	for _, v := range gs.PlayerTurns {
-		if v.ReferencePlayerCharacter.CurrentHealth > 0 {
-			alivePlayerCharacters = append(alivePlayerCharacters, v.ReferencePlayerCharacter)
+	for _, v := range gs.Players {
+		if v.CurrentHealth > 0 {
 			alivePlayers = append(alivePlayers, v)
 		}
 	}
@@ -253,16 +246,13 @@ func (gs *GameState) ReconcileDefeats() {
 	}
 
 	gs.Enemies = aliveEnemies
-	gs.PlayerCharacters = alivePlayerCharacters
-	gs.PlayerTurns = alivePlayers
-
+	gs.Players = alivePlayers
 }
 
 func (gs *GameState) Init() {
 
 	gs.InitLocations()
 	gs.InitPlayers()
-	gs.InitPlayerTurns()
 	gs.InitEnemies()
 }
 
@@ -291,33 +281,28 @@ func (gs *GameState) InitLocations() {
 
 func (gs *GameState) InitPlayers() {
 	log.Println("Setting up Jim...")
-	Jim := &PlayerCharacterEntity{
+	Jim := &Player{
 		MovingEntity:       MovingEntity{Location: gs.Locations[0]},
 		HealthPoolEntity:   HealthPoolEntity{CurrentHealth: 10, MaxHealth: 10},
 		ID:                 1,
 		Name:               "Jim Gordon",
 		CardsInHand:        7,
 		ResourcesAvailable: 5,
+		RemainingActions:   3,
 	}
 
 	log.Println("Setting up Ivy...")
-	Ivy := &PlayerCharacterEntity{
+	Ivy := &Player{
 		MovingEntity:       MovingEntity{Location: gs.Locations[0]},
 		HealthPoolEntity:   HealthPoolEntity{CurrentHealth: 8, MaxHealth: 8},
 		ID:                 1,
 		Name:               "Poison Ivy",
 		CardsInHand:        7,
 		ResourcesAvailable: 5,
+		RemainingActions:   3,
 	}
 
-	gs.PlayerCharacters = append(gs.PlayerCharacters, Jim, Ivy)
-}
-
-func (gs *GameState) InitPlayerTurns() {
-	for _, v := range gs.PlayerCharacters {
-		playerTurn := PlayerTurn{ActionsRemaining: 3, ReferencePlayerCharacter: v}
-		gs.PlayerTurns = append(gs.PlayerTurns, &playerTurn)
-	}
+	gs.Players = append(gs.Players, Jim, Ivy)
 }
 
 func (gs *GameState) InitEnemies() {
@@ -369,18 +354,18 @@ func (gs *GameState) GetLocationByName(name string) *LocationEntity {
 	return &LocationEntity{}
 }
 
-func (gs *GameState) PollNextTurn() (*PlayerTurn, error) {
+func (gs *GameState) PollNextTurn() (*Player, error) {
 
-	selectable := []*PlayerTurn{}
-	for _, v := range gs.PlayerTurns {
-		if v.ActionsRemaining > 0 {
+	selectable := []*Player{}
+	for _, v := range gs.Players {
+		if v.RemainingActions > 0 {
 			selectable = append(selectable, v)
 		}
 	}
 
 	activeArray := []string{}
 	for _, v := range selectable {
-		activeArray = append(activeArray, fmt.Sprintf("%s (currently at %s)", v.ReferencePlayerCharacter.Name, v.ReferencePlayerCharacter.Location.Name))
+		activeArray = append(activeArray, fmt.Sprintf("%s (currently at %s)", v.Name, v.Location.Name))
 	}
 	prompt := promptui.Select{
 		Label: ">>> --- Choose a player to act --- <<<",
@@ -389,14 +374,14 @@ func (gs *GameState) PollNextTurn() (*PlayerTurn, error) {
 
 	position, _, err := prompt.Run()
 	if err != nil {
-		return &PlayerTurn{}, err
+		return &Player{}, err
 	} else {
 		nextTurn := selectable[position]
 		return nextTurn, nil
 	}
 }
 
-func (gs *GameState) PromptNextAction(player *PlayerCharacterEntity) (string, error) {
+func (gs *GameState) PromptNextAction(player *Player) (string, error) {
 	activeArray := []string{"Move", "Draw", "Resource"}
 
 	if gs.playerHasEnemiesInRange(player) {
@@ -418,7 +403,7 @@ func (gs *GameState) PromptNextAction(player *PlayerCharacterEntity) (string, er
 	}
 }
 
-func (gs *GameState) playerHasEnemiesInRange(pce *PlayerCharacterEntity) bool {
+func (gs *GameState) playerHasEnemiesInRange(pce *Player) bool {
 	for _, v := range gs.Enemies {
 		if pce.Location == v.Location {
 			return true
@@ -428,7 +413,7 @@ func (gs *GameState) playerHasEnemiesInRange(pce *PlayerCharacterEntity) bool {
 	return false
 }
 
-func (gs *GameState) enemiesAtSameLocationForPlayer(pce *PlayerCharacterEntity) []*EnemyEntity {
+func (gs *GameState) enemiesAtSameLocationForPlayer(pce *Player) []*EnemyEntity {
 
 	found := []*EnemyEntity{}
 	for _, v := range gs.Enemies {
@@ -440,7 +425,7 @@ func (gs *GameState) enemiesAtSameLocationForPlayer(pce *PlayerCharacterEntity) 
 }
 
 func (gs *GameState) enemyHasPlayersInRange(ee *EnemyEntity) bool {
-	for _, v := range gs.PlayerCharacters {
+	for _, v := range gs.Players {
 		if ee.Location == v.Location {
 			return true
 		}
@@ -449,10 +434,10 @@ func (gs *GameState) enemyHasPlayersInRange(ee *EnemyEntity) bool {
 	return false
 }
 
-func (gs *GameState) playersAtSameLocationForEnemy(ee *EnemyEntity) []*PlayerCharacterEntity {
+func (gs *GameState) playersAtSameLocationForEnemy(ee *EnemyEntity) []*Player {
 
-	found := []*PlayerCharacterEntity{}
-	for _, v := range gs.PlayerCharacters {
+	found := []*Player{}
+	for _, v := range gs.Players {
 		if ee.Location == v.Location {
 			found = append(found, v)
 		}
@@ -462,8 +447,8 @@ func (gs *GameState) playersAtSameLocationForEnemy(ee *EnemyEntity) []*PlayerCha
 }
 
 func (gs *GameState) PlayerHaveActionsRemaining() bool {
-	for _, v := range gs.PlayerTurns {
-		if v.ActionsRemaining > 0 {
+	for _, v := range gs.Players {
+		if v.RemainingActions > 0 {
 			return true
 		}
 	}
@@ -471,34 +456,34 @@ func (gs *GameState) PlayerHaveActionsRemaining() bool {
 }
 
 func (gs *GameState) ResolvePlayerPhaseStep(running *bool) {
-	nextPlayerTurn, err := gs.PollNextTurn()
+	nextPlayer, err := gs.PollNextTurn()
 	if err != nil {
 		log.Println(err)
 		*running = false
 	}
-	fmt.Printf("%s selected to act!\n", nextPlayerTurn.ReferencePlayerCharacter.Name)
+	fmt.Printf("%s selected to act!\n", nextPlayer.Name)
 
-	action, err := gs.PromptNextAction(nextPlayerTurn.ReferencePlayerCharacter)
+	action, err := gs.PromptNextAction(nextPlayer)
 	if err != nil {
 		log.Println(err)
 		*running = false
 	}
 
-	fmt.Printf("%s will perform a %s action.\n", nextPlayerTurn.ReferencePlayerCharacter.Name, action)
-	nextPlayerTurn.ActionsRemaining -= 1
+	fmt.Printf("%s will perform a %s action.\n", nextPlayer.Name, action)
+	nextPlayer.RemainingActions -= 1
 	switch action {
 
 	case "Move":
-		moveEffect := MoveEffect{&MoveEffectContext{nextPlayerTurn.ReferencePlayerCharacter, 1}}
+		moveEffect := MoveEffect{&MoveEffectContext{nextPlayer, 1}}
 		moveEffect.Apply()
 	case "Attack":
-		gs.ResolveAttackForPlayer(nextPlayerTurn.ReferencePlayerCharacter)
+		gs.ResolveAttackForPlayer(nextPlayer)
 	default:
 		fmt.Println("Targeted unimplemented action")
 	}
 }
 
-func (gs *GameState) ResolveAttackForPlayer(player *PlayerCharacterEntity) {
+func (gs *GameState) ResolveAttackForPlayer(player *Player) {
 	inRange := gs.enemiesAtSameLocationForPlayer(player)
 	promptList := []string{}
 	for _, v := range inRange {
@@ -551,7 +536,7 @@ func (gs *GameState) ResolveEnemyMovement(running *bool, enemy *EnemyEntity) {
 
 	if enemy.Hunter {
 
-		target, steps := enemy.determineHuntingTarget(gs.PlayerCharacters)
+		target, steps := enemy.determineHuntingTarget(gs.Players)
 
 		if len(steps) == 1 {
 			log.Printf("%s is already at its prey location and does not need to move.\n", enemy.Name)
@@ -575,8 +560,8 @@ func (gs *GameState) ResolveEnemyAttacks(running *bool, enemy *EnemyEntity) {
 }
 
 func (gs *GameState) StartNewTurn(running *bool) {
-	for _, v := range gs.PlayerTurns {
-		v.ActionsRemaining = 1
+	for _, v := range gs.Players {
+		v.RemainingActions = 3
 	}
 	gs.TurnCounter += 1
 }
