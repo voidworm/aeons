@@ -44,7 +44,7 @@ func (le *LocationEntity) GetShortestPathTo(target *LocationEntity) []*LocationE
 	currentChild := target
 	for {
 		parent := parents[currentChild]
-		if parent != nil {
+		if parent == nil {
 			break
 		}
 		path = append(path, parent)

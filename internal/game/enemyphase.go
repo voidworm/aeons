@@ -37,7 +37,7 @@ func (gs *GameState) ResolveEnemyMovement(input *enemy.EnemyEntity) {
 			targetLocation := steps[1]
 			eme := enemy.EnemyMoveEffect{TargetEnemy: input, TargetLocation: targetLocation}
 			eme.Apply()
-			log.Printf("%s has %s as target and will move to %s to hunt its prey.\n", input.Name, target.Name, steps[1])
+			log.Printf("%s has %s as target and will move to %s to hunt its prey.\n", input.Name, target.Name, targetLocation.Name)
 		}
 
 	} else {

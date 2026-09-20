@@ -32,6 +32,6 @@ type EnemyMoveEffect struct {
 }
 
 func (eme *EnemyMoveEffect) Apply() {
-	path := eme.TargetEnemy.MovementPathTowards(eme.TargetLocation)
-	eme.TargetEnemy.MoveTo(path[1])
+	//path := eme.TargetEnemy.MovementPathTowards(eme.TargetLocation)
+	eme.TargetEnemy.MoveTo(eme.TargetLocation)
 }
