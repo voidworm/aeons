@@ -16,7 +16,22 @@ type EnemyEntity struct {
 	Damage int
 }
 
-func (ee *EnemyEntity) GenerateMoveGoal() *location.LocationEntity {
+func (me *EnemyEntity) GenerateMoveGoal(target *location.LocationEntity) *location.LocationEntity {
+	return me.MovementPathTowards(target)[1]
+}
 
-	return nil
+// setter for location
+// overwrite if you need to do stuff before or after moving
+func (ee *EnemyEntity) MoveTo(target *location.LocationEntity) {
+	ee.Location = target
+}
+
+type EnemyMoveEffect struct {
+	TargetEnemy    *EnemyEntity
+	TargetLocation *location.LocationEntity
+}
+
+func (eme *EnemyMoveEffect) Apply() {
+	path := eme.TargetEnemy.MovementPathTowards(eme.TargetLocation)
+	eme.TargetEnemy.MoveTo(path[1])
 }

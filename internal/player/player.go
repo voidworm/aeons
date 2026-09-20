@@ -1,6 +1,7 @@
 package player
 
 import (
+	"aeons/internal/enemy"
 	"aeons/internal/healthpool"
 	"aeons/internal/location"
 	"aeons/internal/moving"
@@ -16,6 +17,21 @@ type Player struct {
 	RemainingActions   int
 }
 
-func (pe *Player) GenerateMoveGoal() *location.LocationEntity {
-	return pe.PromptMoveTargetSelection()
+type PlayerMoveEffect struct {
+	TargetPlayer   *Player
+	TargetLocation *location.LocationEntity
+}
+
+func (pem *PlayerMoveEffect) Apply() {
+	pem.TargetPlayer.MoveTo(pem.TargetLocation)
+}
+
+type PlayerAttackEffect struct {
+	TargetPlayer *Player
+	TargetEnemy  *enemy.EnemyEntity
+	DamageAmount int
+}
+
+func (pae *PlayerAttackEffect) Apply() {
+	pae.TargetEnemy.TakeDamage(pae.DamageAmount)
 }

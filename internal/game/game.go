@@ -3,18 +3,11 @@ package game
 import (
 	"fmt"
 	"log"
-	"math"
-	"math/rand/v2"
 
-	"aeons/internal/effect"
 	"aeons/internal/enemy"
-	"aeons/internal/healthpool"
 	"aeons/internal/location"
-	"aeons/internal/moving"
 	"aeons/internal/player"
 	"aeons/internal/prompt"
-
-	"github.com/manifoldco/promptui"
 )
 
 type GameState struct {
@@ -39,103 +32,15 @@ func (gs *GameState) ReconcileDefeats() {
 			aliveEnemies = append(aliveEnemies, v)
 		}
 	}
-
 	gs.Enemies = aliveEnemies
 	gs.Players = alivePlayers
 }
 
-func (gs *GameState) Init() {
-
-	gs.InitLocations()
-	gs.InitPlayers()
-	gs.InitEnemies()
-}
-
-func (gs *GameState) InitLocations() {
-
-	log.Println("Setting up Locations...")
-	Porch := &location.LocationEntity{ID: 1, Name: "Porch"}
-	DownstairsHallway := &location.LocationEntity{ID: 1, Name: "Downstairs Hallway"}
-	Kitchen := &location.LocationEntity{ID: 1, Name: "Kitchen"}
-	LivingRoom := &location.LocationEntity{ID: 1, Name: "Living Room"}
-	UpstairsHallway := &location.LocationEntity{ID: 1, Name: "Upstairs Hallway"}
-	SleepingRoom := &location.LocationEntity{ID: 1, Name: "Sleeping Room"}
-	Attic := &location.LocationEntity{ID: 1, Name: "Attic"}
-
-	log.Println("Setting up Locations linking...")
-	Porch.OutgoingConnections = append(Porch.OutgoingConnections, DownstairsHallway)
-	DownstairsHallway.OutgoingConnections = append(DownstairsHallway.OutgoingConnections, Porch, Kitchen, LivingRoom, UpstairsHallway)
-	Kitchen.OutgoingConnections = append(Kitchen.OutgoingConnections, DownstairsHallway, LivingRoom)
-	LivingRoom.OutgoingConnections = append(LivingRoom.OutgoingConnections, DownstairsHallway, Kitchen)
-	UpstairsHallway.OutgoingConnections = append(UpstairsHallway.OutgoingConnections, DownstairsHallway, SleepingRoom, Attic)
-	SleepingRoom.OutgoingConnections = append(SleepingRoom.OutgoingConnections, UpstairsHallway, Porch)
-	Attic.OutgoingConnections = append(Attic.OutgoingConnections, UpstairsHallway)
-
-	gs.Locations = append(gs.Locations, Porch, DownstairsHallway, Kitchen, LivingRoom, UpstairsHallway, SleepingRoom, Attic)
-}
-
-func (gs *GameState) InitPlayers() {
-	log.Println("Setting up Jim...")
-	Jim := &player.Player{
-		MovingEntity:       moving.MovingEntity{Location: gs.Locations[0]},
-		HealthPoolEntity:   healthpool.HealthPoolEntity{CurrentHealth: 10, MaxHealth: 10},
-		ID:                 1,
-		Name:               "Jim Gordon",
-		CardsInHand:        7,
-		ResourcesAvailable: 5,
-		RemainingActions:   3,
+func (gs *GameState) StartNewTurn() {
+	for _, v := range gs.Players {
+		v.RemainingActions = 3
 	}
-
-	log.Println("Setting up Ivy...")
-	Ivy := &player.Player{
-		MovingEntity:       moving.MovingEntity{Location: gs.Locations[0]},
-		HealthPoolEntity:   healthpool.HealthPoolEntity{CurrentHealth: 8, MaxHealth: 8},
-		ID:                 1,
-		Name:               "Poison Ivy",
-		CardsInHand:        7,
-		ResourcesAvailable: 5,
-		RemainingActions:   3,
-	}
-
-	gs.Players = append(gs.Players, Jim, Ivy)
-}
-
-func (gs *GameState) InitEnemies() {
-
-	log.Println("Setting up Ghoul...")
-	ghoul := &enemy.EnemyEntity{
-		MovingEntity:     moving.MovingEntity{Location: gs.Locations[len(gs.Locations)-1]},
-		HealthPoolEntity: healthpool.HealthPoolEntity{CurrentHealth: 5, MaxHealth: 5},
-		ID:               1,
-		Name:             "Noxious Ghoul",
-		Aloof:            false,
-		Hunter:           true,
-		Damage:           2,
-	}
-
-	log.Println("Setting up Rat...")
-	rat := &enemy.EnemyEntity{
-		MovingEntity:     moving.MovingEntity{Location: gs.Locations[3]},
-		HealthPoolEntity: healthpool.HealthPoolEntity{CurrentHealth: 2, MaxHealth: 2},
-		ID:               1,
-		Name:             "Chittering Rat",
-		Aloof:            false,
-		Hunter:           false,
-		Damage:           1,
-	}
-
-	log.Println("Setting up Suspicious Plant...")
-	plant := &enemy.EnemyEntity{
-		MovingEntity:     moving.MovingEntity{Location: gs.Locations[3]},
-		HealthPoolEntity: healthpool.HealthPoolEntity{CurrentHealth: 2, MaxHealth: 2},
-		ID:               1,
-		Name:             "Suspicious Plant",
-		Aloof:            true,
-		Hunter:           false,
-		Damage:           1,
-	}
-
-	gs.Enemies = append(gs.Enemies, ghoul, rat, plant)
+	gs.TurnCounter += 1
 }
 
 func (gs *GameState) GetLocationByName(name string) *location.LocationEntity {
@@ -149,55 +54,9 @@ func (gs *GameState) GetLocationByName(name string) *location.LocationEntity {
 	return &location.LocationEntity{}
 }
 
-func (gs *GameState) PollNextTurn() (*player.Player, error) {
-
-	selectable := []*player.Player{}
-	for _, v := range gs.Players {
-		if v.RemainingActions > 0 {
-			selectable = append(selectable, v)
-		}
-	}
-
-	activeArray := []string{}
-	for _, v := range selectable {
-		activeArray = append(activeArray, fmt.Sprintf("%s (currently at %s)", v.Name, v.Location.Name))
-	}
-
-	label := ">>> --- Choose a player to act --- <<<"
-	index, err := prompt.PromptUser(label, activeArray, false)
-	if err != nil {
-		return &player.Player{}, err
-	}
-
-	nextTurn := selectable[index]
-	fmt.Printf("%s selected to act!\n", nextTurn.Name)
-	return nextTurn, nil
-
-}
-
-func (gs *GameState) PromptNextAction(player *player.Player) (string, error) {
-	actionArray := []string{"Move", "Draw", "Resource"}
-
-	if gs.playerHasEnemiesInRange(player) {
-		actionArray = append(actionArray, "Attack", "Evade")
-	}
-
-	label := fmt.Sprintf("<<< --- What will %s do? --- >>> ", player.Name)
-
-	index, err := prompt.PromptUser(label, actionArray, true)
-	if err != nil {
-		return "", err
-	}
-	if index == len(actionArray) {
-		return "Cancel", nil
-	}
-
-	return actionArray[index], nil
-}
-
-func (gs *GameState) playerHasEnemiesInRange(pce *player.Player) bool {
+func (gs *GameState) LocationHasEnemies(le *location.LocationEntity) bool {
 	for _, v := range gs.Enemies {
-		if pce.Location == v.Location {
+		if le == v.Location {
 			return true
 		}
 	}
@@ -205,28 +64,28 @@ func (gs *GameState) playerHasEnemiesInRange(pce *player.Player) bool {
 	return false
 }
 
-func (gs *GameState) enemiesAtSameLocationForPlayer(pce *player.Player) []*enemy.EnemyEntity {
+func (gs *GameState) LocationHasPlayers(le *location.LocationEntity) bool {
+	for _, v := range gs.Players {
+		if le == v.Location {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (gs *GameState) EnemiesAtLocation(le *location.LocationEntity) []*enemy.EnemyEntity {
 
 	found := []*enemy.EnemyEntity{}
 	for _, v := range gs.Enemies {
-		if pce.Location == v.Location {
+		if le == v.Location {
 			found = append(found, v)
 		}
 	}
 	return found
 }
 
-func (gs *GameState) enemyHasPlayersInRange(ee *enemy.EnemyEntity) bool {
-	for _, v := range gs.Players {
-		if ee.Location == v.Location {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (gs *GameState) playersAtSameLocationForEnemy(ee *enemy.EnemyEntity) []*player.Player {
+func (gs *GameState) PlayersAtLocation(ee *enemy.EnemyEntity) []*player.Player {
 
 	found := []*player.Player{}
 	for _, v := range gs.Players {
@@ -238,6 +97,54 @@ func (gs *GameState) playersAtSameLocationForEnemy(ee *enemy.EnemyEntity) []*pla
 	return found
 }
 
+func (gs *GameState) ResolvePlayerPhaseStep() error {
+	nextPlayer, err := gs.PromptForNextPlayer()
+	if err != nil {
+		return err
+	}
+
+	cancelled, action, err := gs.PromptForPlayerAction(nextPlayer)
+	if err != nil {
+		return err
+	} else if cancelled {
+		gs.ResolvePlayerPhaseStep()
+	}
+
+	switch action {
+	case "Move":
+
+		cancelled, location, err := gs.ChooseTargetForPlayerMove(nextPlayer)
+		if err != nil {
+			return err
+		} else if cancelled {
+			gs.ResolvePlayerPhaseStep()
+		} else {
+			nextPlayer.RemainingActions -= 1
+			pme := player.PlayerMoveEffect{TargetPlayer: nextPlayer, TargetLocation: location}
+			pme.Apply()
+		}
+
+	case "Attack":
+		nextPlayer.RemainingActions -= 1
+		cancelled, target, err := gs.ChooseTargetForPlayerAttack(nextPlayer)
+		if err != nil {
+			return err
+		} else if cancelled {
+			gs.ResolvePlayerPhaseStep()
+		} else {
+			pae := player.PlayerAttackEffect{TargetPlayer: nextPlayer, TargetEnemy: target, DamageAmount: 1}
+			pae.Apply()
+		}
+	case "Cancel":
+		gs.ResolveAttackForPlayer(nextPlayer)
+	default:
+		fmt.Println("Selected unimplemented action")
+	}
+
+	gs.ReconcileDefeats()
+	return nil
+}
+
 func (gs *GameState) PlayerHaveActionsRemaining() bool {
 	for _, v := range gs.Players {
 		if v.RemainingActions > 0 {
@@ -247,145 +154,57 @@ func (gs *GameState) PlayerHaveActionsRemaining() bool {
 	return false
 }
 
-func (gs *GameState) ResolvePlayerPhaseStep() error {
-	nextPlayer, err := gs.PollNextTurn()
+func (gs *GameState) ChooseTargetForPlayerMove(player *player.Player) (bool, *location.LocationEntity, error) {
+	targets := player.Location.OutgoingConnections
+	optionsArray := []string{}
+
+	for _, v := range targets {
+		optionsArray = append(optionsArray, v.Name)
+	}
+
+	cancelled, position, err := prompt.PromptCancellable(">>> --- Choose a location to move to --- <<<", optionsArray)
+
 	if err != nil {
-		return err
+		return false, &location.LocationEntity{}, err
+	} else if cancelled {
+		return true, &location.LocationEntity{}, nil
+	} else {
+		return false, targets[position], nil
 	}
-
-	action, err := gs.PromptNextAction(nextPlayer)
-	if err != nil {
-		return err
-	}
-
-	switch action {
-	case "Move":
-		nextPlayer.RemainingActions -= 1
-		moveEffect := effect.MoveEffect{&effect.MoveEffectContext{nextPlayer, 1}}
-		moveEffect.Apply()
-	case "Attack":
-		nextPlayer.RemainingActions -= 1
-		gs.ResolveAttackForPlayer(nextPlayer)
-	case "Cancel":
-		gs.ResolvePlayerPhaseStep()
-	default:
-		fmt.Println("Selected unimplemented action")
-	}
-
-	gs.ReconcileDefeats()
-	return nil
 }
 
-func (gs *GameState) ResolveAttackForPlayer(player *player.Player) {
-	inRange := gs.enemiesAtSameLocationForPlayer(player)
+func (gs *GameState) ChooseTargetForPlayerAttack(player *player.Player) (bool, *enemy.EnemyEntity, error) {
+	inRange := gs.EnemiesAtLocation(player.Location)
 	promptList := []string{}
 	for _, v := range inRange {
 		promptItem := fmt.Sprintf("%s (Remaining Health: %d/%d)", v.Name, v.CurrentHealth, v.MaxHealth)
 		promptList = append(promptList, promptItem)
 	}
 
-	prompt := promptui.Select{
-		Label: ">>> --- Choose a location to move to --- <<<",
-		Items: promptList,
+	cancelled, position, err := prompt.PromptCancellable(">>> --- Chose a target to attack --- <<<", promptList)
+	if err != nil {
+		return false, &enemy.EnemyEntity{}, err
+	} else if cancelled {
+		return true, &enemy.EnemyEntity{}, nil
+	} else {
+		return false, inRange[position], nil
 	}
-	position, _, err := prompt.Run()
+}
+
+func (gs *GameState) ResolveAttackForPlayer(player *player.Player) {
+
+	cancelled, enemy, err := gs.ChooseTargetForPlayerAttack(player)
+
 	if err != nil {
 		log.Println("The attack failed because the input was not an enemy.")
-	}
-	target := inRange[position]
-
-	target.TakeDamage(1)
-	log.Printf("%s attacks %s down to %d/%d health.\n", player.Name, target.Name, target.CurrentHealth, target.MaxHealth)
-	if target.CurrentHealth == 0 {
-		log.Printf("%s has defeated %s!", player.Name, target.Name)
-	}
-}
-
-func (gs *GameState) ResolveAttackForEnemy(enemy *enemy.EnemyEntity) {
-	inRange := gs.playersAtSameLocationForEnemy(enemy)
-
-	if len(inRange) == 0 {
-		log.Printf("%s has no targets for an attack and doesn't attack.\n", enemy.Name)
-		return
-	}
-
-	for _, target := range inRange {
-		target.TakeDamage(enemy.Damage)
-		log.Printf("%s attacks %s for %d damage down to %d/%d health.\n", enemy.Name, target.Name, enemy.Damage, target.CurrentHealth, target.MaxHealth)
-		if target.CurrentHealth == 0 {
-			log.Printf("%s has defeated %s!\n", target.Name, target.Name)
-		}
-	}
-}
-
-func (gs *GameState) ResolveEnemyPhase() {
-	for _, v := range gs.Enemies {
-		gs.ResolveEnemyMovement(v)
-		gs.ResolveEnemyAttacks(v)
-		gs.ReconcileDefeats()
-	}
-
-}
-
-func (gs *GameState) ResolveEnemyMovement(enemy *enemy.EnemyEntity) {
-
-	if enemy.Hunter {
-
-		target, steps := gs.DetermineHuntingTargetForEnemy(enemy)
-
-		if len(steps) == 1 {
-			log.Printf("%s is already at its prey location and does not need to move.\n", enemy.Name)
-		} else {
-			targetLocation := gs.GetLocationByName(steps[1])
-			enemy.MoveTo(targetLocation)
-			log.Printf("%s has %s as target and will move to %s to hunt its prey.\n", enemy.Name, target.Name, steps[1])
-		}
-
-	} else {
-		log.Printf("%s is not a hunter and does not move.", enemy.Name)
-	}
-}
-
-func (gs *GameState) ResolveEnemyAttacks(enemy *enemy.EnemyEntity) {
-	if !enemy.Aloof {
-		gs.ResolveAttackForEnemy(enemy)
-	} else {
-		log.Printf("%s is aloof and doesn't attack.", enemy.Name)
-	}
-}
-
-func (gs *GameState) StartNewTurn() {
-	for _, v := range gs.Players {
-		v.RemainingActions = 3
-	}
-	gs.TurnCounter += 1
-}
-
-func (gs *GameState) DetermineHuntingTargetForEnemy(enemy *enemy.EnemyEntity) (*player.Player, []string) {
-	CurrentTargets := []*player.Player{}
-	CurrentSteps := [][]string{}
-	CurrentMinDistance := math.MaxInt
-
-	for _, v := range gs.Players {
-		steps, err := enemy.Location.GetShortestPathTo(v.Location)
-		if err != nil {
-			log.Println(err)
-		}
-
-		if len(steps) == CurrentMinDistance {
-			CurrentTargets = append(CurrentTargets, v)
-			CurrentSteps = append(CurrentSteps, steps)
-		}
-
-		if len(steps) < CurrentMinDistance {
-			CurrentMinDistance = len(steps)
-			CurrentTargets = []*player.Player{v}
-			CurrentSteps = [][]string{steps}
+		if cancelled {
+			//wemustgoback
 		}
 	}
 
-	n := rand.IntN(len(CurrentTargets))
-	finalTarget := CurrentTargets[n]
-	finalSteps := CurrentSteps[n]
-	return finalTarget, finalSteps
+	enemy.TakeDamage(1)
+	log.Printf("%s attacks %s down to %d/%d health.\n", player.Name, enemy.Name, enemy.CurrentHealth, enemy.MaxHealth)
+	if enemy.CurrentHealth == 0 {
+		log.Printf("%s has defeated %s!", player.Name, enemy.Name)
+	}
 }

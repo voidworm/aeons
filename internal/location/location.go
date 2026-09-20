@@ -1,7 +1,6 @@
 package location
 
 import (
-	"errors"
 	"slices"
 )
 
@@ -11,53 +10,48 @@ type LocationEntity struct {
 	OutgoingConnections []*LocationEntity
 }
 
-func (le *LocationEntity) GetShortestPathTo(target *LocationEntity) ([]string, error) {
+// returns the path between two locations, including each of the locations.
+// this function assumes that the the locations do have a connection path
+// if you intend to load maps that have locations that can't be reached, this will break.
+func (le *LocationEntity) GetShortestPathTo(target *LocationEntity) []*LocationEntity {
 
 	//stuff we need to check
 	queue := []*LocationEntity{le}
 
 	//stuff we have checked
-	visited := []*LocationEntity{le}
+	visited := map[*LocationEntity]bool{le: true}
 
 	//the parents we took
-	parents := make(map[string]string)
-
-	found := false
+	parents := make(map[*LocationEntity]*LocationEntity)
 
 	for len(queue) != 0 {
 		current := queue[0]
 		queue = queue[1:]
 		if current == target {
-			found = true
 			break
 		}
 		for _, v := range current.OutgoingConnections {
-			alreadyVisited := slices.ContainsFunc(visited, func(location *LocationEntity) bool {
-				return (location == v)
-			})
+			alreadyVisited := visited[v]
 			if !alreadyVisited {
-				visited = append(visited, v)
+				visited[v] = true
 				queue = append(queue, v)
-				parents[v.Name] = current.Name
+				parents[v] = current
 			}
 		}
 	}
 
-	if found {
-		path := []string{target.Name}
-		currentChild := target.Name
-		for {
-			parent := parents[currentChild]
-			if parent == "" {
-				break
-			}
-			path = append(path, parent)
-			currentChild = parent
+	path := []*LocationEntity{target}
+	currentChild := target
+	for {
+		parent := parents[currentChild]
+		if parent != nil {
+			break
 		}
-		slices.Reverse(path)
-		return path, nil
+		path = append(path, parent)
+		currentChild = parent
 	}
 
-	//since maps should be a graph this should never happen but you never know
-	return []string{}, errors.New("Locations are not connected")
+	slices.Reverse(path)
+	return path
+
 }

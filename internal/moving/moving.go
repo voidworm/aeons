@@ -1,10 +1,7 @@
 package moving
 
 import (
-	"log"
 	"math/rand/v2"
-
-	"github.com/manifoldco/promptui"
 
 	"aeons/internal/location"
 )
@@ -15,49 +12,26 @@ type MovingEntity struct {
 
 type Movable interface {
 	GenerateMoveGoal() *location.LocationEntity
-	MovementPathTowards(*location.LocationEntity) ([]string, error)
+	MovementPathTowards(*location.LocationEntity) ([]*location.LocationEntity, error)
 	PossibleMoveTargets() []*location.LocationEntity
-	PromptMoveTargetSelection() *location.LocationEntity
 	MoveTo(*location.LocationEntity)
 }
 
-func (me *MovingEntity) MovementPathTowards(target *location.LocationEntity) ([]string, error) {
-	path, err := me.Location.GetShortestPathTo(target)
-	if err != nil {
-		return []string{}, err
-	}
-	return path, nil
+// this is a getter for the locations shortest path
+// don't overwrite this
+func (me *MovingEntity) MovementPathTowards(target *location.LocationEntity) []*location.LocationEntity {
+	return me.Location.GetShortestPathTo(target)
 }
 
+// this function returns a random connected location
+// it should almost always be overwritten for your entity
 func (me *MovingEntity) GenerateMoveGoal() *location.LocationEntity {
-	return me.PossibleMoveTargets()[rand.IntN(len(me.PossibleMoveTargets()))]
+	linkedLocations := me.Location.OutgoingConnections
+	return linkedLocations[rand.IntN(len(linkedLocations))]
 }
 
-func (me *MovingEntity) PossibleMoveTargets() []*location.LocationEntity {
-	return me.Location.OutgoingConnections
-}
-
-func (me *MovingEntity) PromptMoveTargetSelection() *location.LocationEntity {
-	optionsArray := []string{}
-
-	for _, v := range me.PossibleMoveTargets() {
-		optionsArray = append(optionsArray, v.Name)
-	}
-
-	prompt := promptui.Select{
-		Label: ">>> --- Choose a location to move to --- <<<",
-		Items: optionsArray,
-	}
-	position, _, err := prompt.Run()
-
-	if err != nil {
-		log.Printf("error when retrieving move goal for generic MovingEntitiy")
-		return nil
-	} else {
-		return me.PossibleMoveTargets()[position]
-	}
-}
-
+// setter for location
+// overwrite if you need to do stuff before or after moving
 func (m *MovingEntity) MoveTo(target *location.LocationEntity) {
 	m.Location = target
 }
