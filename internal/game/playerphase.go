@@ -4,6 +4,7 @@ import (
 	"aeons/internal/combat"
 	"aeons/internal/enemy"
 	"aeons/internal/location"
+	"aeons/internal/moving"
 	"aeons/internal/player"
 	"aeons/internal/prompt"
 	"fmt"
@@ -11,12 +12,12 @@ import (
 )
 
 func (gs *GameState) ResolvePlayerPhaseStep() error {
-	nextPlayer, err := gs.PromptForNextPlayer()
+	currentPlayer, err := gs.PromptForNextPlayer()
 	if err != nil {
 		return err
 	}
 
-	cancelled, action, err := gs.PromptForPlayerAction(nextPlayer)
+	cancelled, action, err := gs.PromptForPlayerAction(currentPlayer)
 	if err != nil {
 		return err
 	} else if cancelled {
@@ -26,31 +27,31 @@ func (gs *GameState) ResolvePlayerPhaseStep() error {
 	switch action {
 	case "Move":
 
-		cancelled, location, err := gs.ChooseTargetForPlayerMove(nextPlayer)
+		cancelled, location, err := gs.ChooseTargetForPlayerMove(currentPlayer)
 		if err != nil {
 			return err
 		} else if cancelled {
 			gs.ResolvePlayerPhaseStep()
 		} else {
-			nextPlayer.RemainingActions -= 1
-			pme := player.PlayerMoveEffect{TargetPlayer: nextPlayer, TargetLocation: location}
-			pme.Apply()
+			currentPlayer.RemainingActions -= 1
+			moveEffect := moving.MoveEffect{Entity: currentPlayer, Target: location}
+			moveEffect.Apply()
 		}
 
 	case "Attack":
 
-		cancelled, target, err := gs.ChooseTargetForPlayerAttack(nextPlayer)
+		cancelled, target, err := gs.ChooseTargetForPlayerAttack(currentPlayer)
 		if err != nil {
 			return err
 		} else if cancelled {
 			gs.ResolvePlayerPhaseStep()
 		} else {
-			nextPlayer.RemainingActions -= 1
-			effect := combat.DamageEffect{Source: nextPlayer, Target: target}
+			currentPlayer.RemainingActions -= 1
+			effect := combat.DamageEffect{Source: currentPlayer, Target: target}
 			effect.Apply()
 		}
 	case "Cancel":
-		gs.ResolveAttackForPlayer(nextPlayer)
+		gs.ResolveAttackForPlayer(currentPlayer)
 	default:
 		fmt.Println("Selected unimplemented action")
 	}
@@ -60,7 +61,7 @@ func (gs *GameState) ResolvePlayerPhaseStep() error {
 }
 
 func (gs *GameState) ChooseTargetForPlayerMove(player *player.Player) (bool, *location.LocationEntity, error) {
-	targets := player.Location.OutgoingConnections
+	targets := player.CurrentLocation.OutgoingConnections
 	optionsArray := []string{}
 
 	for _, v := range targets {
@@ -79,7 +80,7 @@ func (gs *GameState) ChooseTargetForPlayerMove(player *player.Player) (bool, *lo
 }
 
 func (gs *GameState) ChooseTargetForPlayerAttack(player *player.Player) (bool, *enemy.EnemyEntity, error) {
-	inRange := gs.EnemiesAtLocation(player.Location)
+	inRange := gs.EnemiesAtLocation(player.CurrentLocation)
 	promptList := []string{}
 	for _, v := range inRange {
 		promptItem := fmt.Sprintf("%s (Remaining Health: %d/%d)", v.Name, v.CurrentHealth, v.MaxHealth)

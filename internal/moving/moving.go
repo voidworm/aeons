@@ -1,37 +1,42 @@
 package moving
 
 import (
-	"math/rand/v2"
-
 	"aeons/internal/location"
 )
 
 type MovingEntity struct {
-	Location *location.LocationEntity
+	CurrentLocation *location.LocationEntity
 }
 
 type Movable interface {
-	GenerateMoveGoal() *location.LocationEntity
-	MovementPathTowards(*location.LocationEntity) ([]*location.LocationEntity, error)
-	PossibleMoveTargets() []*location.LocationEntity
+	MoveTowards(*location.LocationEntity)
 	MoveTo(*location.LocationEntity)
 }
 
-// this is a getter for the locations shortest path
-// don't overwrite this
-func (me *MovingEntity) GetShortestPathTo(target *location.LocationEntity) []*location.LocationEntity {
-	return me.Location.GetShortestPathTo(target)
-}
-
-// this function returns a random connected location
-// it should almost always be overwritten for your entity
-func (me *MovingEntity) GenerateMoveGoal() *location.LocationEntity {
-	linkedLocations := me.Location.OutgoingConnections
-	return linkedLocations[rand.IntN(len(linkedLocations))]
+// generic move towards function
+// will calc the path to the target and then move once towards the target
+// can be overwritten if your move towards is not a bfs
+func (m *MovingEntity) MoveTowards(target *location.LocationEntity) {
+	steps := m.CurrentLocation.GetShortestPathTo(target)
+	switch len(steps) {
+	case 1:
+		//the entity is already at the target we don't need to do anything
+	default:
+		m.MoveTo(steps[1])
+	}
 }
 
 // setter for location
 // overwrite if you need to do stuff before or after moving
 func (m *MovingEntity) MoveTo(target *location.LocationEntity) {
-	m.Location = target
+	m.CurrentLocation = target
+}
+
+type MoveEffect struct {
+	Entity Movable
+	Target *location.LocationEntity
+}
+
+func (hme *MoveEffect) Apply() {
+	hme.Entity.MoveTowards(hme.Target)
 }

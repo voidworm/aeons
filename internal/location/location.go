@@ -14,7 +14,14 @@ type LocationEntity struct {
 // this function assumes that the the locations do have a connection path
 // if you intend to load maps that have locations that can't be reached, this will break.
 func (le *LocationEntity) GetShortestPathTo(target *LocationEntity) []*LocationEntity {
+	return le.breathSearchFirst(target)
+}
 
+func (le *LocationEntity) DistanceTo(target *LocationEntity) int {
+	return len(le.breathSearchFirst(target))
+}
+
+func (le *LocationEntity) breathSearchFirst(target *LocationEntity) []*LocationEntity {
 	//stuff we need to check
 	queue := []*LocationEntity{le}
 
@@ -53,5 +60,4 @@ func (le *LocationEntity) GetShortestPathTo(target *LocationEntity) []*LocationE
 
 	slices.Reverse(path)
 	return path
-
 }

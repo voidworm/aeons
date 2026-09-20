@@ -42,7 +42,7 @@ func (gs *GameState) InitLocations() {
 func (gs *GameState) InitPlayers() {
 	log.Println("Setting up Jim...")
 	Jim := &player.Player{
-		MovingEntity:       moving.MovingEntity{Location: gs.Locations[0]},
+		MovingEntity:       moving.MovingEntity{CurrentLocation: gs.Locations[0]},
 		HealthPool:         combat.HealthPool{CurrentHealth: 10, MaxHealth: 10},
 		ID:                 1,
 		Name:               "Jim Gordon",
@@ -54,7 +54,7 @@ func (gs *GameState) InitPlayers() {
 
 	log.Println("Setting up Ivy...")
 	Ivy := &player.Player{
-		MovingEntity:       moving.MovingEntity{Location: gs.Locations[0]},
+		MovingEntity:       moving.MovingEntity{CurrentLocation: gs.Locations[0]},
 		HealthPool:         combat.HealthPool{CurrentHealth: 8, MaxHealth: 8},
 		ID:                 1,
 		Name:               "Poison Ivy",
@@ -71,7 +71,7 @@ func (gs *GameState) InitEnemies() {
 
 	log.Println("Setting up Ghoul...")
 	ghoul := &enemy.EnemyEntity{
-		MovingEntity: moving.MovingEntity{Location: gs.Locations[len(gs.Locations)-1]},
+		MovingEntity: moving.MovingEntity{CurrentLocation: gs.Locations[len(gs.Locations)-1]},
 		HealthPool:   combat.HealthPool{CurrentHealth: 5, MaxHealth: 5},
 		ID:           1,
 		Name:         "Noxious Ghoul",
@@ -82,7 +82,7 @@ func (gs *GameState) InitEnemies() {
 
 	log.Println("Setting up Rat...")
 	rat := &enemy.EnemyEntity{
-		MovingEntity: moving.MovingEntity{Location: gs.Locations[3]},
+		MovingEntity: moving.MovingEntity{CurrentLocation: gs.Locations[3]},
 		HealthPool:   combat.HealthPool{CurrentHealth: 2, MaxHealth: 2},
 		ID:           1,
 		Name:         "Chittering Rat",
@@ -93,7 +93,7 @@ func (gs *GameState) InitEnemies() {
 
 	log.Println("Setting up Suspicious Plant...")
 	plant := &enemy.EnemyEntity{
-		MovingEntity: moving.MovingEntity{Location: gs.Locations[3]},
+		MovingEntity: moving.MovingEntity{CurrentLocation: gs.Locations[3]},
 		HealthPool:   combat.HealthPool{CurrentHealth: 2, MaxHealth: 2},
 		ID:           1,
 		Name:         "Suspicious Plant",

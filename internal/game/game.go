@@ -41,7 +41,7 @@ func (gs *GameState) StartNewTurn() {
 
 func (gs *GameState) LocationHasEnemies(le *location.LocationEntity) bool {
 	for _, v := range gs.Enemies {
-		if le == v.Location {
+		if le == v.CurrentLocation {
 			return true
 		}
 	}
@@ -49,12 +49,11 @@ func (gs *GameState) LocationHasEnemies(le *location.LocationEntity) bool {
 	return false
 }
 
-
 func (gs *GameState) EnemiesAtLocation(le *location.LocationEntity) []*enemy.EnemyEntity {
 
 	found := []*enemy.EnemyEntity{}
 	for _, v := range gs.Enemies {
-		if le == v.Location {
+		if le == v.CurrentLocation {
 			found = append(found, v)
 		}
 	}
@@ -65,7 +64,7 @@ func (gs *GameState) PlayersAtLocation(ee *enemy.EnemyEntity) []*player.Player {
 
 	found := []*player.Player{}
 	for _, v := range gs.Players {
-		if ee.Location == v.Location {
+		if ee.CurrentLocation == v.CurrentLocation {
 			found = append(found, v)
 		}
 	}

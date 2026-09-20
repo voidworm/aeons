@@ -17,7 +17,7 @@ func (gs *GameState) PromptForNextPlayer() (*player.Player, error) {
 
 	activeArray := []string{}
 	for _, v := range selectable {
-		activeArray = append(activeArray, fmt.Sprintf("%s (currently at %s)", v.Name, v.Location.Name))
+		activeArray = append(activeArray, fmt.Sprintf("%s (currently at %s)", v.Name, v.CurrentLocation.Name))
 	}
 
 	label := ">>> --- Choose a player to act --- <<<"
@@ -29,13 +29,12 @@ func (gs *GameState) PromptForNextPlayer() (*player.Player, error) {
 	nextTurn := selectable[index]
 	fmt.Printf("%s selected to act!\n", nextTurn.Name)
 	return nextTurn, nil
-
 }
 
 func (gs *GameState) PromptForPlayerAction(player *player.Player) (bool, string, error) {
 	actionArray := []string{"Move", "Draw", "Resource"}
 
-	if gs.LocationHasEnemies(player.Location) {
+	if gs.LocationHasEnemies(player.CurrentLocation) {
 		actionArray = append(actionArray, "Attack", "Evade")
 	}
 

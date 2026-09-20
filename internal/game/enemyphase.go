@@ -3,7 +3,7 @@ package game
 import (
 	"aeons/internal/combat"
 	"aeons/internal/enemy"
-	"aeons/internal/location"
+	"aeons/internal/moving"
 	"aeons/internal/player"
 	"log"
 	"math"
@@ -16,6 +16,38 @@ func (gs *GameState) ResolveEnemyPhase() {
 		gs.ResolveEnemyAttacks(v)
 		gs.ReconcileDefeats()
 	}
+}
+
+func (gs *GameState) ResolveEnemyMovement(input *enemy.EnemyEntity) {
+	if !input.Hunter {
+		log.Printf("%s is not a hunter and does not move.", input.Name)
+		return
+	}
+
+	target := gs.DetermineHuntingTargetForEnemy(input)
+	moveEffect := moving.MoveEffect{Entity: input, Target: target.CurrentLocation}
+	moveEffect.Apply()
+
+}
+
+func (gs *GameState) DetermineHuntingTargetForEnemy(enemy *enemy.EnemyEntity) *player.Player {
+
+	lowestDistance := math.MaxInt
+	lowestPlayers := []*player.Player{}
+	for _, currentPlayer := range gs.Players {
+		distance := enemy.CurrentLocation.DistanceTo(currentPlayer.CurrentLocation)
+		if distance == lowestDistance {
+			lowestPlayers = append(lowestPlayers, currentPlayer)
+		} else if distance < lowestDistance {
+			lowestPlayers = []*player.Player{currentPlayer}
+			lowestDistance = distance
+		}
+	}
+
+	//selects a random entry from the array
+	//if only one entry, it's that entry
+	selectedIndex := rand.IntN(len(lowestPlayers))
+	return lowestPlayers[selectedIndex]
 }
 
 func (gs *GameState) ResolveEnemyAttacks(enemy *enemy.EnemyEntity) {
@@ -38,50 +70,4 @@ func (gs *GameState) ResolveAttackForEnemy(enemy *enemy.EnemyEntity) {
 		effect := combat.DamageEffect{Source: enemy, Target: target}
 		effect.Apply()
 	}
-}
-
-func (gs *GameState) ResolveEnemyMovement(input *enemy.EnemyEntity) {
-
-	if input.Hunter {
-
-		target, steps := gs.DetermineHuntingTargetForEnemy(input)
-
-		if len(steps) == 1 {
-			log.Printf("%s is already at its prey location and does not need to move.\n", input.Name)
-		} else {
-			targetLocation := steps[1]
-			eme := enemy.EnemyMoveEffect{TargetEnemy: input, TargetLocation: targetLocation}
-			eme.Apply()
-			log.Printf("%s has %s as target and will move to %s to hunt its prey.\n", input.Name, target.Name, targetLocation.Name)
-		}
-
-	} else {
-		log.Printf("%s is not a hunter and does not move.", input.Name)
-	}
-}
-
-func (gs *GameState) DetermineHuntingTargetForEnemy(enemy *enemy.EnemyEntity) (*player.Player, []*location.LocationEntity) {
-	CurrentTargets := []*player.Player{}
-	CurrentSteps := [][]*location.LocationEntity{}
-	CurrentMinDistance := math.MaxInt
-
-	for _, v := range gs.Players {
-		steps := enemy.Location.GetShortestPathTo(v.Location)
-
-		if len(steps) == CurrentMinDistance {
-			CurrentTargets = append(CurrentTargets, v)
-			CurrentSteps = append(CurrentSteps, steps)
-		}
-
-		if len(steps) < CurrentMinDistance {
-			CurrentMinDistance = len(steps)
-			CurrentTargets = []*player.Player{v}
-			CurrentSteps = [][]*location.LocationEntity{steps}
-		}
-	}
-
-	n := rand.IntN(len(CurrentTargets))
-	finalTarget := CurrentTargets[n]
-	finalSteps := CurrentSteps[n]
-	return finalTarget, finalSteps
 }
