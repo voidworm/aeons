@@ -1,6 +1,7 @@
 package game
 
 import (
+	"aeons/internal/combat"
 	"aeons/internal/enemy"
 	"aeons/internal/location"
 	"aeons/internal/player"
@@ -25,6 +26,20 @@ func (gs *GameState) ResolveEnemyAttacks(enemy *enemy.EnemyEntity) {
 	}
 }
 
+func (gs *GameState) ResolveAttackForEnemy(enemy *enemy.EnemyEntity) {
+	inRange := gs.PlayersAtLocation(enemy)
+
+	if len(inRange) == 0 {
+		log.Printf("%s has no targets for an attack and doesn't attack.\n", enemy.Name)
+		return
+	}
+
+	for _, target := range inRange {
+		effect := combat.DamageEffect{Source: enemy, Target: target}
+		effect.Apply()
+	}
+}
+
 func (gs *GameState) ResolveEnemyMovement(input *enemy.EnemyEntity) {
 
 	if input.Hunter {
@@ -42,23 +57,6 @@ func (gs *GameState) ResolveEnemyMovement(input *enemy.EnemyEntity) {
 
 	} else {
 		log.Printf("%s is not a hunter and does not move.", input.Name)
-	}
-}
-
-func (gs *GameState) ResolveAttackForEnemy(enemy *enemy.EnemyEntity) {
-	inRange := gs.PlayersAtLocation(enemy)
-
-	if len(inRange) == 0 {
-		log.Printf("%s has no targets for an attack and doesn't attack.\n", enemy.Name)
-		return
-	}
-
-	for _, target := range inRange {
-		target.TakeDamage(enemy.Damage)
-		log.Printf("%s attacks %s for %d damage down to %d/%d health.\n", enemy.Name, target.Name, enemy.Damage, target.CurrentHealth, target.MaxHealth)
-		if target.CurrentHealth == 0 {
-			log.Printf("%s has defeated %s!\n", target.Name, target.Name)
-		}
 	}
 }
 

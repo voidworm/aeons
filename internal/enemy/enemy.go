@@ -1,14 +1,14 @@
 package enemy
 
 import (
-	"aeons/internal/healthpool"
+	"aeons/internal/combat"
 	"aeons/internal/location"
 	"aeons/internal/moving"
 )
 
 type EnemyEntity struct {
 	moving.MovingEntity
-	healthpool.HealthPoolEntity
+	combat.HealthPool
 	ID     int
 	Name   string
 	Aloof  bool
@@ -16,8 +16,12 @@ type EnemyEntity struct {
 	Damage int
 }
 
-func (me *EnemyEntity) GenerateMoveGoal(target *location.LocationEntity) *location.LocationEntity {
-	return me.MovementPathTowards(target)[1]
+func (ee *EnemyEntity) GenerateMoveGoal(target *location.LocationEntity) *location.LocationEntity {
+	return ee.GetShortestPathTo(target)[1]
+}
+
+func (ee *EnemyEntity) OutgoingDamage() int {
+	return ee.Damage
 }
 
 // setter for location
@@ -32,6 +36,5 @@ type EnemyMoveEffect struct {
 }
 
 func (eme *EnemyMoveEffect) Apply() {
-	//path := eme.TargetEnemy.MovementPathTowards(eme.TargetLocation)
 	eme.TargetEnemy.MoveTo(eme.TargetLocation)
 }

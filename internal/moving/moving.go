@@ -19,7 +19,7 @@ type Movable interface {
 
 // this is a getter for the locations shortest path
 // don't overwrite this
-func (me *MovingEntity) MovementPathTowards(target *location.LocationEntity) []*location.LocationEntity {
+func (me *MovingEntity) GetShortestPathTo(target *location.LocationEntity) []*location.LocationEntity {
 	return me.Location.GetShortestPathTo(target)
 }
 
