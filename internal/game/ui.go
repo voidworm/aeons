@@ -32,10 +32,14 @@ func (gs *GameState) PromptForNextPlayer() (*player.Unit, error) {
 }
 
 func (gs *GameState) PromptForPlayerAction(player *player.Unit) (bool, string, error) {
-	actionArray := []string{"Move", "Draw", "Resource"}
+	actionArray := []string{"Move"}
 
 	if gs.LocationHasEnemies(player.CurrentLocation) {
 		actionArray = append(actionArray, "Attack", "Evade")
+	}
+
+	if gs.LocationHasHarvest(player.CurrentLocation) {
+		actionArray = append(actionArray, "Harvest")
 	}
 
 	label := fmt.Sprintf("<<< --- What will %s do? --- >>> ", player.Name)

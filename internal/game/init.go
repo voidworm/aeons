@@ -2,98 +2,119 @@ package game
 
 import (
 	"aeons/internal/combat"
-	"aeons/internal/enemy"
+	"aeons/internal/creature"
+	"aeons/internal/harvesting"
 	"aeons/internal/location"
 	"aeons/internal/moving"
 	"aeons/internal/player"
 	"log"
+	"math/rand/v2"
+	"slices"
 )
 
 func (gs *GameState) Init() {
 
 	gs.InitLocations()
+	gs.InitHarvestingUnits()
 	gs.InitPlayers()
-	gs.InitEnemies()
+	gs.InitCreatures()
 }
 
 func (gs *GameState) InitLocations() {
 
-	log.Println("Setting up Locations...")
-	Porch := &location.LocationEntity{ID: 1, Name: "Porch"}
-	DownstairsHallway := &location.LocationEntity{ID: 1, Name: "Downstairs Hallway"}
-	Kitchen := &location.LocationEntity{ID: 1, Name: "Kitchen"}
-	LivingRoom := &location.LocationEntity{ID: 1, Name: "Living Room"}
-	UpstairsHallway := &location.LocationEntity{ID: 1, Name: "Upstairs Hallway"}
-	SleepingRoom := &location.LocationEntity{ID: 1, Name: "Sleeping Room"}
-	Attic := &location.LocationEntity{ID: 1, Name: "Attic"}
+	log.Println("[LOCATIONS] Setting up Locations....")
+	SecludedDen := &location.LocationEntity{ID: 1, Name: "Secluded Den"}
+	WindsweptPlains := &location.LocationEntity{ID: 1, Name: "Windswept Plains"}
+	RedhornLake := &location.LocationEntity{ID: 1, Name: "Redhorn Lake"}
+	ConiferousGrove := &location.LocationEntity{ID: 1, Name: "Coniferous Grove"}
+	AridPlateau := &location.LocationEntity{ID: 1, Name: "Arid Plateau"}
+	SlumberingCrag := &location.LocationEntity{ID: 1, Name: "Slumbering Crag"}
+	HermitsRecluse := &location.LocationEntity{ID: 1, Name: "Hermit's Recluse"}
 
-	log.Println("Setting up Locations linking...")
-	Porch.OutgoingConnections = append(Porch.OutgoingConnections, DownstairsHallway)
-	DownstairsHallway.OutgoingConnections = append(DownstairsHallway.OutgoingConnections, Porch, Kitchen, LivingRoom, UpstairsHallway)
-	Kitchen.OutgoingConnections = append(Kitchen.OutgoingConnections, DownstairsHallway, LivingRoom)
-	LivingRoom.OutgoingConnections = append(LivingRoom.OutgoingConnections, DownstairsHallway, Kitchen)
-	UpstairsHallway.OutgoingConnections = append(UpstairsHallway.OutgoingConnections, DownstairsHallway, SleepingRoom, Attic)
-	SleepingRoom.OutgoingConnections = append(SleepingRoom.OutgoingConnections, UpstairsHallway, Porch)
-	Attic.OutgoingConnections = append(Attic.OutgoingConnections, UpstairsHallway)
+	SecludedDen.OutgoingConnections = append(SecludedDen.OutgoingConnections, WindsweptPlains)
+	WindsweptPlains.OutgoingConnections = append(WindsweptPlains.OutgoingConnections, SecludedDen, RedhornLake, ConiferousGrove, AridPlateau)
+	RedhornLake.OutgoingConnections = append(RedhornLake.OutgoingConnections, WindsweptPlains, ConiferousGrove)
+	ConiferousGrove.OutgoingConnections = append(ConiferousGrove.OutgoingConnections, WindsweptPlains, RedhornLake)
+	AridPlateau.OutgoingConnections = append(AridPlateau.OutgoingConnections, WindsweptPlains, SlumberingCrag, HermitsRecluse)
+	SlumberingCrag.OutgoingConnections = append(SlumberingCrag.OutgoingConnections, AridPlateau, SecludedDen)
+	HermitsRecluse.OutgoingConnections = append(HermitsRecluse.OutgoingConnections, AridPlateau)
 
-	gs.Locations = append(gs.Locations, Porch, DownstairsHallway, Kitchen, LivingRoom, UpstairsHallway, SleepingRoom, Attic)
+	gs.Locations = append(gs.Locations, SecludedDen, WindsweptPlains, RedhornLake, ConiferousGrove, AridPlateau, SlumberingCrag, HermitsRecluse)
+}
+
+func (gs *GameState) InitHarvestingUnits() {
+	grabBag := append([]*location.LocationEntity(nil), gs.Locations...)
+	for range 5 {
+		r := rand.IntN(len(grabBag))
+		randomLocation := grabBag[r]
+		grabBag = slices.Delete(grabBag, r, r+1)
+
+		h := harvesting.GenerateRandomPredefinedHarvestingUnit(randomLocation)
+		gs.HarvestUnits = append(gs.HarvestUnits, h)
+		log.Printf("[HARVESTING] Spwaning %s at %s\n", h.Name, randomLocation.Name)
+	}
 }
 
 func (gs *GameState) InitPlayers() {
-	log.Println("Setting up Jim...")
-	Jim := &player.Unit{
+	log.Println("[PLAYERS] Setting up Druid...")
+	Druid := &player.Unit{
 		MovingEntity:       moving.MovingEntity{CurrentLocation: gs.Locations[0]},
 		HealthPool:         combat.HealthPool{CurrentHealth: 10, MaxHealth: 10},
 		ID:                 1,
-		Name:               "Jim Gordon",
+		Name:               "Druid",
 		CardsInHand:        7,
 		ResourcesAvailable: 5,
 		RemainingActions:   3,
 		Damage:             1,
 	}
 
-	log.Println("Setting up Ivy...")
-	Ivy := &player.Unit{
+	log.Println("[PLAYERS] Setting up Scoundrel...")
+	Scoundrel := &player.Unit{
 		MovingEntity:       moving.MovingEntity{CurrentLocation: gs.Locations[0]},
 		HealthPool:         combat.HealthPool{CurrentHealth: 8, MaxHealth: 8},
 		ID:                 1,
-		Name:               "Poison Ivy",
+		Name:               "Scoundrel",
 		CardsInHand:        7,
 		ResourcesAvailable: 5,
 		RemainingActions:   3,
 		Damage:             1,
 	}
 
-	gs.Players = append(gs.Players, Jim, Ivy)
+	gs.Players = append(gs.Players, Druid, Scoundrel)
 }
 
-func (gs *GameState) InitEnemies() {
+func (gs *GameState) getRandomLocation() *location.LocationEntity {
+	return gs.Locations[rand.IntN(len(gs.Locations))]
+}
 
-	log.Println("Setting up Ghoul...")
-	ghoul := &enemy.EnemyEntity{
-		MovingEntity: moving.MovingEntity{CurrentLocation: gs.Locations[len(gs.Locations)-1]},
+func (gs *GameState) InitCreatures() {
+
+	Stag := &creature.Unit{
+		MovingEntity: moving.MovingEntity{CurrentLocation: gs.getRandomLocation()},
 		HealthPool:   combat.HealthPool{CurrentHealth: 5, MaxHealth: 5},
 		ID:           1,
-		Name:         "Noxious Ghoul",
-		Aloof:        false,
+		Name:         "Stag",
+		Aloof:        true,
 		Hunter:       true,
 		Damage:       2,
 	}
 
-	log.Println("Setting up Rat...")
-	rat := &enemy.EnemyEntity{
-		MovingEntity: moving.MovingEntity{CurrentLocation: gs.Locations[3]},
+	log.Printf("[CREATURES] Spawned %s at %s", Stag.Name, Stag.CurrentLocation.Name)
+
+	Racoon := &creature.Unit{
+		MovingEntity: moving.MovingEntity{CurrentLocation: gs.getRandomLocation()},
 		HealthPool:   combat.HealthPool{CurrentHealth: 2, MaxHealth: 2},
-		ID:           1,
-		Name:         "Chittering Rat",
+		ID:           2,
+		Name:         "Raccoon",
 		Aloof:        false,
 		Hunter:       false,
 		Damage:       1,
 	}
 
-	log.Println("Setting up Suspicious Plant...")
-	plant := &enemy.EnemyEntity{
-		MovingEntity: moving.MovingEntity{CurrentLocation: gs.Locations[3]},
+	log.Printf("[CREATURES] Spawned %s at %s", Racoon.Name, Racoon.CurrentLocation.Name)
+
+	plant := &creature.Unit{
+		MovingEntity: moving.MovingEntity{CurrentLocation: gs.getRandomLocation()},
 		HealthPool:   combat.HealthPool{CurrentHealth: 2, MaxHealth: 2},
 		ID:           1,
 		Name:         "Suspicious Plant",
@@ -102,5 +123,7 @@ func (gs *GameState) InitEnemies() {
 		Damage:       1,
 	}
 
-	gs.Enemies = append(gs.Enemies, ghoul, rat, plant)
+	log.Printf("[CREATURES] Spawned %s at %s", plant.Name, plant.CurrentLocation.Name)
+
+	gs.Enemies = append(gs.Enemies, Stag, Racoon, plant)
 }

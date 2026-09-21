@@ -2,7 +2,8 @@ package game
 
 import (
 	"aeons/internal/combat"
-	"aeons/internal/enemy"
+	"aeons/internal/creature"
+	"aeons/internal/harvesting"
 	"aeons/internal/location"
 	"aeons/internal/moving"
 	"aeons/internal/player"
@@ -12,12 +13,12 @@ import (
 )
 
 func (gs *GameState) ResolvePlayerPhaseStep() error {
-	currentPlayer, err := gs.PromptForNextPlayer()
+	activePlayer, err := gs.PromptForNextPlayer()
 	if err != nil {
 		return err
 	}
 
-	cancelled, action, err := gs.PromptForPlayerAction(currentPlayer)
+	cancelled, action, err := gs.PromptForPlayerAction(activePlayer)
 	if err != nil {
 		return err
 	} else if cancelled {
@@ -27,31 +28,43 @@ func (gs *GameState) ResolvePlayerPhaseStep() error {
 	switch action {
 	case "Move":
 
-		cancelled, location, err := gs.ChooseTargetForPlayerMove(currentPlayer)
+		cancelled, location, err := gs.ChooseTargetForPlayerMove(activePlayer)
 		if err != nil {
 			return err
 		} else if cancelled {
 			gs.ResolvePlayerPhaseStep()
 		} else {
-			currentPlayer.RemainingActions -= 1
-			moveEffect := moving.MoveEffect{Entity: currentPlayer, Target: location}
+			activePlayer.RemainingActions -= 1
+			moveEffect := moving.MoveEffect{Entity: activePlayer, Target: location}
 			moveEffect.Apply()
 		}
 
 	case "Attack":
 
-		cancelled, target, err := gs.ChooseTargetForPlayerAttack(currentPlayer)
+		cancelled, target, err := gs.ChooseTargetForPlayerAttack(activePlayer)
 		if err != nil {
 			return err
 		} else if cancelled {
 			gs.ResolvePlayerPhaseStep()
 		} else {
-			currentPlayer.RemainingActions -= 1
-			effect := combat.DamageEffect{Source: currentPlayer, Target: target}
+			activePlayer.RemainingActions -= 1
+			effect := combat.DamageEffect{Source: activePlayer, Target: target}
+			effect.Apply()
+		}
+	case "Harvest":
+
+		cancelled, target, err := gs.ChooseHarvestableForHarvestAction(activePlayer)
+		if err != nil {
+			return err
+		} else if cancelled {
+			gs.ResolvePlayerPhaseStep()
+		} else {
+			activePlayer.RemainingActions -= 1
+			effect := harvesting.Effect{TargetHarvestable: target, Player: activePlayer}
 			effect.Apply()
 		}
 	case "Cancel":
-		gs.ResolveAttackForPlayer(currentPlayer)
+		gs.ResolveAttackForPlayer(activePlayer)
 	default:
 		fmt.Println("Selected unimplemented action")
 	}
@@ -79,7 +92,7 @@ func (gs *GameState) ChooseTargetForPlayerMove(player *player.Unit) (bool, *loca
 	}
 }
 
-func (gs *GameState) ChooseTargetForPlayerAttack(player *player.Unit) (bool, *enemy.EnemyEntity, error) {
+func (gs *GameState) ChooseTargetForPlayerAttack(player *player.Unit) (bool, *creature.Unit, error) {
 	inRange := gs.EnemiesAtLocation(player.CurrentLocation)
 	promptList := []string{}
 	for _, v := range inRange {
@@ -89,9 +102,27 @@ func (gs *GameState) ChooseTargetForPlayerAttack(player *player.Unit) (bool, *en
 
 	cancelled, position, err := prompt.PromptCancellable(">>> --- Chose a target to attack --- <<<", promptList)
 	if err != nil {
-		return false, &enemy.EnemyEntity{}, err
+		return false, &creature.Unit{}, err
 	} else if cancelled {
-		return true, &enemy.EnemyEntity{}, nil
+		return true, &creature.Unit{}, nil
+	} else {
+		return false, inRange[position], nil
+	}
+}
+
+func (gs *GameState) ChooseHarvestableForHarvestAction(player *player.Unit) (bool, *harvesting.Unit, error) {
+	inRange := gs.HarvestUnitsAtLocation(player.CurrentLocation)
+	promptList := []string{}
+	for _, v := range inRange {
+		promptItem := fmt.Sprintf("%s (Remaining: %d Healing, %d Resources)", v.Name, v.HealYieldConfig.CurrentCapacity, v.ResourceYieldConfig.CurrentCapacity)
+		promptList = append(promptList, promptItem)
+	}
+
+	cancelled, position, err := prompt.PromptCancellable(">>> --- What will you harvest? --- <<<", promptList)
+	if err != nil {
+		return false, &harvesting.Unit{}, err
+	} else if cancelled {
+		return true, &harvesting.Unit{}, nil
 	} else {
 		return false, inRange[position], nil
 	}

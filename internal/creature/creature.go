@@ -1,11 +1,11 @@
-package enemy
+package creature
 
 import (
 	"aeons/internal/combat"
 	"aeons/internal/moving"
 )
 
-type EnemyEntity struct {
+type Unit struct {
 	moving.MovingEntity
 	combat.HealthPool
 	ID     int
@@ -15,6 +15,6 @@ type EnemyEntity struct {
 	Damage int
 }
 
-func (ee *EnemyEntity) OutgoingDamage() int {
+func (ee *Unit) OutgoingDamage() int {
 	return ee.Damage
 }

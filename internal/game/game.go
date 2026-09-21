@@ -1,16 +1,18 @@
 package game
 
 import (
-	"aeons/internal/enemy"
+	"aeons/internal/creature"
+	"aeons/internal/harvesting"
 	"aeons/internal/location"
 	"aeons/internal/player"
 )
 
 type GameState struct {
-	Locations   []*location.LocationEntity
-	Players     []*player.Unit
-	Enemies     []*enemy.EnemyEntity
-	TurnCounter int
+	Locations    []*location.LocationEntity
+	Players      []*player.Unit
+	Enemies      []*creature.Unit
+	HarvestUnits []*harvesting.Unit
+	TurnCounter  int
 }
 
 func (gs *GameState) ReconcileDefeats() {
@@ -48,10 +50,19 @@ func (gs *GameState) LocationHasEnemies(le *location.LocationEntity) bool {
 
 	return false
 }
+func (gs *GameState) LocationHasHarvest(le *location.LocationEntity) bool {
+	for _, v := range gs.HarvestUnits {
+		if le == v.StaticLocation {
+			return true
+		}
+	}
 
-func (gs *GameState) EnemiesAtLocation(le *location.LocationEntity) []*enemy.EnemyEntity {
+	return false
+}
 
-	found := []*enemy.EnemyEntity{}
+func (gs *GameState) EnemiesAtLocation(le *location.LocationEntity) []*creature.Unit {
+
+	found := []*creature.Unit{}
 	for _, v := range gs.Enemies {
 		if le == v.CurrentLocation {
 			found = append(found, v)
@@ -59,8 +70,18 @@ func (gs *GameState) EnemiesAtLocation(le *location.LocationEntity) []*enemy.Ene
 	}
 	return found
 }
+func (gs *GameState) HarvestUnitsAtLocation(le *location.LocationEntity) []*harvesting.Unit {
 
-func (gs *GameState) PlayersAtLocation(ee *enemy.EnemyEntity) []*player.Unit {
+	found := []*harvesting.Unit{}
+	for _, v := range gs.HarvestUnits {
+		if le == v.StaticLocation {
+			found = append(found, v)
+		}
+	}
+	return found
+}
+
+func (gs *GameState) PlayersAtLocation(ee *creature.Unit) []*player.Unit {
 
 	found := []*player.Unit{}
 	for _, v := range gs.Players {

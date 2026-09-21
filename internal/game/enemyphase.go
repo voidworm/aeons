@@ -2,7 +2,7 @@ package game
 
 import (
 	"aeons/internal/combat"
-	"aeons/internal/enemy"
+	"aeons/internal/creature"
 	"aeons/internal/moving"
 	"aeons/internal/player"
 	"log"
@@ -18,7 +18,7 @@ func (gs *GameState) ResolveEnemyPhase() {
 	}
 }
 
-func (gs *GameState) ResolveEnemyMovement(input *enemy.EnemyEntity) {
+func (gs *GameState) ResolveEnemyMovement(input *creature.Unit) {
 	if !input.Hunter {
 		log.Printf("%s is not a hunter and does not move.", input.Name)
 		return
@@ -30,7 +30,7 @@ func (gs *GameState) ResolveEnemyMovement(input *enemy.EnemyEntity) {
 
 }
 
-func (gs *GameState) DetermineHuntingTargetForEnemy(enemy *enemy.EnemyEntity) *player.Unit {
+func (gs *GameState) DetermineHuntingTargetForEnemy(enemy *creature.Unit) *player.Unit {
 
 	lowestDistance := math.MaxInt
 	lowestPlayers := []*player.Unit{}
@@ -50,7 +50,7 @@ func (gs *GameState) DetermineHuntingTargetForEnemy(enemy *enemy.EnemyEntity) *p
 	return lowestPlayers[selectedIndex]
 }
 
-func (gs *GameState) ResolveEnemyAttacks(enemy *enemy.EnemyEntity) {
+func (gs *GameState) ResolveEnemyAttacks(enemy *creature.Unit) {
 	if !enemy.Aloof {
 		gs.ResolveAttackForEnemy(enemy)
 	} else {
@@ -58,7 +58,7 @@ func (gs *GameState) ResolveEnemyAttacks(enemy *enemy.EnemyEntity) {
 	}
 }
 
-func (gs *GameState) ResolveAttackForEnemy(enemy *enemy.EnemyEntity) {
+func (gs *GameState) ResolveAttackForEnemy(enemy *creature.Unit) {
 	inRange := gs.PlayersAtLocation(enemy)
 
 	if len(inRange) == 0 {
