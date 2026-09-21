@@ -2,11 +2,10 @@ package player
 
 import (
 	"aeons/internal/combat"
-	"aeons/internal/location"
 	"aeons/internal/moving"
 )
 
-type Player struct {
+type Unit struct {
 	moving.MovingEntity
 	combat.HealthPool
 	ID                 int
@@ -17,15 +16,6 @@ type Player struct {
 	Damage             int
 }
 
-func (p *Player) OutgoingDamage() int {
+func (p *Unit) OutgoingDamage() int {
 	return p.Damage
-}
-
-type PlayerMoveEffect struct {
-	TargetPlayer   *Player
-	TargetLocation *location.LocationEntity
-}
-
-func (pem *PlayerMoveEffect) Apply() {
-	pem.TargetPlayer.MoveTo(pem.TargetLocation)
 }

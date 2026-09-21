@@ -6,9 +6,9 @@ import (
 	"fmt"
 )
 
-func (gs *GameState) PromptForNextPlayer() (*player.Player, error) {
+func (gs *GameState) PromptForNextPlayer() (*player.Unit, error) {
 
-	selectable := []*player.Player{}
+	selectable := []*player.Unit{}
 	for _, v := range gs.Players {
 		if v.RemainingActions > 0 {
 			selectable = append(selectable, v)
@@ -23,7 +23,7 @@ func (gs *GameState) PromptForNextPlayer() (*player.Player, error) {
 	label := ">>> --- Choose a player to act --- <<<"
 	index, err := prompt.Prompt(label, activeArray)
 	if err != nil {
-		return &player.Player{}, err
+		return &player.Unit{}, err
 	}
 
 	nextTurn := selectable[index]
@@ -31,7 +31,7 @@ func (gs *GameState) PromptForNextPlayer() (*player.Player, error) {
 	return nextTurn, nil
 }
 
-func (gs *GameState) PromptForPlayerAction(player *player.Player) (bool, string, error) {
+func (gs *GameState) PromptForPlayerAction(player *player.Unit) (bool, string, error) {
 	actionArray := []string{"Move", "Draw", "Resource"}
 
 	if gs.LocationHasEnemies(player.CurrentLocation) {

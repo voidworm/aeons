@@ -60,7 +60,7 @@ func (gs *GameState) ResolvePlayerPhaseStep() error {
 	return nil
 }
 
-func (gs *GameState) ChooseTargetForPlayerMove(player *player.Player) (bool, *location.LocationEntity, error) {
+func (gs *GameState) ChooseTargetForPlayerMove(player *player.Unit) (bool, *location.LocationEntity, error) {
 	targets := player.CurrentLocation.OutgoingConnections
 	optionsArray := []string{}
 
@@ -79,7 +79,7 @@ func (gs *GameState) ChooseTargetForPlayerMove(player *player.Player) (bool, *lo
 	}
 }
 
-func (gs *GameState) ChooseTargetForPlayerAttack(player *player.Player) (bool, *enemy.EnemyEntity, error) {
+func (gs *GameState) ChooseTargetForPlayerAttack(player *player.Unit) (bool, *enemy.EnemyEntity, error) {
 	inRange := gs.EnemiesAtLocation(player.CurrentLocation)
 	promptList := []string{}
 	for _, v := range inRange {
@@ -97,7 +97,7 @@ func (gs *GameState) ChooseTargetForPlayerAttack(player *player.Player) (bool, *
 	}
 }
 
-func (gs *GameState) ResolveAttackForPlayer(player *player.Player) {
+func (gs *GameState) ResolveAttackForPlayer(player *player.Unit) {
 
 	cancelled, enemy, err := gs.ChooseTargetForPlayerAttack(player)
 

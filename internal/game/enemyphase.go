@@ -30,16 +30,16 @@ func (gs *GameState) ResolveEnemyMovement(input *enemy.EnemyEntity) {
 
 }
 
-func (gs *GameState) DetermineHuntingTargetForEnemy(enemy *enemy.EnemyEntity) *player.Player {
+func (gs *GameState) DetermineHuntingTargetForEnemy(enemy *enemy.EnemyEntity) *player.Unit {
 
 	lowestDistance := math.MaxInt
-	lowestPlayers := []*player.Player{}
+	lowestPlayers := []*player.Unit{}
 	for _, currentPlayer := range gs.Players {
 		distance := enemy.CurrentLocation.DistanceTo(currentPlayer.CurrentLocation)
 		if distance == lowestDistance {
 			lowestPlayers = append(lowestPlayers, currentPlayer)
 		} else if distance < lowestDistance {
-			lowestPlayers = []*player.Player{currentPlayer}
+			lowestPlayers = []*player.Unit{currentPlayer}
 			lowestDistance = distance
 		}
 	}

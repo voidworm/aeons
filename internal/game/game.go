@@ -8,7 +8,7 @@ import (
 
 type GameState struct {
 	Locations   []*location.LocationEntity
-	Players     []*player.Player
+	Players     []*player.Unit
 	Enemies     []*enemy.EnemyEntity
 	TurnCounter int
 }
@@ -60,9 +60,9 @@ func (gs *GameState) EnemiesAtLocation(le *location.LocationEntity) []*enemy.Ene
 	return found
 }
 
-func (gs *GameState) PlayersAtLocation(ee *enemy.EnemyEntity) []*player.Player {
+func (gs *GameState) PlayersAtLocation(ee *enemy.EnemyEntity) []*player.Unit {
 
-	found := []*player.Player{}
+	found := []*player.Unit{}
 	for _, v := range gs.Players {
 		if ee.CurrentLocation == v.CurrentLocation {
 			found = append(found, v)

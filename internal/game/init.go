@@ -41,7 +41,7 @@ func (gs *GameState) InitLocations() {
 
 func (gs *GameState) InitPlayers() {
 	log.Println("Setting up Jim...")
-	Jim := &player.Player{
+	Jim := &player.Unit{
 		MovingEntity:       moving.MovingEntity{CurrentLocation: gs.Locations[0]},
 		HealthPool:         combat.HealthPool{CurrentHealth: 10, MaxHealth: 10},
 		ID:                 1,
@@ -53,7 +53,7 @@ func (gs *GameState) InitPlayers() {
 	}
 
 	log.Println("Setting up Ivy...")
-	Ivy := &player.Player{
+	Ivy := &player.Unit{
 		MovingEntity:       moving.MovingEntity{CurrentLocation: gs.Locations[0]},
 		HealthPool:         combat.HealthPool{CurrentHealth: 8, MaxHealth: 8},
 		ID:                 1,
