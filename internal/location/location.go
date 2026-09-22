@@ -4,32 +4,32 @@ import (
 	"slices"
 )
 
-type LocationEntity struct {
+type Unit struct {
 	ID                  int
 	Name                string
-	OutgoingConnections []*LocationEntity
+	OutgoingConnections []*Unit
 }
 
 // returns the path between two locations, including each of the locations.
 // this function assumes that the the locations do have a connection path
 // if you intend to load maps that have locations that can't be reached, this will break.
-func (le *LocationEntity) GetShortestPathTo(target *LocationEntity) []*LocationEntity {
+func (le *Unit) GetShortestPathTo(target *Unit) []*Unit {
 	return le.breathSearchFirst(target)
 }
 
-func (le *LocationEntity) DistanceTo(target *LocationEntity) int {
+func (le *Unit) DistanceTo(target *Unit) int {
 	return len(le.breathSearchFirst(target))
 }
 
-func (le *LocationEntity) breathSearchFirst(target *LocationEntity) []*LocationEntity {
+func (le *Unit) breathSearchFirst(target *Unit) []*Unit {
 	//stuff we need to check
-	queue := []*LocationEntity{le}
+	queue := []*Unit{le}
 
 	//stuff we have checked
-	visited := map[*LocationEntity]bool{le: true}
+	visited := map[*Unit]bool{le: true}
 
 	//the parents we took
-	parents := make(map[*LocationEntity]*LocationEntity)
+	parents := make(map[*Unit]*Unit)
 
 	for len(queue) != 0 {
 		current := queue[0]
@@ -47,7 +47,7 @@ func (le *LocationEntity) breathSearchFirst(target *LocationEntity) []*LocationE
 		}
 	}
 
-	path := []*LocationEntity{target}
+	path := []*Unit{target}
 	currentChild := target
 	for {
 		parent := parents[currentChild]

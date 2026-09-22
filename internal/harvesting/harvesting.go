@@ -18,14 +18,14 @@ type Harvestable interface {
 // basic harvesting unit
 type Unit struct {
 	Name                string
-	StaticLocation      *location.LocationEntity
+	StaticLocation      *location.Unit
 	HealYieldConfig     *YieldConfig
 	ResourceYieldConfig *YieldConfig
 }
 
-type GenerateFunc func(location *location.LocationEntity) *Unit
+type GenerateFunc func(location *location.Unit) *Unit
 
-func GenerateRandomPredefinedHarvestingUnit(location *location.LocationEntity) *Unit {
+func GenerateRandomPredefinedHarvestingUnit(location *location.Unit) *Unit {
 	generateFuncs := []GenerateFunc{
 		GenerateBerryBush,
 		GenerateBrush,
@@ -37,7 +37,7 @@ func GenerateRandomPredefinedHarvestingUnit(location *location.LocationEntity) *
 	return f(location)
 }
 
-func GenerateBerryBush(location *location.LocationEntity) *Unit {
+func GenerateBerryBush(location *location.Unit) *Unit {
 	return &Unit{
 		Name:                "Berry Bush",
 		StaticLocation:      location,
@@ -46,7 +46,7 @@ func GenerateBerryBush(location *location.LocationEntity) *Unit {
 	}
 }
 
-func GenerateBrush(location *location.LocationEntity) *Unit {
+func GenerateBrush(location *location.Unit) *Unit {
 	return &Unit{
 		Name:                "Brush",
 		StaticLocation:      location,
@@ -55,7 +55,7 @@ func GenerateBrush(location *location.LocationEntity) *Unit {
 	}
 }
 
-func GenerateMushroomField(location *location.LocationEntity) *Unit {
+func GenerateMushroomField(location *location.Unit) *Unit {
 	return &Unit{
 		Name:                "Mushroom Field",
 		StaticLocation:      location,
@@ -64,7 +64,7 @@ func GenerateMushroomField(location *location.LocationEntity) *Unit {
 	}
 }
 
-func GenerateLushCopse(location *location.LocationEntity) *Unit {
+func GenerateLushCopse(location *location.Unit) *Unit {
 	return &Unit{
 		Name:                "Lush Copse",
 		StaticLocation:      location,
@@ -73,7 +73,7 @@ func GenerateLushCopse(location *location.LocationEntity) *Unit {
 	}
 }
 
-func GenerateFruitTree(location *location.LocationEntity) *Unit {
+func GenerateFruitTree(location *location.Unit) *Unit {
 	return &Unit{
 		Name:                "Fruit Tree",
 		StaticLocation:      location,
@@ -108,9 +108,9 @@ func (u *Unit) GenerateYield() *Yield {
 	return yield
 }
 
-func (u *Unit) HandleTick() {
-	u.HealYieldConfig.HandleTick()
-	u.ResourceYieldConfig.HandleTick()
+func (u *Unit) Tick() {
+	u.HealYieldConfig.Tick()
+	u.ResourceYieldConfig.Tick()
 }
 
 // config for yields
@@ -161,10 +161,11 @@ func GenerateLargeYieldConfig() *YieldConfig {
 	}
 }
 
-func (yc *YieldConfig) HandleTick() {
+func (yc *YieldConfig) Tick() {
 	yc.CurrentTicks++
 	if yc.CurrentTicks == yc.RespawnTicks {
-		yc.CurrentCapacity = yc.MaxCapacity
+		yc.CurrentCapacity += yc.YieldAmount
+		yc.CurrentTicks = 0
 	}
 }
 

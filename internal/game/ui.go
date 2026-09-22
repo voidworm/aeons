@@ -32,10 +32,18 @@ func (gs *GameState) PromptForNextPlayer() (*player.Unit, error) {
 }
 
 func (gs *GameState) PromptForPlayerAction(player *player.Unit) (bool, string, error) {
-	actionArray := []string{"Move"}
+	actionArray := []string{}
+
+	if gs.LocationCanBeLeft(player.CurrentLocation) {
+		actionArray = append(actionArray, "Move")
+	}
 
 	if gs.LocationHasEnemies(player.CurrentLocation) {
-		actionArray = append(actionArray, "Attack", "Evade")
+		actionArray = append(actionArray, "Attack")
+	}
+
+	if gs.LocationHaEvadableCreatures(player.CurrentLocation) {
+		actionArray = append(actionArray, "Evade")
 	}
 
 	if gs.LocationHasHarvest(player.CurrentLocation) {

@@ -21,6 +21,6 @@ func main() {
 			}
 		}
 		gs.ResolveCreaturePhase()
-		gs.StartNewTurn()
+		gs.ResolveUpkeepPhase()
 	}
 }

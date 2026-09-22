@@ -3,6 +3,7 @@ package game
 import (
 	"aeons/internal/combat"
 	"aeons/internal/creature"
+	"aeons/internal/evading"
 	"aeons/internal/harvesting"
 	"aeons/internal/location"
 	"aeons/internal/moving"
@@ -63,6 +64,18 @@ func (gs *GameState) ResolvePlayerPhaseStep() error {
 			effect := harvesting.Effect{TargetHarvestable: target, Player: activePlayer}
 			effect.Apply()
 		}
+	case "Evade":
+		cancelled, target, err := gs.ChooseEvadeTargetForPlayer(activePlayer)
+		if err != nil {
+			return err
+		} else if cancelled {
+			gs.ResolvePlayerPhaseStep()
+		} else {
+			activePlayer.RemainingActions -= 1
+			effect := evading.Effect{EvadingPlayer: activePlayer, EvadedCreature: target}
+			effect.Apply()
+		}
+
 	case "Cancel":
 		gs.ResolveAttackForPlayer(activePlayer)
 	default:
@@ -73,7 +86,7 @@ func (gs *GameState) ResolvePlayerPhaseStep() error {
 	return nil
 }
 
-func (gs *GameState) ChooseTargetForPlayerMove(player *player.Unit) (bool, *location.LocationEntity, error) {
+func (gs *GameState) ChooseTargetForPlayerMove(player *player.Unit) (bool, *location.Unit, error) {
 	targets := player.CurrentLocation.OutgoingConnections
 	optionsArray := []string{}
 
@@ -84,11 +97,29 @@ func (gs *GameState) ChooseTargetForPlayerMove(player *player.Unit) (bool, *loca
 	cancelled, position, err := prompt.PromptCancellable(">>> --- Choose a location to move to --- <<<", optionsArray)
 
 	if err != nil {
-		return false, &location.LocationEntity{}, err
+		return false, &location.Unit{}, err
 	} else if cancelled {
-		return true, &location.LocationEntity{}, nil
+		return true, &location.Unit{}, nil
 	} else {
 		return false, targets[position], nil
+	}
+}
+
+func (gs *GameState) ChooseEvadeTargetForPlayer(player *player.Unit) (bool, *creature.Unit, error) {
+	inRange := gs.EvadableEnemiesAtLocation(player.CurrentLocation)
+	promptList := []string{}
+	for _, v := range inRange {
+		promptItem := fmt.Sprintf("%s (Remaining Health: %d/%d)", v.Name, v.CurrentHealth, v.MaxHealth)
+		promptList = append(promptList, promptItem)
+	}
+
+	cancelled, position, err := prompt.PromptCancellable(">>> --- Chose a target to evade --- <<<", promptList)
+	if err != nil {
+		return false, &creature.Unit{}, err
+	} else if cancelled {
+		return true, &creature.Unit{}, nil
+	} else {
+		return false, inRange[position], nil
 	}
 }
 
