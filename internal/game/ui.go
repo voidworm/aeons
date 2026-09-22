@@ -50,6 +50,8 @@ func (gs *GameState) PromptForPlayerAction(player *player.Unit) (bool, string, e
 		actionArray = append(actionArray, "Harvest")
 	}
 
+	actionArray = append(actionArray, "Yield")
+
 	label := fmt.Sprintf("<<< --- What will %s do? --- >>> ", player.Name)
 
 	cancelled, index, err := prompt.PromptCancellable(label, actionArray)

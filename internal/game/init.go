@@ -22,7 +22,7 @@ func (gs *GameState) Init() {
 
 func (gs *GameState) InitLocations() {
 
-	log.Println("[LOCATIONS] Setting up Locations....")
+	log.Println("[INIT] Setting up locations....")
 	SecludedDen := &location.Unit{ID: 1, Name: "Secluded Den"}
 	WindsweptPlains := &location.Unit{ID: 1, Name: "Windswept Plains"}
 	RedhornLake := &location.Unit{ID: 1, Name: "Redhorn Lake"}
@@ -51,12 +51,12 @@ func (gs *GameState) InitHarvestingUnits() {
 
 		h := harvesting.GenerateRandomPredefinedHarvestingUnit(randomLocation)
 		gs.HarvestUnits = append(gs.HarvestUnits, h)
-		log.Printf("[HARVESTING] Spwaning %s at %s\n", h.Name, randomLocation.Name)
+		log.Printf("[INIT] Spawning harvestable %s at %s\n", h.Name, randomLocation.Name)
 	}
 }
 
 func (gs *GameState) InitPlayers() {
-	log.Println("[PLAYERS] Setting up Druid...")
+	log.Println("[INIT] Setting up player Druid...")
 	Druid := &player.Unit{
 		MovingEntity:       moving.MovingEntity{CurrentLocation: gs.Locations[0]},
 		HealthPool:         combat.HealthPool{CurrentHealth: 10, MaxHealth: 10},
@@ -68,7 +68,7 @@ func (gs *GameState) InitPlayers() {
 		Damage:             1,
 	}
 
-	log.Println("[PLAYERS] Setting up Scoundrel...")
+	log.Println("[INIT] Setting up player Scoundrel...")
 	Scoundrel := &player.Unit{
 		MovingEntity:       moving.MovingEntity{CurrentLocation: gs.Locations[0]},
 		HealthPool:         combat.HealthPool{CurrentHealth: 8, MaxHealth: 8},
@@ -102,7 +102,7 @@ func (gs *GameState) InitCreatures() {
 		Damage: 2,
 	}
 
-	log.Printf("[CREATURES] Spawned %s at %s", Stag.Name, Stag.CurrentLocation.Name)
+	log.Printf("[INIT] Spawned creature %s at %s", Stag.Name, Stag.CurrentLocation.Name)
 
 	Racoon := &creature.Unit{
 		MovingEntity: moving.MovingEntity{CurrentLocation: gs.getRandomLocation()},
@@ -117,7 +117,7 @@ func (gs *GameState) InitCreatures() {
 		Damage: 1,
 	}
 
-	log.Printf("[CREATURES] Spawned %s at %s", Racoon.Name, Racoon.CurrentLocation.Name)
+	log.Printf("[INIT] Spawned creature %s at %s", Racoon.Name, Racoon.CurrentLocation.Name)
 
 	Plant := &creature.Unit{
 		MovingEntity: moving.MovingEntity{CurrentLocation: gs.getRandomLocation()},
@@ -125,14 +125,14 @@ func (gs *GameState) InitCreatures() {
 		ID:           1,
 		Name:         "Suspicious Plant",
 		CreatureBehaviourConfig: &creature.CreatureBehaviourConfig{
-			CreatureAloofConfig:     creature.GenerateAloofConfig(false),
-			CreatureMovementConfig:  creature.GenerateIdleConfig(),
+			CreatureAloofConfig:     creature.GenerateAloofConfig(true),
+			CreatureMovementConfig:  creature.GenerateShyConfig(),
 			CreatureTurnStateConfig: creature.GenerateDefaultTurnStateConfig(),
 		},
 		Damage: 1,
 	}
 
-	log.Printf("[CREATURES] Spawned %s at %s", Plant.Name, Plant.CurrentLocation.Name)
+	log.Printf("[INIT] Spawned creature %s at %s", Plant.Name, Plant.CurrentLocation.Name)
 
 	gs.Creatures = append(gs.Creatures, Stag, Racoon, Plant)
 }

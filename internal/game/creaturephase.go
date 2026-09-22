@@ -28,7 +28,11 @@ func (gs *GameState) ResolveCreatureMovement(input *creature.Unit) {
 
 	target := gs.DetermineMovementTargetForCreature(input)
 	if target == input.CurrentLocation {
-		log.Printf("[CREATURE PHASE] %s has no need to move.", input.Name)
+		if input.Exhausted {
+			log.Printf("[CREATURE PHASE] %s is exhausted and can not move.", input.Name)
+		} else {
+			log.Printf("[CREATURE PHASE] %s would move but is already at its target.", input.Name)
+		}
 		return
 	}
 
@@ -42,13 +46,13 @@ func (gs *GameState) DetermineMovementTargetForCreature(creature *creature.Unit)
 	if creature.Curious {
 		return gs.DetermineMovementForCuriousCreature(creature)
 	} else if creature.Shy {
-		return gs.DetermineMovementTargetForCreature(creature)
+		return gs.DetermineMovementTargetForShyCreature(creature)
 	}
 
 	return nil //cannot happen
 }
 
-func (gs *GameState) DetermineMovementForShyCreature(creature *creature.Unit) *location.Unit {
+func (gs *GameState) DetermineMovementTargetForShyCreature(creature *creature.Unit) *location.Unit {
 	creatureLocation := creature.CurrentLocation
 
 	if !gs.LocationHasPlayers(creatureLocation) {
@@ -68,7 +72,10 @@ func (gs *GameState) DetermineMovementForShyCreature(creature *creature.Unit) *l
 		return creatureLocation
 	}
 
-	return possibleLocations[rand.IntN(len(possibleLocations))]
+	target := possibleLocations[rand.IntN(len(possibleLocations))]
+	log.Printf("[CREATURE PHASE] %s is shy and runs away to %s.", creature.Name, target.Name)
+	return target
+
 }
 
 func (gs *GameState) DetermineMovementForCuriousCreature(creature *creature.Unit) *location.Unit {
@@ -93,7 +100,7 @@ func (gs *GameState) DetermineMovementForCuriousCreature(creature *creature.Unit
 }
 
 func (gs *GameState) ResolveCreatureAttack(creature *creature.Unit) {
-	if !creature.Aloof || !creature.Exhausted {
+	if !creature.Aloof && !creature.Exhausted {
 		gs.ResolveAttackForCreature(creature)
 	} else if creature.Aloof {
 		log.Printf("[CREATURE PHASE] %s is aloof and doesn't attack.", creature.Name)

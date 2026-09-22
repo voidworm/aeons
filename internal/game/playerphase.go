@@ -75,9 +75,10 @@ func (gs *GameState) ResolvePlayerPhaseStep() error {
 			effect := evading.Effect{EvadingPlayer: activePlayer, EvadedCreature: target}
 			effect.Apply()
 		}
-
+	case "Yield":
+		activePlayer.RemainingActions -= 1
 	case "Cancel":
-		gs.ResolveAttackForPlayer(activePlayer)
+		gs.ResolvePlayerPhaseStep()
 	default:
 		fmt.Println("Selected unimplemented action")
 	}

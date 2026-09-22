@@ -110,7 +110,7 @@ func (gs *GameState) EvadableEnemiesAtLocation(le *location.Unit) []*creature.Un
 
 	found := []*creature.Unit{}
 	for _, v := range gs.Creatures {
-		if le == v.CurrentLocation && !v.Aloof && !v.Exhausted {
+		if le == v.CurrentLocation && v.IsEvadable() {
 			found = append(found, v)
 		}
 	}
