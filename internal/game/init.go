@@ -113,7 +113,7 @@ func (gs *GameState) InitCreatures() {
 
 	log.Printf("[CREATURES] Spawned %s at %s", Racoon.Name, Racoon.CurrentLocation.Name)
 
-	plant := &creature.Unit{
+	Plant := &creature.Unit{
 		MovingEntity: moving.MovingEntity{CurrentLocation: gs.getRandomLocation()},
 		HealthPool:   combat.HealthPool{CurrentHealth: 2, MaxHealth: 2},
 		ID:           1,
@@ -123,7 +123,7 @@ func (gs *GameState) InitCreatures() {
 		Damage:       1,
 	}
 
-	log.Printf("[CREATURES] Spawned %s at %s", plant.Name, plant.CurrentLocation.Name)
+	log.Printf("[CREATURES] Spawned %s at %s", Plant.Name, Plant.CurrentLocation.Name)
 
-	gs.Enemies = append(gs.Enemies, Stag, Racoon, plant)
+	gs.Creatures = append(gs.Creatures, Stag, Racoon, Plant)
 }

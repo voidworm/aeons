@@ -20,7 +20,7 @@ func main() {
 				return
 			}
 		}
-		gs.ResolveEnemyPhase()
+		gs.ResolveCreaturePhase()
 		gs.StartNewTurn()
 	}
 }

@@ -10,7 +10,7 @@ import (
 type GameState struct {
 	Locations    []*location.LocationEntity
 	Players      []*player.Unit
-	Enemies      []*creature.Unit
+	Creatures    []*creature.Unit
 	HarvestUnits []*harvesting.Unit
 	TurnCounter  int
 }
@@ -24,13 +24,13 @@ func (gs *GameState) ReconcileDefeats() {
 		}
 	}
 
-	aliveEnemies := gs.Enemies[:0]
-	for _, v := range gs.Enemies {
+	aliveCreatures := gs.Creatures[:0]
+	for _, v := range gs.Creatures {
 		if v.CurrentHealth > 0 {
-			aliveEnemies = append(aliveEnemies, v)
+			aliveCreatures = append(aliveCreatures, v)
 		}
 	}
-	gs.Enemies = aliveEnemies
+	gs.Creatures = aliveCreatures
 	gs.Players = alivePlayers
 }
 
@@ -42,7 +42,7 @@ func (gs *GameState) StartNewTurn() {
 }
 
 func (gs *GameState) LocationHasEnemies(le *location.LocationEntity) bool {
-	for _, v := range gs.Enemies {
+	for _, v := range gs.Creatures {
 		if le == v.CurrentLocation {
 			return true
 		}
@@ -50,6 +50,7 @@ func (gs *GameState) LocationHasEnemies(le *location.LocationEntity) bool {
 
 	return false
 }
+
 func (gs *GameState) LocationHasHarvest(le *location.LocationEntity) bool {
 	for _, v := range gs.HarvestUnits {
 		if le == v.StaticLocation {
@@ -63,7 +64,7 @@ func (gs *GameState) LocationHasHarvest(le *location.LocationEntity) bool {
 func (gs *GameState) EnemiesAtLocation(le *location.LocationEntity) []*creature.Unit {
 
 	found := []*creature.Unit{}
-	for _, v := range gs.Enemies {
+	for _, v := range gs.Creatures {
 		if le == v.CurrentLocation {
 			found = append(found, v)
 		}

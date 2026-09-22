@@ -85,7 +85,8 @@ func GenerateFruitTree(location *location.LocationEntity) *Unit {
 func (u *Unit) HarvestBy(player *player.Unit) {
 	yield := u.GenerateYield()
 	player.ResourcesAvailable += yield.Resources
-	player.CurrentHealth += 5
+	player.CurrentHealth += yield.Healing
+	player.CurrentHealth = min(player.CurrentHealth, player.MaxHealth)
 	log.Printf("[HARVESTING] %s was harvested by %s for %d healing and %d resources\n", u.Name, player.Name, yield.Healing, yield.Resources)
 }
 
@@ -167,14 +168,14 @@ func (yc *YieldConfig) HandleTick() {
 	}
 }
 
-func (dc *YieldConfig) Drop() int {
-	dropAmount := dc.AvailableAmount()
-	dc.CurrentCapacity -= dropAmount
+func (yc *YieldConfig) Drop() int {
+	dropAmount := yc.AvailableAmount()
+	yc.CurrentCapacity -= dropAmount
 	return dropAmount
 }
 
-func (dc *YieldConfig) AvailableAmount() int {
-	return max(dc.CurrentCapacity, dc.YieldAmount)
+func (yc *YieldConfig) AvailableAmount() int {
+	return min(yc.CurrentCapacity, yc.YieldAmount)
 }
 
 // basic yield
