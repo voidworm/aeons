@@ -3,7 +3,7 @@ import { MainScene } from './scenes/MainScene'
 
 const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
-    backgroundColor: '#1e1e2e',
+    backgroundColor: '#1e5c2c',
     scale : {
         mode: Phaser.Scale.RESIZE,
         width: '100%',
