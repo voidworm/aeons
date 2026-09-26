@@ -7,6 +7,10 @@ export class Card extends Phaser.GameObjects.Container {
     public name: string = "Generic card"
     public effect: string = "Generic effect"
 
+    public border!: Phaser.GameObjects.Rectangle
+
+    public pointed: boolean = false
+
     constructor(scene: MainScene, x: number, y: number, cardname: string, cardtext: string) {
         super(scene, x, y)
 
@@ -25,9 +29,9 @@ export class Card extends Phaser.GameObjects.Container {
 
     setHighlighted(input : boolean) {
         if (input) {
-            this.alpha = 0.5
+            this.border.fillColor = 0xf58b0a
         }else {
-            this.alpha = 1
+             this.border.fillColor = 0x000000
         }
         this.isHighlighted = input
     }
@@ -44,14 +48,22 @@ export class Card extends Phaser.GameObjects.Container {
     }
 
     onDragend() {
-        this.setScale(1)
+        if (this.pointed)
+            this.setScale(1)
+        else 
+            this.setScale(1.025)
+
         this.emit('cardDragEnd', this)
     }
 
     onPointerOver() {
+        this.pointed = true
+        this.setScale(1.025)
     }
 
     onPointerOut() {
+         this.pointed = false
+          this.setScale(1)
     }
 
 }
