@@ -8,11 +8,16 @@ import (
 )
 
 type GameState struct {
+	nextID int
 	Locations    []*location.Unit
 	Players      []*player.Unit
 	Creatures    []*creature.Unit
 	HarvestUnits []*harvesting.Unit
-	TurnCounter  int
+}
+
+func (gs *GameState) NextID() int {
+	gs.nextID++
+	return gs.nextID
 }
 
 func (gs *GameState) ReconcileDefeats() {

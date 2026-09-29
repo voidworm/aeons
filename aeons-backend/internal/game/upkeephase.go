@@ -15,5 +15,4 @@ func (gs *GameState) ResolvePlayerRefresh() {
 	for _, v := range gs.Players {
 		v.RemainingActions = 3
 	}
-	gs.TurnCounter += 1
 }

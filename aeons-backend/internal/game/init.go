@@ -23,13 +23,13 @@ func (gs *GameState) Init() {
 func (gs *GameState) InitLocations() {
 
 	log.Println("[INIT] Setting up locations....")
-	SecludedDen := &location.Unit{ID: 1, Name: "Secluded Den"}
-	WindsweptPlains := &location.Unit{ID: 1, Name: "Windswept Plains"}
-	RedhornLake := &location.Unit{ID: 1, Name: "Redhorn Lake"}
-	ConiferousGrove := &location.Unit{ID: 1, Name: "Coniferous Grove"}
-	AridPlateau := &location.Unit{ID: 1, Name: "Arid Plateau"}
-	SlumberingCrag := &location.Unit{ID: 1, Name: "Slumbering Crag"}
-	HermitsRecluse := &location.Unit{ID: 1, Name: "Hermit's Recluse"}
+	SecludedDen := &location.Unit{ID: gs.NextID(), Name: "Secluded Den"}
+	WindsweptPlains := &location.Unit{ID: gs.NextID(), Name: "Windswept Plains"}
+	RedhornLake := &location.Unit{ID: gs.NextID(), Name: "Redhorn Lake"}
+	ConiferousGrove := &location.Unit{ID: gs.NextID(), Name: "Coniferous Grove"}
+	AridPlateau := &location.Unit{ID: gs.NextID(), Name: "Arid Plateau"}
+	SlumberingCrag := &location.Unit{ID: gs.NextID(), Name: "Slumbering Crag"}
+	HermitsRecluse := &location.Unit{ID: gs.NextID(), Name: "Hermit's Recluse"}
 
 	SecludedDen.OutgoingConnections = append(SecludedDen.OutgoingConnections, WindsweptPlains)
 	WindsweptPlains.OutgoingConnections = append(WindsweptPlains.OutgoingConnections, SecludedDen, RedhornLake, ConiferousGrove, AridPlateau)
@@ -49,7 +49,7 @@ func (gs *GameState) InitHarvestingUnits() {
 		randomLocation := grabBag[r]
 		grabBag = slices.Delete(grabBag, r, r+1)
 
-		h := harvesting.GenerateRandomPredefinedHarvestingUnit(randomLocation)
+		h := harvesting.GenerateRandomPredefinedHarvestingUnit(gs.NextID(), randomLocation)
 		gs.HarvestUnits = append(gs.HarvestUnits, h)
 		log.Printf("[INIT] Spawning harvestable %s at %s\n", h.Name, randomLocation.Name)
 	}
@@ -60,7 +60,7 @@ func (gs *GameState) InitPlayers() {
 	Druid := &player.Unit{
 		MovingEntity:       moving.MovingEntity{CurrentLocation: gs.Locations[0]},
 		HealthPool:         combat.HealthPool{CurrentHealth: 10, MaxHealth: 10},
-		ID:                 1,
+		ID:                 gs.NextID(),
 		Name:               "Druid",
 		CardsInHand:        7,
 		ResourcesAvailable: 5,
@@ -72,7 +72,7 @@ func (gs *GameState) InitPlayers() {
 	Scoundrel := &player.Unit{
 		MovingEntity:       moving.MovingEntity{CurrentLocation: gs.Locations[0]},
 		HealthPool:         combat.HealthPool{CurrentHealth: 8, MaxHealth: 8},
-		ID:                 1,
+		ID:                 gs.NextID(),
 		Name:               "Scoundrel",
 		CardsInHand:        7,
 		ResourcesAvailable: 5,
@@ -92,7 +92,7 @@ func (gs *GameState) InitCreatures() {
 	Stag := &creature.Unit{
 		MovingEntity: moving.MovingEntity{CurrentLocation: gs.getRandomLocation()},
 		HealthPool:   combat.HealthPool{CurrentHealth: 5, MaxHealth: 5},
-		ID:           1,
+		ID:           gs.NextID(),
 		Name:         "Stag",
 		CreatureBehaviourConfig: &creature.CreatureBehaviourConfig{
 			CreatureAloofConfig:     creature.GenerateAloofConfig(true),
@@ -107,7 +107,7 @@ func (gs *GameState) InitCreatures() {
 	Racoon := &creature.Unit{
 		MovingEntity: moving.MovingEntity{CurrentLocation: gs.getRandomLocation()},
 		HealthPool:   combat.HealthPool{CurrentHealth: 2, MaxHealth: 2},
-		ID:           2,
+		ID:           gs.NextID(),
 		Name:         "Raccoon",
 		CreatureBehaviourConfig: &creature.CreatureBehaviourConfig{
 			CreatureAloofConfig:     creature.GenerateAloofConfig(false),
@@ -122,7 +122,7 @@ func (gs *GameState) InitCreatures() {
 	Plant := &creature.Unit{
 		MovingEntity: moving.MovingEntity{CurrentLocation: gs.getRandomLocation()},
 		HealthPool:   combat.HealthPool{CurrentHealth: 2, MaxHealth: 2},
-		ID:           1,
+		ID:           gs.NextID(),
 		Name:         "Suspicious Plant",
 		CreatureBehaviourConfig: &creature.CreatureBehaviourConfig{
 			CreatureAloofConfig:     creature.GenerateAloofConfig(true),
@@ -136,3 +136,5 @@ func (gs *GameState) InitCreatures() {
 
 	gs.Creatures = append(gs.Creatures, Stag, Racoon, Plant)
 }
+
+

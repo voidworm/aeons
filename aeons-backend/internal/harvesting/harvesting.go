@@ -17,15 +17,16 @@ type Harvestable interface {
 
 // basic harvesting unit
 type Unit struct {
+	ID	int
 	Name                string
 	StaticLocation      *location.Unit
 	HealYieldConfig     *YieldConfig
 	ResourceYieldConfig *YieldConfig
 }
 
-type GenerateFunc func(location *location.Unit) *Unit
+type GenerateFunc func(id int, location *location.Unit) *Unit
 
-func GenerateRandomPredefinedHarvestingUnit(location *location.Unit) *Unit {
+func GenerateRandomPredefinedHarvestingUnit(id int, location *location.Unit) *Unit {
 	generateFuncs := []GenerateFunc{
 		GenerateBerryBush,
 		GenerateBrush,
@@ -34,11 +35,12 @@ func GenerateRandomPredefinedHarvestingUnit(location *location.Unit) *Unit {
 		GenerateFruitTree,
 	}
 	f := generateFuncs[rand.IntN(len(generateFuncs))]
-	return f(location)
+	return f(id, location)
 }
 
-func GenerateBerryBush(location *location.Unit) *Unit {
+func GenerateBerryBush(id int, location *location.Unit) *Unit {
 	return &Unit{
+		ID:				id,
 		Name:                "Berry Bush",
 		StaticLocation:      location,
 		HealYieldConfig:     GenerateSmallYieldConfig(),
@@ -46,8 +48,9 @@ func GenerateBerryBush(location *location.Unit) *Unit {
 	}
 }
 
-func GenerateBrush(location *location.Unit) *Unit {
+func GenerateBrush(id int, location *location.Unit) *Unit {
 	return &Unit{
+		ID:	id,
 		Name:                "Brush",
 		StaticLocation:      location,
 		HealYieldConfig:     GenerateEmptyYieldConfig(),
@@ -55,8 +58,9 @@ func GenerateBrush(location *location.Unit) *Unit {
 	}
 }
 
-func GenerateMushroomField(location *location.Unit) *Unit {
+func GenerateMushroomField(id int, location *location.Unit) *Unit {
 	return &Unit{
+		ID: id,
 		Name:                "Mushroom Field",
 		StaticLocation:      location,
 		HealYieldConfig:     GenerateLargeYieldConfig(),
@@ -64,8 +68,9 @@ func GenerateMushroomField(location *location.Unit) *Unit {
 	}
 }
 
-func GenerateLushCopse(location *location.Unit) *Unit {
+func GenerateLushCopse(id int, location *location.Unit) *Unit {
 	return &Unit{
+		ID: id,
 		Name:                "Lush Copse",
 		StaticLocation:      location,
 		HealYieldConfig:     GenerateSmallYieldConfig(),
@@ -73,8 +78,9 @@ func GenerateLushCopse(location *location.Unit) *Unit {
 	}
 }
 
-func GenerateFruitTree(location *location.Unit) *Unit {
+func GenerateFruitTree(id int, location *location.Unit) *Unit {
 	return &Unit{
+		ID: id,
 		Name:                "Fruit Tree",
 		StaticLocation:      location,
 		HealYieldConfig:     GenerateLargeYieldConfig(),

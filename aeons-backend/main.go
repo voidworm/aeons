@@ -1,26 +1,16 @@
 package main
 
 import (
-	"aeons/internal/game"
+	"aeons/server"
 	"log"
+	"net/http"
 )
 
 func main() {
 
-	gs := &game.GameState{TurnCounter: 1}
-	gs.Init()
-	running := true
+	mux := http.NewServeMux()
+	mux.Handle("/ws", server.New())
 
-	for running {
-		log.Printf("Starting Turn %d", gs.TurnCounter)
-		for gs.PlayerHaveActionsRemaining() {
-			err := gs.ResolvePlayerPhaseStep()
-			if err != nil {
-				log.Println(err)
-				return
-			}
-		}
-		gs.ResolveCreaturePhase()
-		gs.ResolveUpkeepPhase()
-	}
+	log.Fatal(http.ListenAndServe(":8080", mux))
+
 }
