@@ -1,11 +1,14 @@
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   width: 100%;
   margin: 0;
 }
-#game, #game-container {
+#game,
+#game-container {
   height: 100%;
-  width: 100%
+  width: 100%;
 }
 
 body {
