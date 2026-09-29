@@ -62,20 +62,22 @@ export class MainScene extends Phaser.Scene {
   }
 
   handleCardDrag(card: PlayerCard) {
-
     for (const location of this.locationCards) {
-        const overlapping = Phaser.Geom.Intersects.RectangleToRectangle(card.getBounds(), location.getBounds())
-        location.setHighlighted(overlapping)
+        const overlapping = Phaser.Geom.Intersects.RectangleToRectangle(card.getOverlapBounds(), location.getOverlapBounds())
+        if (overlapping)
+          location.onPointerOver()
+        else 
+          location.onPointerOut()
     }
   }
 
   handleCardDrop(card: PlayerCard) {
 
-    const locationHighlighted = this.locationCards.find(loc => loc.isHighlighted)
+    const locationHighlighted = this.locationCards.find(loc => loc.isHovering)
      if (!locationHighlighted) { 
     }else {
           this.lastActionText.text = `${card.name} played on ${locationHighlighted.name}`
-        locationHighlighted?.setHighlighted(false)
+        locationHighlighted.isHovering = false
     }
   }
 

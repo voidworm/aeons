@@ -3,13 +3,18 @@ import type { MainScene } from '../scenes/MainScene'
 
 export class Card extends Phaser.GameObjects.Container {
 
-    public isHighlighted: boolean = false
+    public floating: boolean = false
     public name: string = "Generic card"
     public effect: string = "Generic effect"
 
-    public border!: Phaser.GameObjects.Rectangle
-
     public pointed: boolean = false
+
+    public isHovering = false
+    protected tween: Phaser.Tweens.Tween | null = null
+    protected tweensManager: Phaser.Tweens.TweenManager
+
+    protected shadow!: Phaser.GameObjects.Rectangle
+    protected content!: Phaser.GameObjects.Container
 
     constructor(scene: MainScene, x: number, y: number, cardname: string, cardtext: string) {
         super(scene, x, y)
@@ -18,6 +23,7 @@ export class Card extends Phaser.GameObjects.Container {
         this.setInteractive({ draggable: true })
         this.name = cardname
         this.effect = cardtext
+        this.tweensManager = scene.tweens
 
         this.on('dragstart', ()=> {this.onDragStart()})
         this.on('drag', (pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {this.onDrag(pointer, dragX, dragY)})
@@ -25,45 +31,84 @@ export class Card extends Phaser.GameObjects.Container {
 
         this.on('pointerover', () => {this.onPointerOver()})
         this.on('pointerout', () => {this.onPointerOut()})
-    }
+}
 
-    setHighlighted(input : boolean) {
-        if (input) {
-            this.border.fillColor = 0xf58b0a
-        }else {
-             this.border.fillColor = 0x000000
-        }
-        this.isHighlighted = input
-    }
+
 
     onDragStart() {
-        this.setScale(1.05)
+        this.setFloating(true)
         this.emit('cardDragStart', this)
     }
 
-    onDrag(pointer: Phaser.Input.Pointer, dragX: number, dragY: number) {
+
+    setFloating(input: boolean){
+        this.floating = input
+        this.tweensManager.add({
+         targets: this.content,
+          scale: input ? 1.05 : 1,
+        y: input ? -10 : 0,
+        duration: 150,
+        ease: 'Sine.easeOut'
+    })
+      this.tweensManager.add({
+        targets: this.shadow,
+        scale: input ? 1.1 : 1,
+        x: input ? 20 : 14,
+        y: input ? -20 : -14,
+        alpha: input ? 0.3 : 0.4,
+        duration: 150,
+        ease: 'Sine.easeOut'
+    })
+    
+}
+
+    onDrag(_pointer: Phaser.Input.Pointer, dragX: number, dragY: number) {
         this.x = dragX
         this.y = dragY
         this.emit('cardDragged', this)
     }
 
     onDragend() {
-        if (this.pointed)
-            this.setScale(1)
-        else 
-            this.setScale(1.025)
+      this.setFloating(false)
 
         this.emit('cardDragEnd', this)
     }
 
-    onPointerOver() {
-        this.pointed = true
-        this.setScale(1.025)
-    }
+onPointerOver() {
+    this.isHovering = true;
+    if (this.tween?.isPlaying())
+        return;
+
+    this.tween = this.tweensManager.add({
+        targets: this,
+        angle: { from: -.5, to: .5 },
+        duration: 600,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+        onRepeat: () => {
+            if (!this.isHovering)
+                this.finishHover() 
+        }
+    })
+}
+
+finishHover() {
+    this.tween?.stop()
+    this.tweensManager.add({
+        targets: this,
+        angle: 0,
+        duration: 600,
+        ease: 'Sine.easeOut',
+    })
+}
 
     onPointerOut() {
-         this.pointed = false
-          this.setScale(1)
+           this.isHovering = false;
     }
+
+getOverlapBounds(): Phaser.Geom.Rectangle {
+    return this.content.getBounds()
+}
 
 }
