@@ -1,6 +1,7 @@
 package harvesting
 
 import (
+	"aeons/internal/card"
 	"aeons/internal/location"
 	"aeons/internal/player"
 	"fmt"
@@ -201,4 +202,13 @@ type Effect struct {
 
 func (e *Effect) Apply() {
 	e.TargetHarvestable.HarvestBy(e.Player)
+}
+
+
+func (u *Unit) GetTargetType() card.TargetType {
+	return card.TargetTypeHarvest
+}
+
+func (u *Unit) GetID() int {
+	return u.ID
 }

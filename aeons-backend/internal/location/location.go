@@ -1,6 +1,7 @@
 package location
 
 import (
+	"aeons/internal/card"
 	"slices"
 )
 
@@ -60,4 +61,13 @@ func (le *Unit) breathSearchFirst(target *Unit) []*Unit {
 
 	slices.Reverse(path)
 	return path
+}
+
+
+func (u *Unit) GetTargetType() card.TargetType {
+	return card.TargetTypeLocation
+}
+
+func (u *Unit) GetID() int {
+	return u.ID
 }

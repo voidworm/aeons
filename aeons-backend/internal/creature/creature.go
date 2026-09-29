@@ -1,6 +1,7 @@
 package creature
 
 import (
+	"aeons/internal/card"
 	"aeons/internal/combat"
 	"aeons/internal/moving"
 )
@@ -98,4 +99,12 @@ func (u *Unit) IsEvadable() bool {
 	}
 
 	return true
+}
+
+func (u *Unit) GetTargetType() card.TargetType {
+	return card.TargetTypePlayer
+}
+
+func (u *Unit) GetID() int {
+	return u.ID
 }

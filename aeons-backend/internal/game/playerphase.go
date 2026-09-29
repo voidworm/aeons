@@ -3,29 +3,16 @@ package game
 import (
 	"aeons/internal/combat"
 	"aeons/internal/creature"
-	"aeons/internal/evading"
 	"aeons/internal/harvesting"
 	"aeons/internal/location"
-	"aeons/internal/moving"
 	"aeons/internal/player"
-	"aeons/internal/prompt"
-	"fmt"
 	"log"
 )
 
 func (gs *GameState) ResolvePlayerPhaseStep() error {
-	activePlayer, err := gs.PromptForNextPlayer()
-	if err != nil {
-		return err
-	}
+	
 
-	cancelled, action, err := gs.PromptForPlayerAction(activePlayer)
-	if err != nil {
-		return err
-	} else if cancelled {
-		gs.ResolvePlayerPhaseStep()
-	}
-
+	/*
 	switch action {
 	case "Move":
 
@@ -84,80 +71,28 @@ func (gs *GameState) ResolvePlayerPhaseStep() error {
 	}
 
 	gs.ReconcileDefeats()
+	*/
 	return nil
 }
 
 func (gs *GameState) ChooseTargetForPlayerMove(player *player.Unit) (bool, *location.Unit, error) {
-	targets := player.CurrentLocation.OutgoingConnections
-	optionsArray := []string{}
-
-	for _, v := range targets {
-		optionsArray = append(optionsArray, v.Name)
-	}
-
-	cancelled, position, err := prompt.PromptCancellable(">>> --- Choose a location to move to --- <<<", optionsArray)
-
-	if err != nil {
-		return false, &location.Unit{}, err
-	} else if cancelled {
-		return true, &location.Unit{}, nil
-	} else {
-		return false, targets[position], nil
-	}
+	//old ui trash has been removed
+	return false, nil, nil
 }
 
 func (gs *GameState) ChooseEvadeTargetForPlayer(player *player.Unit) (bool, *creature.Unit, error) {
-	inRange := gs.EvadableEnemiesAtLocation(player.CurrentLocation)
-	promptList := []string{}
-	for _, v := range inRange {
-		promptItem := fmt.Sprintf("%s (Remaining Health: %d/%d)", v.Name, v.CurrentHealth, v.MaxHealth)
-		promptList = append(promptList, promptItem)
-	}
-
-	cancelled, position, err := prompt.PromptCancellable(">>> --- Chose a target to evade --- <<<", promptList)
-	if err != nil {
-		return false, &creature.Unit{}, err
-	} else if cancelled {
-		return true, &creature.Unit{}, nil
-	} else {
-		return false, inRange[position], nil
-	}
+	//old ui trash has been removed
+	return false, nil, nil
 }
 
 func (gs *GameState) ChooseTargetForPlayerAttack(player *player.Unit) (bool, *creature.Unit, error) {
-	inRange := gs.EnemiesAtLocation(player.CurrentLocation)
-	promptList := []string{}
-	for _, v := range inRange {
-		promptItem := fmt.Sprintf("%s (Remaining Health: %d/%d)", v.Name, v.CurrentHealth, v.MaxHealth)
-		promptList = append(promptList, promptItem)
-	}
-
-	cancelled, position, err := prompt.PromptCancellable(">>> --- Chose a target to attack --- <<<", promptList)
-	if err != nil {
-		return false, &creature.Unit{}, err
-	} else if cancelled {
-		return true, &creature.Unit{}, nil
-	} else {
-		return false, inRange[position], nil
-	}
+	//old ui trash has been removed
+	return false, nil, nil
 }
 
 func (gs *GameState) ChooseHarvestableForHarvestAction(player *player.Unit) (bool, *harvesting.Unit, error) {
-	inRange := gs.HarvestUnitsAtLocation(player.CurrentLocation)
-	promptList := []string{}
-	for _, v := range inRange {
-		promptItem := fmt.Sprintf("%s (Remaining: %d Healing, %d Resources)", v.Name, v.HealYieldConfig.CurrentCapacity, v.ResourceYieldConfig.CurrentCapacity)
-		promptList = append(promptList, promptItem)
-	}
-
-	cancelled, position, err := prompt.PromptCancellable(">>> --- What will you harvest? --- <<<", promptList)
-	if err != nil {
-		return false, &harvesting.Unit{}, err
-	} else if cancelled {
-		return true, &harvesting.Unit{}, nil
-	} else {
-		return false, inRange[position], nil
-	}
+	//old ui trash has been removed
+	return false, nil, nil
 }
 
 func (gs *GameState) ResolveAttackForPlayer(player *player.Unit) {

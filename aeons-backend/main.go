@@ -1,7 +1,7 @@
 package main
 
 import (
-	"aeons/server"
+	"aeons/internal/server"
 	"log"
 	"net/http"
 )

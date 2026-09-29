@@ -1,6 +1,7 @@
 package server
 
 import (
+	"aeons/internal/card"
 	"aeons/internal/game"
 	"aeons/internal/harvesting"
 )
@@ -11,6 +12,7 @@ type GameStateDTO struct {
 	Players []PlayerDTO `json:"players"`
 	Creatures []CreatureDTO `json:"creatures"`
 	Harvestables []HarvestableDTO `json:"harvestables"`
+	Cards []CardDTO `json:"cards"`
 }
 
 type LocationDTO struct {
@@ -26,8 +28,9 @@ type PlayerDTO struct {
 	Health     int    `json:"health"`
 	MaxHealth  int    `json:"maxHealth"`
 	Actions    int    `json:"actions"`
-	Hand       int    `json:"cardsInHand"`
-	Resources  int    `json:"resources"`	
+	Hand       []int  `json:"hand"`
+	Resources  int    `json:"resources"`
+	Damage     int    `json:"damage"`
 }
 
 type CreatureDTO struct {
@@ -36,6 +39,18 @@ type CreatureDTO struct {
 	LocationID int    `json:"locationId"`
 	Health     int    `json:"health"`
 	MaxHealth  int    `json:"maxHealth"`
+	Damage     int    `json:"damage"`
+}
+
+type CardDTO struct {
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	EffectText   string `json:"effectText"`
+	EffectType   int    `json:"effectType"`
+	CanBeCast    bool   `json:"canBeCast"`
+	Range        int    `json:"range"`
+	TargetType   *int   `json:"targetType"`
+	CandidateIDs []int  `json:"candidateIds"`
 }
 
 type HarvestableDTO struct {
@@ -64,6 +79,22 @@ func yieldDTO(yc *harvesting.YieldConfig) YieldDTO {
 	}
 }
 
+func cardDTO(c *card.Card) CardDTO {
+	out := CardDTO{
+		ID: c.ID, Name: c.Name, EffectText: c.EffectText,
+		EffectType: int(c.Type), CanBeCast: c.CanBeCast, Range: c.Range,
+		CandidateIDs: make([]int, 0, len(c.Candidates)),
+	}
+	if c.TargetSpec != nil {
+		t := int(c.TargetSpec.Type)
+		out.TargetType = &t
+	}
+	for _, t := range c.Candidates {
+		out.CandidateIDs = append(out.CandidateIDs, t.GetID())
+	}
+	return out
+}
+
 func Snapshot(gs *game.GameState) GameStateDTO {
 	var out GameStateDTO
 
@@ -76,17 +107,22 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 	}
 
 	for _, p := range gs.Players {
+		hand := make([]int, 0, len(p.CardsInHand))
+		for _, c := range p.CardsInHand {
+			hand = append(hand, c.ID)
+		}
 		out.Players = append(out.Players, PlayerDTO{
 			ID: p.ID, Name: p.Name, LocationID: p.CurrentLocation.ID,
 			Health: p.CurrentHealth, MaxHealth: p.MaxHealth,
-			Actions: p.RemainingActions, Hand: p.CardsInHand, Resources: p.ResourcesAvailable,
+			Actions: p.RemainingActions, Hand: hand, Resources: p.ResourcesAvailable,
+			Damage: p.Damage,
 		})
 	}
 
 	for _, c := range gs.Creatures {
 		out.Creatures = append(out.Creatures, CreatureDTO{
 			ID: c.ID, Name: c.Name, LocationID: c.CurrentLocation.ID,
-			Health: c.CurrentHealth, MaxHealth: c.MaxHealth,
+			Health: c.CurrentHealth, MaxHealth: c.MaxHealth, Damage: c.Damage,
 		})
 	}
 
@@ -96,6 +132,10 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 			Healing:   yieldDTO(h.HealYieldConfig),
 			Resources: yieldDTO(h.ResourceYieldConfig),
 		})
+	}
+
+	for _, c := range gs.Cards {
+		out.Cards = append(out.Cards, cardDTO(c))
 	}
 
 	return out

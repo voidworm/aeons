@@ -1,8 +1,10 @@
 package game
 
 import (
+	"aeons/internal/card"
 	"aeons/internal/combat"
 	"aeons/internal/creature"
+	"aeons/internal/evading"
 	"aeons/internal/harvesting"
 	"aeons/internal/location"
 	"aeons/internal/moving"
@@ -62,11 +64,13 @@ func (gs *GameState) InitPlayers() {
 		HealthPool:         combat.HealthPool{CurrentHealth: 10, MaxHealth: 10},
 		ID:                 gs.NextID(),
 		Name:               "Druid",
-		CardsInHand:        7,
+		CardsInHand:        []*card.Card{},
 		ResourcesAvailable: 5,
 		RemainingActions:   3,
 		Damage:             1,
 	}
+
+	Druid.CardsInHand = gs.GenerateBasicHand()
 
 	log.Println("[INIT] Setting up player Scoundrel...")
 	Scoundrel := &player.Unit{
@@ -74,17 +78,155 @@ func (gs *GameState) InitPlayers() {
 		HealthPool:         combat.HealthPool{CurrentHealth: 8, MaxHealth: 8},
 		ID:                 gs.NextID(),
 		Name:               "Scoundrel",
-		CardsInHand:        7,
+		CardsInHand:        []*card.Card{},
 		ResourcesAvailable: 5,
 		RemainingActions:   3,
 		Damage:             1,
 	}
+
+	Scoundrel.CardsInHand = gs.GenerateBasicHand()
 
 	gs.Players = append(gs.Players, Druid, Scoundrel)
 }
 
 func (gs *GameState) getRandomLocation() *location.Unit {
 	return gs.Locations[rand.IntN(len(gs.Locations))]
+}
+
+func (gs *GameState) GenerateBasicHand() []*card.Card {
+	basicHand := []*card.Card{}
+	basicHand = append(basicHand, gs.GenerateBasicMoveCard(), gs.GenerateBasicAttackCard(), gs.GenerateBasicDistractCard(), gs.GenerateBasicHarvestCard())
+	gs.Cards = append(gs.Cards, basicHand...)
+	return basicHand
+}
+
+func (gs *GameState) GenerateBasicMoveCard() *card.Card {
+	BasicMoveCard := &card.Card {
+		ID: gs.NextID(),
+		Type: card.PlayerMove,
+		Name: "Move",
+		EffectText: "Moves your character to an adjacent location.",
+		TargetSpec: nil,
+		Candidates: []card.Targetable{},
+		Effect: nil,
+		Range: 1,
+	}
+
+	BasicMoveTargetLocationSpec := &card.TargetSpec {
+		Type: card.TargetTypeLocation,
+		Target: nil,
+		Filter: nil,
+	}
+
+	BasicMoveCard.TargetSpec = BasicMoveTargetLocationSpec
+	return BasicMoveCard
+}
+
+func (gs *GameState) GenerateBasicAttackCard() *card.Card {
+	BasicAttackCard := &card.Card {
+		ID: gs.NextID(),
+		Name: "Attack",
+		Type: card.PlayerAttack,
+		EffectText: "Attacks a target creature at your location.",
+		TargetSpec: nil,
+		Candidates: []card.Targetable{},
+		Effect: nil,
+		Range: 1,
+	}
+
+	BasicAttackTargetCreatureSpec := &card.TargetSpec {
+		Type: card.TargetTypeCreature,
+		Target: nil,
+		Filter: nil,
+	}
+
+	BasicAttackCard.TargetSpec = BasicAttackTargetCreatureSpec
+	return BasicAttackCard
+}
+
+func (gs *GameState) GenerateBasicDistractCard() *card.Card {
+	BasicDistractCard := &card.Card {
+		ID: gs.NextID(),
+		Name: "Distract",
+		EffectText: "Distracts a target creature at your location.",
+		Type:	card.PlayerDistract,
+		TargetSpec: nil,
+		Candidates: []card.Targetable{},
+		Effect: nil,
+		Range: 1,
+	}
+
+	BasicDistractTargetCreatureSpec := &card.TargetSpec {
+		Type: card.TargetTypeCreature,
+		Target: nil,
+		Filter: nil,
+	}
+
+	BasicDistractCard.TargetSpec = BasicDistractTargetCreatureSpec
+	return BasicDistractCard
+}
+
+func (gs *GameState) GenerateBasicHarvestCard() *card.Card {
+	BasicHarvestCard := &card.Card {
+		ID: gs.NextID(),
+		Type: card.PlayerHarvest,
+		Name: "Harvest",
+		EffectText: "Harvests a target Harvestable at your location.",
+		TargetSpec: nil,
+		Candidates: []card.Targetable{},
+		Effect: nil,
+		Range: 1,
+	}
+
+	BasicHarvestTargetHarvestable := &card.TargetSpec {
+		Type: card.TargetTypeHarvest,
+		Target: nil,
+		Filter: nil,
+	}
+
+	BasicHarvestCard.TargetSpec = BasicHarvestTargetHarvestable
+	return BasicHarvestCard
+}
+
+func (gs *GameState) fillEffectForCard(c *card.Card, owner *player.Unit) {
+		switch c.Type {
+		case card.PlayerMove:
+			location,ok := c.Target.(*location.Unit)
+			if !ok {
+				//shouldnt happen
+			}
+			c.Effect = &moving.MoveEffect {
+				Entity: owner,
+				Target: location,
+			}
+		case card.PlayerAttack:
+			target,ok := c.Target.(*creature.Unit)
+			if !ok {
+				//shouldnt happen
+			}
+			c.Effect = &combat.DamageEffect {
+				Source: owner,
+				Target: target,
+			}
+		case card.PlayerDistract:
+			target,ok := c.Target.(*creature.Unit)
+			if !ok {
+				//shouldnt happen
+			}
+			c.Effect = &evading.Effect {
+				EvadingPlayer: owner,
+				EvadedCreature: target,
+			}
+		case card.PlayerHarvest:
+			target,ok := c.Target.(*harvesting.Unit)
+			if !ok {
+				//shouldnt happen
+			}
+			c.Effect = &harvesting.Effect {
+				Player: owner,
+				TargetHarvestable: target,
+			}
+	} 
 }
 
 func (gs *GameState) InitCreatures() {

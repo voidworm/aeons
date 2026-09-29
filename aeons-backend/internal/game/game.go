@@ -1,6 +1,7 @@
 package game
 
 import (
+	"aeons/internal/card"
 	"aeons/internal/creature"
 	"aeons/internal/harvesting"
 	"aeons/internal/location"
@@ -13,6 +14,7 @@ type GameState struct {
 	Players      []*player.Unit
 	Creatures    []*creature.Unit
 	HarvestUnits []*harvesting.Unit
+	Cards 			[]*card.Card
 }
 
 func (gs *GameState) NextID() int {
@@ -153,3 +155,101 @@ func (gs *GameState) PlayerHaveActionsRemaining() bool {
 	}
 	return false
 }
+
+func (gs *GameState) Candidates(kind card.TargetType) []card.Targetable{
+
+	switch kind {
+	case card.TargetTypeCreature:
+		return toTargetables(gs.Creatures)
+	case card.TargetTypeHarvest:
+		return toTargetables(gs.HarvestUnits)
+	case card.TargetTypePlayer:
+		return toTargetables(gs.Players)
+	case card.TargetTypeLocation:
+		return toTargetables(gs.Locations)
+	default:
+		return []card.Targetable{}
+	}
+}
+
+func toTargetables[T card.Targetable](in []T) []card.Targetable {
+	out := make([]card.Targetable,0,len(in))
+	for _,v := range in {
+		out = append(out, v)
+	}
+	return out
+}
+
+func getEntryWithID[T card.Targetable](in []T, id int) card.Targetable {
+	for _,v := range in {
+		if v.GetID() == id {
+			return  v
+		}
+	}
+	return nil
+}
+
+
+func (gs *GameState) FillCardWithCandidates(input card.Card) {
+		switch input.TargetSpec.Type {
+		case card.TargetTypeCreature:
+			input.Candidates = gs.Candidates(card.TargetTypeCreature)
+		case card.TargetTypePlayer:
+			input.Candidates = gs.Candidates(card.TargetTypePlayer)
+		case card.TargetTypeHarvest:
+			input.Candidates = gs.Candidates(card.TargetTypeHarvest)
+		case card.TargetTypeLocation:
+			input.Candidates = gs.Candidates(card.TargetTypeLocation)
+		default:
+			input.Candidates = nil	
+		}
+	}
+
+func (gs *GameState) GetTargetWithIdAndType(id int, ttype card.TargetType) card.Targetable {
+		switch ttype {
+		case card.TargetTypeCreature:
+			return getEntryWithID(gs.Creatures,id)
+		case card.TargetTypePlayer:
+			return getEntryWithID(gs.Players,id)
+		case card.TargetTypeHarvest:
+			return getEntryWithID(gs.HarvestUnits,id)
+		case card.TargetTypeLocation:
+			return getEntryWithID(gs.Locations,id)
+		default:
+			return nil	
+		}
+}
+
+
+func (gs *GameState) EvaluatePlayerHandPlayability(p *player.Unit) {
+	for _,v := range p.CardsInHand {
+		switch v.Type {
+			case card.PlayerMove: 
+				if gs.LocationCanBeLeft(p.CurrentLocation){
+					v.CanBeCast = true
+				}else {
+					v.CanBeCast = false
+				}
+			case card.PlayerAttack: 
+				if gs.LocationHasEnemies(p.CurrentLocation){
+					v.CanBeCast = true
+				}else {
+					v.CanBeCast = false
+				}
+			case card.PlayerDistract:
+				if gs.LocationHaEvadableCreatures(p.CurrentLocation) {
+					v.CanBeCast = true
+				}else {
+					v.CanBeCast = false
+				}
+			case card.PlayerHarvest:
+				if gs.LocationHasHarvest(p.CurrentLocation) {
+					v.CanBeCast = true
+				}else {
+					v.CanBeCast = false
+				}
+			default:
+				v.CanBeCast = true
+		}
+	}
+}	
