@@ -13,11 +13,13 @@ export class Card extends Phaser.GameObjects.Container {
   protected tweensManager: Phaser.Tweens.TweenManager;
 
   protected shadow!: Phaser.GameObjects.Rectangle;
+  protected disabledLayer!: Phaser.GameObjects.Rectangle;
+  protected isDisabled: boolean;
   protected content!: Phaser.GameObjects.Container;
 
   constructor(scene: MainScene, x: number, y: number, cardname: string, cardtext: string) {
     super(scene, x, y);
-
+    this.isDisabled = false;
     this.setSize(315, 440);
     this.setInteractive({ draggable: true });
     this.name = cardname;
@@ -41,6 +43,8 @@ export class Card extends Phaser.GameObjects.Container {
   }
 
   onDragStart() {
+    if (this.isDisabled) return;
+
     this.setFloating(true);
     this.emit('cardDragStart', this);
   }
@@ -66,14 +70,17 @@ export class Card extends Phaser.GameObjects.Container {
   }
 
   onDrag(_pointer: Phaser.Input.Pointer, dragX: number, dragY: number) {
+    if (this.isDisabled) return;
+
     this.x = dragX;
     this.y = dragY;
     this.emit('cardDragged', this);
   }
 
   onDragend() {
-    this.setFloating(false);
+    if (this.isDisabled) return;
 
+    this.setFloating(false);
     this.emit('cardDragEnd', this);
   }
 
@@ -106,6 +113,11 @@ export class Card extends Phaser.GameObjects.Container {
 
   onPointerOut() {
     this.isHovering = false;
+  }
+
+  setDiabled(on: boolean) {
+    this.isDisabled = on;
+    this.disabledLayer.setVisible(on);
   }
 
   getOverlapBounds(): Phaser.Geom.Rectangle {

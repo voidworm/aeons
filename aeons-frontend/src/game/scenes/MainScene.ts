@@ -1,14 +1,14 @@
 import Phaser from 'phaser';
-import { PlayerCard } from '../objects/PlayerCard';
+import { PlayableCard } from '../objects/PlayableCard';
 import { LocationCard } from '../objects/LocationCard';
 import type { Card } from '../objects/Card';
-import { connect, disconnect, send } from '../../net/socket';
+import { connect } from '../../net/socket';
 
 export class MainScene extends Phaser.Scene {
-  private playerCards: PlayerCard[] = [];
+  private playerCards: PlayableCard[] = [];
   private locationCards: LocationCard[] = [];
   private lastActionText!: Phaser.GameObjects.Text;
-
+  private socket!: WebSocket;
   constructor() {
     super('MainScene');
   }
@@ -16,15 +16,7 @@ export class MainScene extends Phaser.Scene {
   preload() {}
 
   async create() {
-
-    await connect((msg) => {
-      this.lastActionText.text = `server: ${msg.type}`;
-      if (msg.type === 'poc_reply') send('poc_ack');
-    });
-
-    this.events.once(Phaser.Scenes.Events.DESTROY, () => disconnect());
-
-    send('new_game', { level: 'basic' });
+    this.events.once(Phaser.Scenes.Events.DESTROY, () => this.socket.close());
 
     this.add.text(this.scale.width / 2, 50, 'Along the mist-shrouded plains,', {
       color: '#000000',
@@ -37,7 +29,26 @@ export class MainScene extends Phaser.Scene {
       color: '#000000',
     });
 
-    var boltCard = new PlayerCard(
+    this.socket = connect((msg) => {
+      this.lastActionText.text = `server: ${msg.type}`;
+      if (msg.type === 'poc_reply') this.send('poc_ack');
+      if (msg.type === 'game_state') {
+        if (msg.payload) {
+          console.log('Received the new gamestate with a payload');
+          this.handleGameStart(msg.payload);
+        } else {
+          console.log('Received the new gamestate but the payload is missing');
+        }
+      } else {
+        console.log(msg.type);
+      }
+    });
+
+    this.socket.addEventListener('open', () => this.send('new_game', { level: 'basic' }));
+
+    //commenting out generics for now
+    /*
+    var boltCard = new PlayableCard(
       this,
       this.scale.width / 2 - 400,
       this.scale.height,
@@ -45,12 +56,12 @@ export class MainScene extends Phaser.Scene {
       'Attempt to fish at target location.',
       0,
     );
-    boltCard.on('cardDragged', (card: PlayerCard) => this.handleCardDrag(card));
-    boltCard.on('cardDragStart', (card: PlayerCard) => this.handleCardDragStart(card));
-    boltCard.on('cardDragEnd', (card: PlayerCard) => this.handleCardDrop(card));
+    boltCard.on('cardDragged', (card: PlayableCard) => this.handleCardDrag(card));
+    boltCard.on('cardDragStart', (card: PlayableCard) => this.handleCardDragStart(card));
+    boltCard.on('cardDragEnd', (card: PlayableCard) => this.handleCardDrop(card));
     this.playerCards.push(boltCard);
 
-    var cleanseCard = new PlayerCard(
+    var cleanseCard = new PlayableCard(
       this,
       this.scale.width / 2,
       this.scale.height,
@@ -58,12 +69,14 @@ export class MainScene extends Phaser.Scene {
       'Consult the spirits.\n\nIf you succeed, discover tracks at the location.',
       4,
     );
-    cleanseCard.on('cardDragged', (card: PlayerCard) => this.handleCardDrag(card));
-    cleanseCard.on('cardDragStart', (card: PlayerCard) => this.handleCardDragStart(card));
-    cleanseCard.on('cardDragEnd', (card: PlayerCard) => this.handleCardDrop(card));
+    cleanseCard.on('cardDragged', (card: PlayableCard) => this.handleCardDrag(card));
+    cleanseCard.on('cardDragStart', (card: PlayableCard) => this.handleCardDragStart(card));
+    cleanseCard.on('cardDragEnd', (card: PlayableCard) => this.handleCardDrop(card));
+
+    cleanseCard.setDiabled(true);
     this.playerCards.push(cleanseCard);
 
-    var trapCard = new PlayerCard(
+    var trapCard = new PlayableCard(
       this,
       this.scale.width / 2 + 400,
       this.scale.height,
@@ -71,11 +84,12 @@ export class MainScene extends Phaser.Scene {
       'Place a trap at target location',
       2,
     );
-    trapCard.on('cardDragged', (card: PlayerCard) => this.handleCardDrag(card));
-    trapCard.on('cardDragStart', (card: PlayerCard) => this.handleCardDragStart(card));
-    trapCard.on('cardDragEnd', (card: PlayerCard) => this.handleCardDrop(card));
+    trapCard.on('cardDragged', (card: PlayableCard) => this.handleCardDrag(card));
+    trapCard.on('cardDragStart', (card: PlayableCard) => this.handleCardDragStart(card));
+    trapCard.on('cardDragEnd', (card: PlayableCard) => this.handleCardDrop(card));
     this.playerCards.push(trapCard);
 
+    /*
     var secludedDen = new LocationCard(
       this,
       this.scale.width / 2 + 400,
@@ -105,6 +119,11 @@ export class MainScene extends Phaser.Scene {
     );
     windscarredCrag.on('cardDragStart', (card: Card) => this.handleCardDragStart(card));
     this.locationCards.push(windscarredCrag);
+    */
+  }
+
+  send(type: string, payload?: unknown): void {
+    this.socket.send(JSON.stringify({ type, payload }));
   }
 
   update(_timer: number, _delta: number) {}
@@ -113,7 +132,11 @@ export class MainScene extends Phaser.Scene {
     this.children.bringToTop(card);
   }
 
-  handleCardDrag(card: PlayerCard) {
+  handleGameStart(inputGameState: Record<string, unknown>) {
+    console.log(inputGameState);
+  }
+
+  handleCardDrag(card: PlayableCard) {
     for (const location of this.locationCards) {
       const overlapping = Phaser.Geom.Intersects.RectangleToRectangle(
         card.getOverlapBounds(),
@@ -124,10 +147,10 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
-  handleCardDrop(card: PlayerCard) {
+  handleCardDrop(card: PlayableCard) {
     const locationHighlighted = this.locationCards.find((loc) => loc.isHovering);
     if (locationHighlighted) {
-      send('poc_hello', {
+      this.send('poc_hello', {
         played_card: card.name,
         targeted_location: locationHighlighted.name,
       });
