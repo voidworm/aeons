@@ -47,8 +47,15 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 		switch msg.Type {
 		case MsgNewGame:
 			gs = &game.GameState{}
+			log.Print("Received new game request, initalising....")
 			gs.Init()
 			s.send(ctx, conn, MsgGameState, Snapshot(gs))
+		case MsgPocHello:
+			log.Print("Received a hello!")
+			s.send(ctx,conn, MsgPocReply, "...")
+		case MsgPocAck:
+			log.Print("Received an acknowledgement!")
+			s.send(ctx,conn, MsgPocDone, "...")
 		default:
 			s.send(ctx, conn, MsgError, "unknown message type: "+msg.Type)
 			

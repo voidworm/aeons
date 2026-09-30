@@ -14,6 +14,15 @@ const (
 	MsgHAnd = "hand"
 	MsgTargets = "targets"
 	MsgError = "error"
+
+	//poc messages
+	//fe->be
+	MsgPocHello = "poc_hello"
+	MsgPocAck = "poc_ack"
+
+	//be->fe
+	MsgPocReply = "poc_reply"
+	MsgPocDone = "poc_done"
 )
 
 type Envelope struct {
