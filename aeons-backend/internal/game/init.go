@@ -17,9 +17,12 @@ import (
 func (gs *GameState) Init() {
 
 	gs.InitLocations()
-	gs.InitHarvestingUnits()
 	gs.InitPlayers()
+	gs.InitHarvestingUnits()
 	gs.InitCreatures()
+
+	//init hands also sets playability of cards, so needs to be evoked after all creatures and harvesting have been added to the board
+	gs.initHandsForAllPlayers()
 }
 
 func (gs *GameState) InitLocations() {
@@ -70,8 +73,6 @@ func (gs *GameState) InitPlayers() {
 		Damage:             1,
 	}
 
-	Druid.CardsInHand = gs.GenerateBasicHand()
-
 	log.Println("[INIT] Setting up player Scoundrel...")
 	Scoundrel := &player.Unit{
 		MovingEntity:       moving.MovingEntity{CurrentLocation: gs.Locations[0]},
@@ -83,10 +84,14 @@ func (gs *GameState) InitPlayers() {
 		RemainingActions:   3,
 		Damage:             1,
 	}
-
-	Scoundrel.CardsInHand = gs.GenerateBasicHand()
-
 	gs.Players = append(gs.Players, Druid, Scoundrel)
+}
+
+func (gs *GameState)initHandsForAllPlayers() {
+	for _,p := range gs.Players {
+		p.CardsInHand = gs.GenerateBasicHand()
+		gs.EvaluatePlayerHandPlayability(p)
+	}
 }
 
 func (gs *GameState) getRandomLocation() *location.Unit {
