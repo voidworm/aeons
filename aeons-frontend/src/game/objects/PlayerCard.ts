@@ -17,7 +17,7 @@ export class PlayerCard extends Card {
     this.shadow = new Phaser.GameObjects.Rectangle(scene, 14, -14, 315, 440, 0x000000, 0.5);
     const border = new Phaser.GameObjects.Rectangle(scene, 0, 0, 315, 440, 0x000000);
     const face = new Phaser.GameObjects.Rectangle(scene, 0, 0, 295, 420, 0x8b5e34);
-    const art = new Phaser.GameObjects.Rectangle(scene, 0, -90, 255, 300, 0x2ecc71);
+    const art = new Phaser.GameObjects.Rectangle(scene, 0, 20, 255, 320, 0x2ecc71);
     const title = new Phaser.GameObjects.Text(scene, -127.5, -200, this.name, {
       color: '#000000',
       fontSize: '18px',

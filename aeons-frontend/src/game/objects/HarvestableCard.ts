@@ -16,7 +16,7 @@ export class HarvestableCard extends Card {
   frameInit(scene: MainScene) {
     this.shadow = new Phaser.GameObjects.Rectangle(scene, 0, 0, 315, 440, 0x000000, 0.5);
     const border = new Phaser.GameObjects.Rectangle(scene, 0, 0, 315, 440, 0x000000);
-    const face = new Phaser.GameObjects.Rectangle(scene, 0, 0, 295, 420, 0x333333);
+    const face = new Phaser.GameObjects.Rectangle(scene, 0, 0, 295, 420, 0x777777);
     const art = new Phaser.GameObjects.Rectangle(scene, 0, -90, 255, 170, 0x2ecc71);
     const title = new Phaser.GameObjects.Text(scene, -127.5, -200, this.name, {
       color: '#000000',

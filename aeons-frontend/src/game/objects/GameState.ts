@@ -62,5 +62,5 @@ export interface GameStateDTO {
   players: PlayerDTO[];
   creatures: CreatureDTO[];
   harvestables: HarvestableDTO[];
-  cards: PlayableCardDTO[];
+  playables: PlayableCardDTO[];
 }

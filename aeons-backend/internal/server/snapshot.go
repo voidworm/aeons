@@ -12,7 +12,7 @@ type GameStateDTO struct {
 	Players []PlayerDTO `json:"players"`
 	Creatures []CreatureDTO `json:"creatures"`
 	Harvestables []HarvestableDTO `json:"harvestables"`
-	PlayableCards []PlayableCardDTO `json:"cards"`
+	PlayableCards []PlayableCardDTO `json:"playables"`
 }
 
 type LocationDTO struct {
