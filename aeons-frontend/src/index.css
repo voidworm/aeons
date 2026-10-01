@@ -12,5 +12,14 @@ body,
 }
 
 body {
-  background: #005599;
+  background: #1e5c2c;
+}
+
+#game-container canvas {
+  display: block;
+}
+
+html,
+body {
+  overflow: hidden;
 }

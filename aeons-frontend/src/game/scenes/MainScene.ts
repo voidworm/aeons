@@ -3,6 +3,9 @@ import { PlayableCard } from '../objects/PlayableCard';
 import { LocationCard } from '../objects/LocationCard';
 import type { Card } from '../objects/Card';
 import { connect } from '../../net/socket';
+import { CreatureCard } from '../objects/CreatureCard';
+import { HarvestableCard } from '../objects/HarvestableCard';
+import type { GameStateDTO } from '../objects/GameState';
 
 export class MainScene extends Phaser.Scene {
   private playerCards: PlayableCard[] = [];
@@ -17,30 +20,23 @@ export class MainScene extends Phaser.Scene {
 
   async create() {
     this.events.once(Phaser.Scenes.Events.DESTROY, () => this.socket.close());
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this);
 
-    this.add.text(this.scale.width / 2, 50, 'Along the mist-shrouded plains,', {
-      color: '#000000',
-    });
-    this.add.text(this.scale.width / 2, 70, 'Across the eternal plains', { color: '#000000' });
-    this.add.text(this.scale.width / 2, 90, 'And ever towards the ancient forest', {
-      color: '#000000',
-    });
     this.lastActionText = this.add.text(this.scale.width / 2, 130, '...at long last, homebound.', {
       color: '#000000',
     });
 
     this.socket = connect((msg) => {
-      this.lastActionText.text = `server: ${msg.type}`;
-      if (msg.type === 'poc_reply') this.send('poc_ack');
-      if (msg.type === 'game_state') {
-        if (msg.payload) {
-          console.log('Received the new gamestate with a payload');
+      switch (msg.type) {
+        case 'game_state':
           this.handleGameStart(msg.payload);
-        } else {
-          console.log('Received the new gamestate but the payload is missing');
-        }
-      } else {
-        console.log(msg.type);
+          break;
+        case 'poc_reply':
+          this.send('poc_ack');
+          break;
+        case 'error':
+          console.error(msg.payload);
+          break;
       }
     });
 
@@ -48,20 +44,19 @@ export class MainScene extends Phaser.Scene {
 
     //commenting out generics for now
     /*
-    var boltCard = new PlayableCard(
+    var raccoonCard = new CreatureCard(
       this,
-      this.scale.width / 2 - 400,
-      this.scale.height,
-      'Fishing',
-      'Attempt to fish at target location.',
-      0,
+      this.scale.width / 2 + 200,
+      this.scale.height - 400,
+      'Raccoon',
+      'A raccoon wandering around. What might he do next, steal your berries?',
     );
-    boltCard.on('cardDragged', (card: PlayableCard) => this.handleCardDrag(card));
-    boltCard.on('cardDragStart', (card: PlayableCard) => this.handleCardDragStart(card));
-    boltCard.on('cardDragEnd', (card: PlayableCard) => this.handleCardDrop(card));
-    this.playerCards.push(boltCard);
+    raccoonCard.on('cardDragged', (card: CreatureCard) => this.handleCardDrag(card));
+    raccoonCard.on('cardDragStart', (card: CreatureCard) => this.handleCardDragStart(card));
+    raccoonCard.on('cardDragEnd', (card: CreatureCard) => this.handleCardDrop(card));
+    this.playerCards.push(raccoonCard);
 
-    var cleanseCard = new PlayableCard(
+    var riteOfSeekingCard = new PlayableCard(
       this,
       this.scale.width / 2,
       this.scale.height,
@@ -69,27 +64,38 @@ export class MainScene extends Phaser.Scene {
       'Consult the spirits.\n\nIf you succeed, discover tracks at the location.',
       4,
     );
+    riteOfSeekingCard.on('cardDragged', (card: PlayableCard) => this.handleCardDrag(card));
+    riteOfSeekingCard.on('cardDragStart', (card: PlayableCard) => this.handleCardDragStart(card));
+    riteOfSeekingCard.on('cardDragEnd', (card: PlayableCard) => this.handleCardDrop(card));
+
+    this.playerCards.push(riteOfSeekingCard);
+
+    var cleanseCard = new PlayableCard(
+      this,
+      this.scale.width / 2 + 200,
+      this.scale.height,
+      'Cleanse',
+      'Cleanse all debuffs from target player.',
+      1,
+    );
     cleanseCard.on('cardDragged', (card: PlayableCard) => this.handleCardDrag(card));
     cleanseCard.on('cardDragStart', (card: PlayableCard) => this.handleCardDragStart(card));
     cleanseCard.on('cardDragEnd', (card: PlayableCard) => this.handleCardDrop(card));
 
-    cleanseCard.setDiabled(true);
     this.playerCards.push(cleanseCard);
 
-    var trapCard = new PlayableCard(
+    var berryBush = new HarvestableCard(
       this,
       this.scale.width / 2 + 400,
       this.scale.height,
-      'Trap',
-      'Place a trap at target location',
-      2,
+      'Berry Bush',
+      'Berries around here are known to be very tasty. Especially raccoons love them.',
     );
-    trapCard.on('cardDragged', (card: PlayableCard) => this.handleCardDrag(card));
-    trapCard.on('cardDragStart', (card: PlayableCard) => this.handleCardDragStart(card));
-    trapCard.on('cardDragEnd', (card: PlayableCard) => this.handleCardDrop(card));
-    this.playerCards.push(trapCard);
+    berryBush.on('cardDragged', (card: HarvestableCard) => this.handleCardDrag(card));
+    berryBush.on('cardDragStart', (card: HarvestableCard) => this.handleCardDragStart(card));
+    berryBush.on('cardDragEnd', (card: HarvestableCard) => this.handleCardDrop(card));
+    this.playerCards.push(berryBush);
 
-    /*
     var secludedDen = new LocationCard(
       this,
       this.scale.width / 2 + 400,
@@ -100,6 +106,7 @@ export class MainScene extends Phaser.Scene {
     secludedDen.on('cardDragStart', (card: Card) => this.handleCardDragStart(card));
     this.locationCards.push(secludedDen);
 
+    /*
     var eternalPlains = new LocationCard(
       this,
       this.scale.width / 2,
@@ -126,14 +133,46 @@ export class MainScene extends Phaser.Scene {
     this.socket.send(JSON.stringify({ type, payload }));
   }
 
+  private onResize(
+    gameSize: Phaser.Structs.Size,
+    _baseSize: Phaser.Structs.Size,
+    _displaySize: Phaser.Structs.Size,
+    previousWidth: number,
+    previousHeight: number,
+  ): void {
+    const ratioX = gameSize.width / previousWidth;
+    const ratioY = gameSize.height / previousHeight;
+    const factor = Math.min(1, gameSize.width / 1920, gameSize.height / 1080);
+
+    for (const card of [...this.playerCards, ...this.locationCards]) {
+      card.setScale(factor);
+      if (card.floating) continue;
+      card.setPosition(card.x * ratioX, card.y * ratioY);
+    }
+  }
+
   update(_timer: number, _delta: number) {}
 
   handleCardDragStart(card: Card) {
     this.children.bringToTop(card);
   }
 
-  handleGameStart(inputGameState: Record<string, unknown>) {
-    console.log(inputGameState);
+  handleGameStart(inputGameState: GameStateDTO) {
+    for (const card of inputGameState.cards) {
+      console.log(`Found card ${card.name}`);
+    }
+    for (const creature of inputGameState.creatures) {
+      console.log(`Found card ${creature.name}`);
+    }
+    for (const harvestable of inputGameState.harvestables) {
+      console.log(`Found card ${harvestable.name}`);
+    }
+    for (const location of inputGameState.locations) {
+      console.log(`Found card ${location.name}`);
+    }
+    for (const player of inputGameState.players) {
+      console.log(`Found card ${player.name}`);
+    }
   }
 
   handleCardDrag(card: PlayableCard) {

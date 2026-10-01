@@ -9,7 +9,7 @@ export class CreatureCard extends Card {
   }
 
   frameInit(scene: MainScene) {
-    this.shadow = new Phaser.GameObjects.Rectangle(scene, 14, -14, 315, 440, 0x000000, 0.5);
+    this.shadow = new Phaser.GameObjects.Rectangle(scene, 0, 0, 315, 440, 0x000000, 0.5);
     const border = new Phaser.GameObjects.Rectangle(scene, 0, 0, 315, 440, 0x000000);
     const face = new Phaser.GameObjects.Rectangle(scene, 0, 0, 295, 420, 0xad3d2b);
     const art = new Phaser.GameObjects.Rectangle(scene, 0, -90, 255, 170, 0x2ecc71);
@@ -34,5 +34,25 @@ export class CreatureCard extends Card {
     this.disabledLayer.setVisible(false);
 
     scene.add.existing(this);
+  }
+
+  setFloating(input: boolean) {
+    this.floating = input;
+    this.tweensManager.add({
+      targets: this.content,
+      scale: input ? 1.05 : 1,
+      y: input ? -10 : 0,
+      duration: 150,
+      ease: 'Sine.easeOut',
+    });
+    this.tweensManager.add({
+      targets: this.shadow,
+      scale: input ? 1.1 : 1,
+      x: input ? 25 : 0,
+      y: input ? -25 : 0,
+      alpha: input ? 0.25 : 1,
+      duration: 150,
+      ease: 'Sine.easeOut',
+    });
   }
 }
