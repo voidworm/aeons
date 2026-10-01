@@ -43,7 +43,7 @@ export class MainScene extends Phaser.Scene {
     this.socket.addEventListener('open', () => this.send('new_game', { level: 'basic' }));
 
     //commenting out generics for now
-    /*
+
     var raccoonCard = new CreatureCard(
       this,
       this.scale.width / 2 + 200,

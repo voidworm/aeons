@@ -11,7 +11,7 @@ type Unit struct {
 	combat.HealthPool
 	ID                 int
 	Name               string
-	CardsInHand        []*card.Card
+	CardsInHand        []*card.PlayableCard
 	ResourcesAvailable int
 	RemainingActions   int
 	Damage             int

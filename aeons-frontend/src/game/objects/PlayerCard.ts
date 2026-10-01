@@ -1,0 +1,35 @@
+import type { MainScene } from '../scenes/MainScene';
+import { Card } from './Card';
+import Phaser from 'phaser';
+import type { PlayerDTO } from './GameState';
+
+export class PlayerCard extends Card {
+  constructor(scene: MainScene, x: number, y: number, cardname: string, cardtext: string) {
+    super(scene, x, y, cardname, cardtext);
+    this.frameInit(scene);
+  }
+
+  static fromDto(scene: MainScene, x: integer, y: integer, dto: PlayerDTO) {
+    return new PlayerCard(scene, x, y, dto.name, '');
+  }
+
+  frameInit(scene: MainScene) {
+    this.shadow = new Phaser.GameObjects.Rectangle(scene, 14, -14, 315, 440, 0x000000, 0.5);
+    const border = new Phaser.GameObjects.Rectangle(scene, 0, 0, 315, 440, 0x000000);
+    const face = new Phaser.GameObjects.Rectangle(scene, 0, 0, 295, 420, 0x8b5e34);
+    const art = new Phaser.GameObjects.Rectangle(scene, 0, -90, 255, 300, 0x2ecc71);
+    const title = new Phaser.GameObjects.Text(scene, -127.5, -200, this.name, {
+      color: '#000000',
+      fontSize: '18px',
+    });
+
+    this.disabledLayer = new Phaser.GameObjects.Rectangle(scene, 0, 0, 315, 440, 0x111111, 0.5);
+    this.disabledLayer.setVisible(false);
+
+    this.content = scene.add.container(0, 0, [border, face, art, title, this.disabledLayer]);
+    this.add(this.shadow);
+    this.add(this.content);
+
+    scene.add.existing(this);
+  }
+}

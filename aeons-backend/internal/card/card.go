@@ -38,7 +38,7 @@ func (s TargetSpec) Accepts(t Targetable) bool {
 	return s.Filter == nil || s.Filter(t)
 }
 
-type Card struct {
+type PlayableCard struct {
 	ID int
 	Type EffectType
 	CanBeCast bool
@@ -48,10 +48,11 @@ type Card struct {
 	TargetSpec *TargetSpec
 	Candidates []Targetable
 	Effect effect.Effect
+	Cost int
 	Range int
 }
 
-func (c *Card) Play() {
+func (c *PlayableCard) Play() {
 
 	c.Effect.Apply()
 }

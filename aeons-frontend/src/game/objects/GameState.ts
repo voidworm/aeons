@@ -9,6 +9,7 @@ export interface YieldDTO {
 export interface LocationDTO {
   id: number;
   name: string;
+  flavor: string;
   connections: number[];
 }
 
@@ -31,21 +32,24 @@ export interface CreatureDTO {
   health: number;
   maxHealth: number;
   damage: number;
+  flavor: string;
 }
 
 export interface HarvestableDTO {
   id: number;
   name: string;
+  flavor: string;
   locationId: number;
   healing: YieldDTO;
   resources: YieldDTO;
 }
 
-export interface CardDTO {
+export interface PlayableCardDTO {
   id: number;
   name: string;
   effectText: string;
   effectType: number;
+  cost: integer;
   canBeCast: boolean;
   range: number;
   targetType: number | null;
@@ -58,5 +62,5 @@ export interface GameStateDTO {
   players: PlayerDTO[];
   creatures: CreatureDTO[];
   harvestables: HarvestableDTO[];
-  cards: CardDTO[];
+  cards: PlayableCardDTO[];
 }

@@ -1,11 +1,16 @@
 import type { MainScene } from '../scenes/MainScene';
 import { Card } from './Card';
 import Phaser from 'phaser';
+import type { LocationDTO } from './GameState';
 
 export class LocationCard extends Card {
   constructor(scene: MainScene, x: number, y: number, cardname: string, cardtext: string) {
     super(scene, x, y, cardname, cardtext);
     this.frameInit(scene);
+  }
+
+  static fromDto(scene: MainScene, x: integer, y: integer, dto: LocationDTO) {
+    return new LocationCard(scene, x, y, dto.name, dto.flavor);
   }
 
   frameInit(scene: MainScene) {
@@ -16,11 +21,14 @@ export class LocationCard extends Card {
     const art = new Phaser.GameObjects.Rectangle(scene, 0, -40, 255, 270, 0x2ecc71);
     const title = new Phaser.GameObjects.Text(scene, -127.5, -200, this.name, {
       color: '#000000',
+      fontFamily: '"Times New Roman", Times, serif',
       fontSize: '18px',
     });
     const textBox = new Phaser.GameObjects.Rectangle(scene, 0, 155, 255, 85, 0xd8c9a3);
-    const effectText = new Phaser.GameObjects.Text(scene, -122.5, 140, this.effect, {
+    const effectText = new Phaser.GameObjects.Text(scene, -122.5, 140, this.flavor, {
       color: '#000000',
+      fontFamily: '"Times New Roman", Times, serif',
+      fontStyle: 'italic',
       fontSize: '14px',
       wordWrap: { width: 235 },
     });

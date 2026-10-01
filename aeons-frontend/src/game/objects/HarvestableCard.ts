@@ -1,11 +1,16 @@
 import type { MainScene } from '../scenes/MainScene';
 import { Card } from './Card';
 import Phaser from 'phaser';
+import type { HarvestableDTO } from './GameState';
 
 export class HarvestableCard extends Card {
   constructor(scene: MainScene, x: number, y: number, cardname: string, cardtext: string) {
     super(scene, x, y, cardname, cardtext);
     this.frameInit(scene);
+  }
+
+  static fromDto(scene: MainScene, x: integer, y: integer, dto: HarvestableDTO) {
+    return new HarvestableCard(scene, x, y, dto.name, dto.flavor);
   }
 
   frameInit(scene: MainScene) {
@@ -15,13 +20,16 @@ export class HarvestableCard extends Card {
     const art = new Phaser.GameObjects.Rectangle(scene, 0, -90, 255, 170, 0x2ecc71);
     const title = new Phaser.GameObjects.Text(scene, -127.5, -200, this.name, {
       color: '#000000',
+      fontFamily: '"Times New Roman", Times, serif',
       fontSize: '18px',
     });
     const textBox = new Phaser.GameObjects.Rectangle(scene, 0, 105, 255, 150, 0xd8c9a3);
 
-    const effectText = new Phaser.GameObjects.Text(scene, -122.5, 40, this.effect, {
+    const effectText = new Phaser.GameObjects.Text(scene, -122.5, 40, this.flavor, {
       color: '#000000',
       fontSize: '14px',
+      fontFamily: '"Times New Roman", Times, serif',
+      fontStyle: 'italic',
       wordWrap: { width: 235 },
     });
 

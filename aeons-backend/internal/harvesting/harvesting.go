@@ -20,6 +20,7 @@ type Harvestable interface {
 type Unit struct {
 	ID	int
 	Name                string
+	Flavor string
 	StaticLocation      *location.Unit
 	HealYieldConfig     *YieldConfig
 	ResourceYieldConfig *YieldConfig
@@ -43,6 +44,7 @@ func GenerateBerryBush(id int, location *location.Unit) *Unit {
 	return &Unit{
 		ID:				id,
 		Name:                "Berry Bush",
+		Flavor: "The berries around here are very sweet. Raccoons in particular like that.",
 		StaticLocation:      location,
 		HealYieldConfig:     GenerateSmallYieldConfig(),
 		ResourceYieldConfig: GenerateEmptyYieldConfig(),
@@ -53,6 +55,7 @@ func GenerateBrush(id int, location *location.Unit) *Unit {
 	return &Unit{
 		ID:	id,
 		Name:                "Brush",
+		Flavor: "Thorns and sticks. You'll find a way to use these.",
 		StaticLocation:      location,
 		HealYieldConfig:     GenerateEmptyYieldConfig(),
 		ResourceYieldConfig: GenerateSmallYieldConfig(),
@@ -63,6 +66,7 @@ func GenerateMushroomField(id int, location *location.Unit) *Unit {
 	return &Unit{
 		ID: id,
 		Name:                "Mushroom Field",
+		Flavor: "A multitude of fungi growing in a large patch.",
 		StaticLocation:      location,
 		HealYieldConfig:     GenerateLargeYieldConfig(),
 		ResourceYieldConfig: GenerateSmallYieldConfig(),
@@ -73,6 +77,7 @@ func GenerateLushCopse(id int, location *location.Unit) *Unit {
 	return &Unit{
 		ID: id,
 		Name:                "Lush Copse",
+		Flavor: "This copse is home to life of many sorts, not all of it edible, but vivid.",
 		StaticLocation:      location,
 		HealYieldConfig:     GenerateSmallYieldConfig(),
 		ResourceYieldConfig: GenerateLargeYieldConfig(),
@@ -83,6 +88,7 @@ func GenerateFruitTree(id int, location *location.Unit) *Unit {
 	return &Unit{
 		ID: id,
 		Name:                "Fruit Tree",
+		Flavor:			"An almost impossible to exhaust source of both fruit and branches.",
 		StaticLocation:      location,
 		HealYieldConfig:     GenerateLargeYieldConfig(),
 		ResourceYieldConfig: GenerateLargeYieldConfig(),

@@ -4,7 +4,7 @@ import type { MainScene } from '../scenes/MainScene';
 export class Card extends Phaser.GameObjects.Container {
   public floating: boolean = false;
   public name: string = 'Generic card';
-  public effect: string = 'Generic effect';
+  public flavor: string = 'Generic effect';
 
   public pointed: boolean = false;
 
@@ -23,7 +23,7 @@ export class Card extends Phaser.GameObjects.Container {
     this.setSize(315, 440);
     this.setInteractive({ draggable: true });
     this.name = cardname;
-    this.effect = cardtext;
+    this.flavor = cardtext;
     this.tweensManager = scene.tweens;
 
     this.on('dragstart', () => {

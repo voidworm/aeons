@@ -12,13 +12,14 @@ type GameStateDTO struct {
 	Players []PlayerDTO `json:"players"`
 	Creatures []CreatureDTO `json:"creatures"`
 	Harvestables []HarvestableDTO `json:"harvestables"`
-	Cards []CardDTO `json:"cards"`
+	PlayableCards []PlayableCardDTO `json:"cards"`
 }
 
 type LocationDTO struct {
 	ID	int `json:"id"`
 	Name string `json:"name"`
 	Connections []int `json:"connections"`
+	Flavor string `json:"flavor"`
 }
 
 type PlayerDTO struct {
@@ -40,11 +41,13 @@ type CreatureDTO struct {
 	Health     int    `json:"health"`
 	MaxHealth  int    `json:"maxHealth"`
 	Damage     int    `json:"damage"`
+	Flavor		string `json:"flavor"`
 }
 
-type CardDTO struct {
+type PlayableCardDTO struct {
 	ID           int    `json:"id"`
 	Name         string `json:"name"`
+	Cost int `json:"cost"`
 	EffectText   string `json:"effectText"`
 	EffectType   int    `json:"effectType"`
 	CanBeCast    bool   `json:"canBeCast"`
@@ -59,6 +62,7 @@ type HarvestableDTO struct {
 	LocationID int          `json:"locationId"`
 	Healing    YieldDTO     `json:"healing"`
 	Resources  YieldDTO     `json:"resources"`
+	Flavor	string	`json:"flavor"`
 }
 
 type YieldDTO struct {
@@ -79,9 +83,10 @@ func yieldDTO(yc *harvesting.YieldConfig) YieldDTO {
 	}
 }
 
-func cardDTO(c *card.Card) CardDTO {
-	out := CardDTO{
+func playableCardDTO(c *card.PlayableCard) PlayableCardDTO {
+	out := PlayableCardDTO{
 		ID: c.ID, Name: c.Name, EffectText: c.EffectText,
+		Cost: c.Cost,
 		EffectType: int(c.Type), CanBeCast: c.CanBeCast, Range: c.Range,
 		CandidateIDs: make([]int, 0, len(c.Candidates)),
 	}
@@ -103,7 +108,7 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 		for _, c := range l.OutgoingConnections {
 			conns = append(conns, c.ID)
 		}
-		out.Locations = append(out.Locations, LocationDTO{ID: l.ID, Name: l.Name, Connections: conns})
+		out.Locations = append(out.Locations, LocationDTO{ID: l.ID, Name: l.Name, Connections: conns, Flavor: l.Flavor})
 	}
 
 	for _, p := range gs.Players {
@@ -121,21 +126,21 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 
 	for _, c := range gs.Creatures {
 		out.Creatures = append(out.Creatures, CreatureDTO{
-			ID: c.ID, Name: c.Name, LocationID: c.CurrentLocation.ID,
+			ID: c.ID, Name: c.Name, Flavor: c.Flavor, LocationID: c.CurrentLocation.ID,
 			Health: c.CurrentHealth, MaxHealth: c.MaxHealth, Damage: c.Damage,
 		})
 	}
 
 	for _, h := range gs.HarvestUnits {
 		out.Harvestables = append(out.Harvestables, HarvestableDTO{
-			ID: h.ID, Name: h.Name, LocationID: h.StaticLocation.ID,
+			ID: h.ID, Name: h.Name, Flavor: h.Flavor, LocationID: h.StaticLocation.ID,
 			Healing:   yieldDTO(h.HealYieldConfig),
 			Resources: yieldDTO(h.ResourceYieldConfig),
 		})
 	}
 
-	for _, c := range gs.Cards {
-		out.Cards = append(out.Cards, cardDTO(c))
+	for _, c := range gs.PlayableCards {
+		out.PlayableCards = append(out.PlayableCards, playableCardDTO(c))
 	}
 
 	return out

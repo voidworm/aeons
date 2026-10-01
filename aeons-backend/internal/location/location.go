@@ -8,6 +8,7 @@ import (
 type Unit struct {
 	ID                  int
 	Name                string
+	Flavor string
 	OutgoingConnections []*Unit
 }
 

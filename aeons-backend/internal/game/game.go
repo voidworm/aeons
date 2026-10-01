@@ -14,7 +14,7 @@ type GameState struct {
 	Players      []*player.Unit
 	Creatures    []*creature.Unit
 	HarvestUnits []*harvesting.Unit
-	Cards 			[]*card.Card
+	PlayableCards 			[]*card.PlayableCard
 }
 
 func (gs *GameState) NextID() int {
@@ -190,7 +190,7 @@ func getEntryWithID[T card.Targetable](in []T, id int) card.Targetable {
 }
 
 
-func (gs *GameState) FillCardWithCandidates(input card.Card) {
+func (gs *GameState) FillCardWithCandidates(input card.PlayableCard) {
 		switch input.TargetSpec.Type {
 		case card.TargetTypeCreature:
 			input.Candidates = gs.Candidates(card.TargetTypeCreature)

@@ -28,13 +28,13 @@ func (gs *GameState) Init() {
 func (gs *GameState) InitLocations() {
 
 	log.Println("[INIT] Setting up locations....")
-	SecludedDen := &location.Unit{ID: gs.NextID(), Name: "Secluded Den"}
-	WindsweptPlains := &location.Unit{ID: gs.NextID(), Name: "Windswept Plains"}
-	RedhornLake := &location.Unit{ID: gs.NextID(), Name: "Redhorn Lake"}
-	ConiferousGrove := &location.Unit{ID: gs.NextID(), Name: "Coniferous Grove"}
-	AridPlateau := &location.Unit{ID: gs.NextID(), Name: "Arid Plateau"}
-	SlumberingCrag := &location.Unit{ID: gs.NextID(), Name: "Slumbering Crag"}
-	HermitsRecluse := &location.Unit{ID: gs.NextID(), Name: "Hermit's Recluse"}
+	SecludedDen := &location.Unit{ID: gs.NextID(), Name: "Secluded Den", Flavor: "The den has been your home for many years."}
+	WindsweptPlains := &location.Unit{ID: gs.NextID(), Name: "Windswept Plains", Flavor: "The plains lie calm, the grasses and weeds wail in the wind."}
+	RedhornLake := &location.Unit{ID: gs.NextID(), Name: "Redhorn Lake", Flavor: "When the moon rises, the lake glimmers in an ominous red."}
+	ConiferousGrove := &location.Unit{ID: gs.NextID(), Name: "Coniferous Grove", Flavor: "The smell of resin and needles swirls through the shadowy grove."}
+	AridPlateau := &location.Unit{ID: gs.NextID(), Name: "Arid Plateau", Flavor: "Climb the plateau to gain an excellent view over what you call home."}
+	SlumberingCrag := &location.Unit{ID: gs.NextID(), Name: "Slumbering Crag", Flavor: "Those who commune with the earth element find peace here."}
+	HermitsRecluse := &location.Unit{ID: gs.NextID(), Name: "Hermit's Recluse", Flavor: "The blind woman known as the Hermit calls this little cave her home."}
 
 	SecludedDen.OutgoingConnections = append(SecludedDen.OutgoingConnections, WindsweptPlains)
 	WindsweptPlains.OutgoingConnections = append(WindsweptPlains.OutgoingConnections, SecludedDen, RedhornLake, ConiferousGrove, AridPlateau)
@@ -67,7 +67,7 @@ func (gs *GameState) InitPlayers() {
 		HealthPool:         combat.HealthPool{CurrentHealth: 10, MaxHealth: 10},
 		ID:                 gs.NextID(),
 		Name:               "Druid",
-		CardsInHand:        []*card.Card{},
+		CardsInHand:        []*card.PlayableCard{},
 		ResourcesAvailable: 5,
 		RemainingActions:   3,
 		Damage:             1,
@@ -79,7 +79,7 @@ func (gs *GameState) InitPlayers() {
 		HealthPool:         combat.HealthPool{CurrentHealth: 8, MaxHealth: 8},
 		ID:                 gs.NextID(),
 		Name:               "Scoundrel",
-		CardsInHand:        []*card.Card{},
+		CardsInHand:        []*card.PlayableCard{},
 		ResourcesAvailable: 5,
 		RemainingActions:   3,
 		Damage:             1,
@@ -98,15 +98,15 @@ func (gs *GameState) getRandomLocation() *location.Unit {
 	return gs.Locations[rand.IntN(len(gs.Locations))]
 }
 
-func (gs *GameState) GenerateBasicHand() []*card.Card {
-	basicHand := []*card.Card{}
+func (gs *GameState) GenerateBasicHand() []*card.PlayableCard {
+	basicHand := []*card.PlayableCard{}
 	basicHand = append(basicHand, gs.GenerateBasicMoveCard(), gs.GenerateBasicAttackCard(), gs.GenerateBasicDistractCard(), gs.GenerateBasicHarvestCard())
-	gs.Cards = append(gs.Cards, basicHand...)
+	gs.PlayableCards = append(gs.PlayableCards, basicHand...)
 	return basicHand
 }
 
-func (gs *GameState) GenerateBasicMoveCard() *card.Card {
-	BasicMoveCard := &card.Card {
+func (gs *GameState) GenerateBasicMoveCard() *card.PlayableCard {
+	BasicMoveCard := &card.PlayableCard {
 		ID: gs.NextID(),
 		Type: card.PlayerMove,
 		Name: "Move",
@@ -115,6 +115,7 @@ func (gs *GameState) GenerateBasicMoveCard() *card.Card {
 		Candidates: []card.Targetable{},
 		Effect: nil,
 		Range: 1,
+		Cost: 0,
 	}
 
 	BasicMoveTargetLocationSpec := &card.TargetSpec {
@@ -127,8 +128,8 @@ func (gs *GameState) GenerateBasicMoveCard() *card.Card {
 	return BasicMoveCard
 }
 
-func (gs *GameState) GenerateBasicAttackCard() *card.Card {
-	BasicAttackCard := &card.Card {
+func (gs *GameState) GenerateBasicAttackCard() *card.PlayableCard {
+	BasicAttackCard := &card.PlayableCard {
 		ID: gs.NextID(),
 		Name: "Attack",
 		Type: card.PlayerAttack,
@@ -137,6 +138,7 @@ func (gs *GameState) GenerateBasicAttackCard() *card.Card {
 		Candidates: []card.Targetable{},
 		Effect: nil,
 		Range: 1,
+		Cost: 0,
 	}
 
 	BasicAttackTargetCreatureSpec := &card.TargetSpec {
@@ -149,8 +151,8 @@ func (gs *GameState) GenerateBasicAttackCard() *card.Card {
 	return BasicAttackCard
 }
 
-func (gs *GameState) GenerateBasicDistractCard() *card.Card {
-	BasicDistractCard := &card.Card {
+func (gs *GameState) GenerateBasicDistractCard() *card.PlayableCard {
+	BasicDistractCard := &card.PlayableCard {
 		ID: gs.NextID(),
 		Name: "Distract",
 		EffectText: "Distracts a target creature at your location.",
@@ -159,6 +161,7 @@ func (gs *GameState) GenerateBasicDistractCard() *card.Card {
 		Candidates: []card.Targetable{},
 		Effect: nil,
 		Range: 1,
+		Cost: 0,
 	}
 
 	BasicDistractTargetCreatureSpec := &card.TargetSpec {
@@ -171,8 +174,8 @@ func (gs *GameState) GenerateBasicDistractCard() *card.Card {
 	return BasicDistractCard
 }
 
-func (gs *GameState) GenerateBasicHarvestCard() *card.Card {
-	BasicHarvestCard := &card.Card {
+func (gs *GameState) GenerateBasicHarvestCard() *card.PlayableCard {
+	BasicHarvestCard := &card.PlayableCard {
 		ID: gs.NextID(),
 		Type: card.PlayerHarvest,
 		Name: "Harvest",
@@ -181,6 +184,7 @@ func (gs *GameState) GenerateBasicHarvestCard() *card.Card {
 		Candidates: []card.Targetable{},
 		Effect: nil,
 		Range: 1,
+		Cost: 0,
 	}
 
 	BasicHarvestTargetHarvestable := &card.TargetSpec {
@@ -193,7 +197,7 @@ func (gs *GameState) GenerateBasicHarvestCard() *card.Card {
 	return BasicHarvestCard
 }
 
-func (gs *GameState) fillEffectForCard(c *card.Card, owner *player.Unit) {
+func (gs *GameState) fillEffectForCard(c *card.PlayableCard, owner *player.Unit) {
 		switch c.Type {
 		case card.PlayerMove:
 			location,ok := c.Target.(*location.Unit)
@@ -241,6 +245,7 @@ func (gs *GameState) InitCreatures() {
 		HealthPool:   combat.HealthPool{CurrentHealth: 5, MaxHealth: 5},
 		ID:           gs.NextID(),
 		Name:         "Stag",
+		Flavor: "A large stag that wanders the area aimlessly.",
 		CreatureBehaviourConfig: &creature.CreatureBehaviourConfig{
 			CreatureAloofConfig:     creature.GenerateAloofConfig(true),
 			CreatureMovementConfig:  creature.GenerateCuriousConfig(),
@@ -256,6 +261,7 @@ func (gs *GameState) InitCreatures() {
 		HealthPool:   combat.HealthPool{CurrentHealth: 2, MaxHealth: 2},
 		ID:           gs.NextID(),
 		Name:         "Raccoon",
+		Flavor: 		"A nifty little raccoon, known to steal berries. Especially yours.",
 		CreatureBehaviourConfig: &creature.CreatureBehaviourConfig{
 			CreatureAloofConfig:     creature.GenerateAloofConfig(false),
 			CreatureMovementConfig:  creature.GenerateCuriousConfig(),
@@ -271,6 +277,7 @@ func (gs *GameState) InitCreatures() {
 		HealthPool:   combat.HealthPool{CurrentHealth: 2, MaxHealth: 2},
 		ID:           gs.NextID(),
 		Name:         "Suspicious Plant",
+		Flavor: 	"Hmmmmm...",
 		CreatureBehaviourConfig: &creature.CreatureBehaviourConfig{
 			CreatureAloofConfig:     creature.GenerateAloofConfig(true),
 			CreatureMovementConfig:  creature.GenerateShyConfig(),

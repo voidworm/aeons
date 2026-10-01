@@ -9,6 +9,7 @@ import (
 type Unit struct {
 	ID   int
 	Name string
+	Flavor string
 	moving.MovingEntity
 	combat.HealthPool
 	*CreatureBehaviourConfig
