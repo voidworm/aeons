@@ -115,7 +115,7 @@ export class Card extends Phaser.GameObjects.Container {
     this.isHovering = false;
   }
 
-  setDiabled(on: boolean) {
+  setDisabled(on: boolean) {
     this.isDisabled = on;
     this.disabledLayer.setVisible(on);
   }

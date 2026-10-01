@@ -98,6 +98,8 @@ export class MainScene extends Phaser.Scene {
     const cardheight = 220;
     const cardwidth = 157.5;
 
+    console.log(inputGameState);
+
     for (const player of inputGameState.players) {
       const { x, y } = this.nextSlot(factor);
 

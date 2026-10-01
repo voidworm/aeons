@@ -18,7 +18,7 @@ export class PlayableCard extends Card {
 
   static fromDto(scene: MainScene, x: integer, y: integer, dto: PlayableCardDTO) {
     const r = new PlayableCard(scene, x, y, dto.name, dto.effectText, dto.cost);
-    r.setActive(dto.canBeCast);
+    r.setDisabled(dto.canBeCast);
     return r;
   }
 
