@@ -1,90 +1,226 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
 
+export type ShadowMode = 'hovers' | 'flat';
+
+export interface CardConfig {
+  name: string;
+  flavor: string;
+  faceColor: number;
+  artHeight: number;
+  shadow: ShadowMode;
+  showTextBox?: boolean; // default true; the text box fills the space below the art
+  italicText?: boolean; // default false
+  titleBelowArt?: boolean; // default false; centred, bold, 20% larger, beneath the art instead of above it
+  footerHeight?: number; // default 0; shrinks the text box to make room for a footer line beneath it
+}
+
+interface ShadowPose {
+  x: number;
+  y: number;
+  scale: number;
+  alpha: number;
+}
+
+const SHADOW_REST: Record<ShadowMode, ShadowPose> = {
+  hovers: { x: 14, y: -14, scale: 1, alpha: 0.5 },
+  flat: { x: 0, y: 0, scale: 1, alpha: 0 },
+};
+const SHADOW_LIFTED: ShadowPose = { x: 25, y: -25, scale: 1.1, alpha: 0.25 };
+
+const TEXT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
+  color: '#000000',
+  fontFamily: '"Times New Roman", Times, serif',
+};
+
 export class Card extends Phaser.GameObjects.Container {
-  public floating: boolean = false;
-  public name: string = 'Generic card';
-  public flavor: string = 'Generic effect';
+  static readonly WIDTH = 315;
+  static readonly HEIGHT = 440;
 
-  public pointed: boolean = false;
+  // layout, all in top-left card coordinates
+  protected static readonly BORDER = 10;
+  protected static readonly INSET = 30; // border + padding; left/right/bottom margin of art and text box
+  protected static readonly INNER_WIDTH = Card.WIDTH - 2 * Card.INSET; // 255
+  protected static readonly TITLE_Y = 20;
+  protected static readonly ART_Y = 45;
+  protected static readonly GAP = 15;
+  protected static readonly BOTTOM = Card.HEIGHT - Card.INSET; // 410
+  protected static readonly TEXT_PAD = 8;
 
+  public floating = false; // currently lifted by a drag
+  public flavor: string;
   public isHovering = false;
+
+  protected readonly config: CardConfig;
   protected tween: Phaser.Tweens.Tween | null = null;
   protected tweensManager: Phaser.Tweens.TweenManager;
+  protected isDisabled = false;
 
-  protected shadow!: Phaser.GameObjects.Rectangle;
+  protected shadow: Phaser.GameObjects.Rectangle;
+  protected cardFrame: Phaser.GameObjects.Container; // lift/scale target, sits at card centre
+  protected surface: Phaser.GameObjects.Container; // top-left coordinate space
+  protected hitbox: Phaser.GameObjects.Zone;
   protected disabledLayer!: Phaser.GameObjects.Rectangle;
-  protected isDisabled: boolean;
-  protected content!: Phaser.GameObjects.Container;
 
-  constructor(scene: MainScene, x: number, y: number, cardname: string, cardtext: string) {
+  private dragLast = new Phaser.Math.Vector2();
+
+  constructor(scene: MainScene, x: number, y: number, config: CardConfig) {
     super(scene, x, y);
-    this.isDisabled = false;
-    this.setSize(315, 440);
-    this.setInteractive({ draggable: true });
-    this.name = cardname;
-    this.flavor = cardtext;
+    this.config = config;
+    this.name = config.name;
+    this.flavor = config.flavor;
     this.tweensManager = scene.tweens;
 
-    this.on('dragstart', () => {
-      this.onDragStart();
-    });
-    this.on('drag', (pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {
-      this.onDrag(pointer, dragX, dragY);
-    });
-    this.on('dragend', () => this.onDragend());
+    const rest = SHADOW_REST[config.shadow];
+    this.shadow = new Phaser.GameObjects.Rectangle(
+      scene,
+      rest.x,
+      rest.y,
+      Card.WIDTH,
+      Card.HEIGHT,
+      0x000000,
+    ).setAlpha(rest.alpha);
 
-    this.on('pointerover', () => {
-      this.onPointerOver();
-    });
-    this.on('pointerout', () => {
-      this.onPointerOut();
-    });
+    this.surface = new Phaser.GameObjects.Container(scene, -Card.WIDTH / 2, -Card.HEIGHT / 2);
+    this.cardFrame = new Phaser.GameObjects.Container(scene, 0, 0, [this.surface]);
+    this.buildSurface();
+
+    this.hitbox = new Phaser.GameObjects.Zone(scene, 0, 0, Card.WIDTH, Card.HEIGHT);
+    this.hitbox.setInteractive({ draggable: true });
+    this.bindInput();
+
+    this.add([this.shadow, this.cardFrame, this.hitbox]);
+    scene.add.existing(this);
   }
 
-  onDragStart() {
-    if (this.isDisabled) return;
+  private buildSurface(): void {
+    const { BORDER, INSET, INNER_WIDTH, TITLE_Y, ART_Y, GAP, BOTTOM, TEXT_PAD } = Card;
+    const {
+      faceColor,
+      artHeight,
+      showTextBox = true,
+      italicText = false,
+      footerHeight = 0,
+      titleBelowArt = false,
+    } = this.config;
 
+    this.surface.add([
+      this.rect(0, 0, Card.WIDTH, Card.HEIGHT, 0x000000),
+      this.rect(BORDER, BORDER, Card.WIDTH - 2 * BORDER, Card.HEIGHT - 2 * BORDER, faceColor),
+      this.rect(INSET, ART_Y, INNER_WIDTH, artHeight, 0x2ecc71),
+      titleBelowArt
+        ? this.label(INSET + INNER_WIDTH / 2, (ART_Y + artHeight + BOTTOM) / 2, this.name, {
+            fontSize: '21.6px',
+            fontStyle: 'bold',
+            color: '#ffffff',
+          }).setOrigin(0.5)
+        : this.label(INSET, TITLE_Y, this.name, {
+            fontSize: '18px',
+            fontStyle: 'bold',
+            color: '#ffffff',
+          }),
+    ]);
+
+    if (showTextBox) {
+      const top = ART_Y + artHeight + GAP;
+      this.surface.add([
+        this.rect(INSET, top, INNER_WIDTH, BOTTOM - footerHeight - top, 0xd8c9a3),
+        this.label(INSET + TEXT_PAD, top + TEXT_PAD, this.flavor, {
+          fontSize: '14px',
+          fontStyle: italicText ? 'italic' : 'normal',
+          wordWrap: { width: INNER_WIDTH - 2 * TEXT_PAD },
+        }),
+      ]);
+    }
+
+    this.disabledLayer = this.rect(0, 0, Card.WIDTH, Card.HEIGHT, 0x111111, 0.5).setVisible(false);
+    this.surface.add(this.disabledLayer);
+  }
+
+  protected rect(x: number, y: number, w: number, h: number, color: number, alpha = 1) {
+    return new Phaser.GameObjects.Rectangle(this.scene, x, y, w, h, color, alpha).setOrigin(0, 0);
+  }
+
+  protected label(
+    x: number,
+    y: number,
+    content: string,
+    style: Phaser.Types.GameObjects.Text.TextStyle = {},
+  ) {
+    return new Phaser.GameObjects.Text(this.scene, x, y, content, { ...TEXT_STYLE, ...style });
+  }
+
+  // footer line between the text box and the card edge; align 'right' sits flush with the art's right edge
+  protected footer(content: string, align: 'center' | 'right'): Phaser.GameObjects.Text {
+    const { BORDER, INSET, BOTTOM, INNER_WIDTH } = Card;
+    const top = BOTTOM - (this.config.footerHeight ?? 0);
+    const y = (top + Card.HEIGHT - BORDER) / 2;
+    const x = align === 'center' ? INSET + INNER_WIDTH / 2 : INSET + INNER_WIDTH;
+    return this.label(x, y, content, { fontSize: '16px', color: '#ffffff' }).setOrigin(
+      align === 'center' ? 0.5 : 1,
+      0.5,
+    );
+  }
+
+  //inserts below the disabled layer
+  protected addFrameDetails(...objects: Phaser.GameObjects.GameObject[]): void {
+    for (const o of objects) this.surface.addAt(o, this.surface.length - 1);
+  }
+
+  private bindInput(): void {
+    this.hitbox.on('dragstart', (pointer: Phaser.Input.Pointer) => this.onDragStart(pointer));
+    this.hitbox.on('drag', (pointer: Phaser.Input.Pointer) => this.onDrag(pointer));
+    this.hitbox.on('dragend', () => this.onDragend());
+    this.hitbox.on('pointerover', () => this.onPointerOver());
+    this.hitbox.on('pointerout', () => this.onPointerOut());
+  }
+
+  onDragStart(pointer: Phaser.Input.Pointer) {
+    if (this.isDisabled) return;
+    this.dragLast.set(pointer.worldX, pointer.worldY);
     this.setFloating(true);
     this.emit('cardDragStart', this);
   }
 
-  setFloating(input: boolean) {
-    this.floating = input;
-    this.tweensManager.add({
-      targets: this.content,
-      scale: input ? 1.05 : 1,
-      y: input ? -10 : 0,
-      duration: 150,
-      ease: 'Sine.easeOut',
-    });
-    this.tweensManager.add({
-      targets: this.shadow,
-      scale: input ? 1.1 : 1,
-      x: input ? 20 : 14,
-      y: input ? -20 : -14,
-      alpha: input ? 0.5 : 1,
-      duration: 150,
-      ease: 'Sine.easeOut',
-    });
-  }
-
-  onDrag(_pointer: Phaser.Input.Pointer, dragX: number, dragY: number) {
+  onDrag(pointer: Phaser.Input.Pointer) {
     if (this.isDisabled) return;
-
-    this.x = dragX;
-    this.y = dragY;
+    this.x += pointer.worldX - this.dragLast.x;
+    this.y += pointer.worldY - this.dragLast.y;
+    this.dragLast.set(pointer.worldX, pointer.worldY);
     this.emit('cardDragged', this);
   }
 
   onDragend() {
     if (this.isDisabled) return;
-
     this.setFloating(false);
     this.emit('cardDragEnd', this);
   }
 
+  setFloating(lifted: boolean) {
+    this.floating = lifted;
+    const pose = lifted ? SHADOW_LIFTED : SHADOW_REST[this.config.shadow];
+    this.tweensManager.add({
+      targets: this.cardFrame,
+      scale: lifted ? 1.05 : 1,
+      y: lifted ? -10 : 0,
+      duration: 150,
+      ease: 'Sine.easeOut',
+    });
+    this.tweensManager.add({
+      targets: this.shadow,
+      ...pose,
+      duration: 150,
+      ease: 'Sine.easeOut',
+    });
+  }
+
   onPointerOver() {
+    this.emit('cardPointerOver', this);
+    this.isHovering = true;
+    this.setHoverLift(true);
+    if (this.tween?.isPlaying()) return;
+
+    if (this.parentContainer) this.parentContainer.bringToTop(this);
     this.isHovering = true;
     if (this.tween?.isPlaying()) return;
 
@@ -99,20 +235,29 @@ export class Card extends Phaser.GameObjects.Container {
         if (!this.isHovering) this.finishHover();
       },
     });
+    this.emit('cardPointerOver', this);
   }
 
-  finishHover() {
-    this.tween?.stop();
+  private setHoverLift(lifted: boolean): void {
+    if (this.floating) return; //floating means it's beging dragged
+    this.tweensManager.killTweensOf(this.cardFrame);
     this.tweensManager.add({
-      targets: this,
-      angle: 0,
-      duration: 600,
+      targets: this.cardFrame,
+      scale: lifted ? 1.03 : 1,
+      y: lifted ? -6 : 0,
+      duration: 150,
       ease: 'Sine.easeOut',
     });
   }
 
+  finishHover() {
+    this.tween?.stop();
+    this.tweensManager.add({ targets: this, angle: 0, duration: 600, ease: 'Sine.easeOut' });
+  }
+
   onPointerOut() {
     this.isHovering = false;
+    this.setHoverLift(false);
   }
 
   setDisabled(on: boolean) {
@@ -120,7 +265,7 @@ export class Card extends Phaser.GameObjects.Container {
     this.disabledLayer.setVisible(on);
   }
 
-  getOverlapBounds(): Phaser.Geom.Rectangle {
-    return this.content.getBounds();
+  getHitbox(): Phaser.Geom.Rectangle {
+    return this.hitbox.getBounds();
   }
 }

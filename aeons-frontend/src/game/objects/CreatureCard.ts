@@ -1,66 +1,46 @@
 import type { MainScene } from '../scenes/MainScene';
 import { Card } from './Card';
-import Phaser from 'phaser';
 import type { CreatureDTO } from './GameState';
 
 export class CreatureCard extends Card {
-  constructor(scene: MainScene, x: number, y: number, cardname: string, cardtext: string) {
-    super(scene, x, y, cardname, cardtext);
-    this.frameInit(scene);
+  constructor(
+    scene: MainScene,
+    x: number,
+    y: number,
+    name: string,
+    flavor: string,
+    health: number,
+    maxHealth: number,
+    damage: number,
+  ) {
+    super(scene, x, y, {
+      name: name,
+      flavor: flavor,
+      faceColor: 0xad3d2b,
+      artHeight: 170,
+      shadow: 'flat',
+      italicText: true,
+      footerHeight: 24,
+    });
+
+    this.initFrameDetails(maxHealth, health, damage);
   }
 
-  static fromDto(scene: MainScene, x: integer, y: integer, dto: CreatureDTO) {
-    return new CreatureCard(scene, x, y, dto.name, dto.flavor);
+  initFrameDetails(maxHealth: integer, currentHealth: integer, damage: integer) {
+    const hpPct = maxHealth > 0 ? Math.round((currentHealth / maxHealth) * 100) : 0;
+    this.addFrameDetails(this.footer(`${hpPct}% HP    ·    ${damage} DMG`, 'center'));
   }
 
-  frameInit(scene: MainScene) {
-    this.shadow = new Phaser.GameObjects.Rectangle(scene, 0, 0, 315, 440, 0x000000, 0.5);
-    const border = new Phaser.GameObjects.Rectangle(scene, 0, 0, 315, 440, 0x000000);
-    const face = new Phaser.GameObjects.Rectangle(scene, 0, 0, 295, 420, 0xad3d2b);
-    const art = new Phaser.GameObjects.Rectangle(scene, 0, -90, 255, 170, 0x2ecc71);
-    const title = new Phaser.GameObjects.Text(scene, -127.5, -200, this.name, {
-      fontFamily: '"Times New Roman", Times, serif',
-      color: '#000000',
-      fontSize: '18px',
-    });
-    const textBox = new Phaser.GameObjects.Rectangle(scene, 0, 105, 255, 150, 0xd8c9a3);
-
-    const effectText = new Phaser.GameObjects.Text(scene, -122.5, 40, this.flavor, {
-      color: '#000000',
-      fontFamily: '"Times New Roman", Times, serif',
-      fontStyle: 'italic',
-      fontSize: '14px',
-      wordWrap: { width: 235 },
-    });
-
-    this.content = scene.add.container(0, 0, [border, face, art, title, textBox, effectText]);
-    this.add(this.shadow);
-    this.add(this.content);
-
-    this.disabledLayer = new Phaser.GameObjects.Rectangle(scene, 0, 0, 315, 440, 0x111111);
-    this.add(this.disabledLayer);
-    this.disabledLayer.setVisible(false);
-
-    scene.add.existing(this);
-  }
-
-  setFloating(input: boolean) {
-    this.floating = input;
-    this.tweensManager.add({
-      targets: this.content,
-      scale: input ? 1.05 : 1,
-      y: input ? -10 : 0,
-      duration: 150,
-      ease: 'Sine.easeOut',
-    });
-    this.tweensManager.add({
-      targets: this.shadow,
-      scale: input ? 1.1 : 1,
-      x: input ? 25 : 0,
-      y: input ? -25 : 0,
-      alpha: input ? 0.25 : 1,
-      duration: 150,
-      ease: 'Sine.easeOut',
-    });
+  static fromDto(scene: MainScene, x: number, y: number, dto: CreatureDTO) {
+    return new CreatureCard(
+      scene,
+      x,
+      y,
+      dto.name,
+      dto.flavor,
+      dto.health,
+      dto.maxHealth,
+      dto.damage,
+    );
   }
 }

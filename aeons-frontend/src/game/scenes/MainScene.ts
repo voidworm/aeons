@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { PlayableCard } from '../objects/PlayableCard';
 import { LocationCard } from '../objects/LocationCard';
-import type { Card } from '../objects/Card';
+import { Card } from '../objects/Card';
 import { connect } from '../../net/socket';
 import { CreatureCard } from '../objects/CreatureCard';
 import { HarvestableCard } from '../objects/HarvestableCard';
@@ -19,12 +19,19 @@ export class MainScene extends Phaser.Scene {
   private slot = 0;
   private row = 0;
 
+  private handContainer: Phaser.GameObjects.Container;
+  private handBackground: Phaser.GameObjects.Rectangle;
+
   private playableCards: PlayableCard[] = [];
   private locationCards: LocationCard[] = [];
   private harvestableCards: HarvestableCard[] = [];
   private creatureCards: CreatureCard[] = [];
   private players: PlayerCard[] = [];
+
+  private inDragging: boolean = false;
+
   private socket!: WebSocket;
+
   constructor() {
     super('MainScene');
   }
@@ -34,6 +41,24 @@ export class MainScene extends Phaser.Scene {
   async create() {
     this.events.once(Phaser.Scenes.Events.DESTROY, () => this.socket.close());
     this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this);
+
+    const stripHeight = MainScene.CARD_HEIGHT / 2 + 40;
+    const stripTop = this.scale.height - stripHeight;
+
+    this.handContainer = new Phaser.GameObjects.Container(this, 0, stripTop);
+
+    this.handBackground = new Phaser.GameObjects.Rectangle(
+      this,
+      0,
+      0,
+      this.scale.width,
+      stripHeight,
+      0x000000,
+      0.5,
+    ).setOrigin(0, 0);
+
+    this.handContainer.add(this.handBackground);
+    this.add.existing(this.handContainer);
 
     this.socket = connect((msg) => {
       switch (msg.type) {
@@ -78,6 +103,10 @@ export class MainScene extends Phaser.Scene {
       if (card.floating) continue;
       card.setPosition(card.x * ratioX, card.y * ratioY);
     }
+
+    const stripHeight = MainScene.CARD_HEIGHT / 2 + 40;
+    this.handContainer.setPosition(0, gameSize.height - stripHeight);
+    this.handBackground.setSize(gameSize.width, stripHeight);
   }
 
   factor(): integer {
@@ -86,17 +115,12 @@ export class MainScene extends Phaser.Scene {
 
   update(_timer: number, _delta: number) {}
 
-  handleCardDragStart(card: Card) {
-    this.children.bringToTop(card);
-  }
+  handleCardDragStart(_card: Card) {}
 
   handleGameStart(inputGameState: GameStateDTO) {
     this.slot = 0;
     this.row = 0;
     const factor = this.factor();
-    const width = this.scale.width;
-    const cardheight = 220;
-    const cardwidth = 157.5;
 
     console.log(inputGameState);
 
@@ -105,13 +129,21 @@ export class MainScene extends Phaser.Scene {
 
       const c = PlayerCard.fromDto(this, x, y, player);
       c.setScale(this.factor());
+      c.on('cardPointerOver', this.onCardPointerOver, this);
       this.players.push(c);
     }
 
+    let current = 400;
     for (const card of inputGameState.playables) {
-      const { x, y } = this.nextSlot(factor);
-      const c = PlayableCard.fromDto(this, x, y, card);
-      c.setScale(this.factor());
+      const c = PlayableCard.fromDto(this, 0, 0, card);
+      this.handContainer.add(c);
+      c.setPosition(current, MainScene.CARD_HEIGHT / 2 + 20);
+      this.playableCards.push(c);
+      current += MainScene.CARD_WIDTH;
+      current += 10;
+      c.on('cardDragEnd', this.onCardDrop, this);
+      c.on('cardPointerOver', this.onCardPointerOver, this);
+      c.on('cardDragStart', this.onCardDrag, this);
       this.playableCards.push(c);
     }
     for (const creature of inputGameState.creatures) {
@@ -120,6 +152,9 @@ export class MainScene extends Phaser.Scene {
       const c = CreatureCard.fromDto(this, x, y, creature);
       c.setScale(this.factor());
       this.creatureCards.push(c);
+      c.on('cardDragEnd', this.onCardDrop, this);
+      c.on('cardPointerOver', this.onCardPointerOver, this);
+      c.on('cardDragStart', this.onCardDrag, this);
     }
     for (const harvestable of inputGameState.harvestables) {
       const { x, y } = this.nextSlot(factor);
@@ -127,28 +162,36 @@ export class MainScene extends Phaser.Scene {
       const c = HarvestableCard.fromDto(this, x, y, harvestable);
       c.setScale(this.factor());
       this.harvestableCards.push(c);
+      c.on('cardDragEnd', this.onCardDrop, this);
+      c.on('cardPointerOver', this.onCardPointerOver, this);
+      c.on('cardDragStart', this.onCardDrag, this);
     }
     for (const location of inputGameState.locations) {
       const { x, y } = this.nextSlot(factor);
 
       const c = LocationCard.fromDto(this, x, y, location);
+      c.on('cardDragEnd', this.onCardDrop, this);
+      c.on('cardPointerOver', this.onCardPointerOver, this);
+      c.on('cardDragStart', this.onCardDrag, this);
       c.setScale(this.factor());
       this.locationCards.push(c);
     }
   }
 
-  handleCardDrag(card: PlayableCard) {
-    for (const location of this.locationCards) {
-      const overlapping = Phaser.Geom.Intersects.RectangleToRectangle(
-        card.getOverlapBounds(),
-        location.getOverlapBounds(),
-      );
-      if (overlapping) location.onPointerOver();
-      else location.onPointerOut();
-    }
+  onCardPointerOver(card: Card) {
+    if (this.inDragging) return;
+    this.children.bringToTop(card);
   }
 
-  handleCardDrop(card: PlayableCard) {
+  onCardDrag(_card: Card) {
+    //todo: give this proper functionality
+    //old code made no sense anymore
+    this.inDragging = true;
+  }
+
+  onCardDrop(card: Card) {
+    this.inDragging = false;
+
     const locationHighlighted = this.locationCards.find((loc) => loc.isHovering);
     if (locationHighlighted) {
       this.send('poc_hello', {
