@@ -8,11 +8,13 @@ export class PlayableCard extends Card {
     scene: MainScene,
     x: number,
     y: number,
+    id: number,
     cardname: string,
     flavor: string,
     cost: number,
   ) {
     super(scene, x, y, {
+      id: id,
       name: cardname,
       flavor: flavor,
       faceColor: 0x8b5e34,
@@ -29,7 +31,7 @@ export class PlayableCard extends Card {
   }
 
   static fromDto(scene: MainScene, x: integer, y: integer, dto: PlayableCardDTO) {
-    const r = new PlayableCard(scene, x, y, dto.name, dto.effectText, dto.cost);
+    const r = new PlayableCard(scene, x, y, dto.id, dto.name, dto.effectText, dto.cost);
     r.setDisabled(dto.canBeCast);
     return r;
   }

@@ -4,6 +4,7 @@ import type { MainScene } from '../scenes/MainScene';
 export type ShadowMode = 'hovers' | 'flat';
 
 export interface CardConfig {
+  id: number;
   name: string;
   flavor: string;
   faceColor: number;
@@ -27,6 +28,7 @@ const SHADOW_REST: Record<ShadowMode, ShadowPose> = {
   flat: { x: 0, y: 0, scale: 1, alpha: 0 },
 };
 const SHADOW_LIFTED: ShadowPose = { x: 25, y: -25, scale: 1.1, alpha: 0.25 };
+const SHADOW_HOVER: ShadowPose = { x: 20, y: -20, scale: 1.025, alpha: 0.35 };
 
 const TEXT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
   color: '#000000',
@@ -47,6 +49,7 @@ export class Card extends Phaser.GameObjects.Container {
   protected static readonly BOTTOM = Card.HEIGHT - Card.INSET; // 410
   protected static readonly TEXT_PAD = 8;
 
+  public readonly id: number;
   public floating = false; // currently lifted by a drag
   public flavor: string;
   public isHovering = false;
@@ -67,6 +70,7 @@ export class Card extends Phaser.GameObjects.Container {
   constructor(scene: MainScene, x: number, y: number, config: CardConfig) {
     super(scene, x, y);
     this.config = config;
+    this.id = config.id;
     this.name = config.name;
     this.flavor = config.flavor;
     this.tweensManager = scene.tweens;
@@ -238,14 +242,46 @@ export class Card extends Phaser.GameObjects.Container {
     this.emit('cardPointerOver', this);
   }
 
+  // on hover the card pops up (with its shadow) and settles back to rest, the wiggle signals the hover from there
   private setHoverLift(lifted: boolean): void {
     if (this.floating) return; //floating means it's beging dragged
+    const restShadow = SHADOW_REST[this.config.shadow];
     this.tweensManager.killTweensOf(this.cardFrame);
+    this.tweensManager.killTweensOf(this.shadow);
+
+    const settle = () => {
+      this.tweensManager.add({
+        targets: this.cardFrame,
+        scale: 1,
+        y: 0,
+        duration: 350,
+        ease: 'Sine.easeInOut',
+      });
+      this.tweensManager.add({
+        targets: this.shadow,
+        ...restShadow,
+        duration: 350,
+        ease: 'Sine.easeInOut',
+      });
+    };
+
+    if (!lifted) {
+      settle();
+      return;
+    }
+
     this.tweensManager.add({
       targets: this.cardFrame,
-      scale: lifted ? 1.03 : 1,
-      y: lifted ? -6 : 0,
-      duration: 150,
+      scale: 1.015,
+      y: -6,
+      duration: 260,
+      ease: 'Sine.easeOut',
+      onComplete: settle,
+    });
+    this.tweensManager.add({
+      targets: this.shadow,
+      ...SHADOW_HOVER,
+      duration: 260,
       ease: 'Sine.easeOut',
     });
   }

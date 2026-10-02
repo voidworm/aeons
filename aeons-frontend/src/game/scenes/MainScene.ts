@@ -7,7 +7,8 @@ import { CreatureCard } from '../objects/CreatureCard';
 import { HarvestableCard } from '../objects/HarvestableCard';
 import type { GameStateDTO } from '../objects/GameState';
 import { PlayerCard } from '../objects/PlayerCard';
-import type { InputEventHandler } from 'react';
+import { HandContainer } from '../objects/HandContainer';
+import { PlayerSwitcher } from '../objects/PlayerSwitcher';
 
 export class MainScene extends Phaser.Scene {
   private static readonly CARD_WIDTH = 315; // rendered card width
@@ -19,8 +20,8 @@ export class MainScene extends Phaser.Scene {
   private slot = 0;
   private row = 0;
 
-  private handContainer: Phaser.GameObjects.Container;
-  private handBackground: Phaser.GameObjects.Rectangle;
+  private handContainer!: HandContainer;
+  private playerSwitcher!: PlayerSwitcher;
 
   private playableCards: PlayableCard[] = [];
   private locationCards: LocationCard[] = [];
@@ -42,23 +43,8 @@ export class MainScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.DESTROY, () => this.socket.close());
     this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this);
 
-    const stripHeight = MainScene.CARD_HEIGHT / 2 + 40;
-    const stripTop = this.scale.height - stripHeight;
-
-    this.handContainer = new Phaser.GameObjects.Container(this, 0, stripTop);
-
-    this.handBackground = new Phaser.GameObjects.Rectangle(
-      this,
-      0,
-      0,
-      this.scale.width,
-      stripHeight,
-      0x000000,
-      0.5,
-    ).setOrigin(0, 0);
-
-    this.handContainer.add(this.handBackground);
-    this.add.existing(this.handContainer);
+    this.handContainer = new HandContainer(this);
+    this.playerSwitcher = new PlayerSwitcher(this, () => this.switchActivePlayer());
 
     this.socket = connect((msg) => {
       switch (msg.type) {
@@ -104,9 +90,8 @@ export class MainScene extends Phaser.Scene {
       card.setPosition(card.x * ratioX, card.y * ratioY);
     }
 
-    const stripHeight = MainScene.CARD_HEIGHT / 2 + 40;
-    this.handContainer.setPosition(0, gameSize.height - stripHeight);
-    this.handBackground.setSize(gameSize.width, stripHeight);
+    this.handContainer.resize(gameSize.width, gameSize.height);
+    this.playerSwitcher.resize(gameSize.width, gameSize.height);
   }
 
   factor(): integer {
@@ -124,28 +109,37 @@ export class MainScene extends Phaser.Scene {
 
     console.log(inputGameState);
 
+    for (const card of inputGameState.playables) {
+      const c = PlayableCard.fromDto(this, 0, 0, card);
+      c.on('cardDragEnd', this.onCardDrop, this);
+      c.on('cardPointerOver', this.onCardPointerOver, this);
+      c.on('cardDragStart', this.onCardDrag, this);
+      this.playableCards.push(c);
+    }
+
+    var firstPlayerSet = false;
     for (const player of inputGameState.players) {
       const { x, y } = this.nextSlot(factor);
 
       const c = PlayerCard.fromDto(this, x, y, player);
       c.setScale(this.factor());
       c.on('cardPointerOver', this.onCardPointerOver, this);
+
+      if (!firstPlayerSet) {
+        firstPlayerSet = true;
+        c.setActivePlayer(true);
+      }
+
       this.players.push(c);
     }
+    this.playerSwitcher.setPlayers(this.players);
 
-    let current = 400;
-    for (const card of inputGameState.playables) {
-      const c = PlayableCard.fromDto(this, 0, 0, card);
-      this.handContainer.add(c);
-      c.setPosition(current, MainScene.CARD_HEIGHT / 2 + 20);
-      this.playableCards.push(c);
-      current += MainScene.CARD_WIDTH;
-      current += 10;
-      c.on('cardDragEnd', this.onCardDrop, this);
-      c.on('cardPointerOver', this.onCardPointerOver, this);
-      c.on('cardDragStart', this.onCardDrag, this);
-      this.playableCards.push(c);
+    for (const player of this.players) {
+      for (const card of this.playableCards.filter((c) => player.cardsInHand.includes(c.id))) {
+        this.handContainer.addCard(player.id, card);
+      }
     }
+
     for (const creature of inputGameState.creatures) {
       const { x, y } = this.nextSlot(factor);
 
@@ -176,16 +170,32 @@ export class MainScene extends Phaser.Scene {
       c.setScale(this.factor());
       this.locationCards.push(c);
     }
+
+    const active = this.players.find((p) => p.activePlayer);
+    if (active) this.updateActivePCharacterTo(active.id);
   }
 
+  switchActivePlayer() {
+    const inactivePlayer = this.players.find((p) => !p.activePlayer)!;
+    this.updateActivePCharacterTo(inactivePlayer.id);
+  }
+
+  updateActivePCharacterTo(ident: number) {
+    for (const player of this.players) {
+      player.setActivePlayer(player.id === ident);
+    }
+    this.handContainer.setPlayerActive(ident);
+    this.playerSwitcher.showActive(ident);
+  }
+
+  //once we want to highlight cards that are legal targets of a drag this needs to change
   onCardPointerOver(card: Card) {
     if (this.inDragging) return;
     this.children.bringToTop(card);
   }
 
+  //disables the regular hover-response behaviour on other cards
   onCardDrag(_card: Card) {
-    //todo: give this proper functionality
-    //old code made no sense anymore
     this.inDragging = true;
   }
 
@@ -204,7 +214,7 @@ export class MainScene extends Phaser.Scene {
 
   private nextSlot(factor: number): { x: number; y: number } {
     const margin = MainScene.MARGIN * factor;
-    const step = MainScene.CARD_STEP * factor;
+    const step = MainScene.CARD_STEP * factor + 10 * factor;
     const halfWidth = (MainScene.CARD_WIDTH * factor) / 2;
     const halfHeight = (MainScene.CARD_HEIGHT * factor) / 2;
 

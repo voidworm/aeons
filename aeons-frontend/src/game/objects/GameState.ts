@@ -52,8 +52,8 @@ export interface PlayableCardDTO {
   cost: integer;
   canBeCast: boolean;
   range: number;
+  hand: number[];
   targetType: number | null;
-  candidateIds: number[];
 }
 
 export interface GameStateDTO {
