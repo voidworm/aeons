@@ -23,10 +23,10 @@ export class HarvestableCard extends Card {
       name: name,
       flavor: flavor,
       faceColor: 0x777777,
-      artHeight: 170,
+      artHeight: 136,
       shadow: 'flat',
       italicText: true,
-      footerHeight: 24,
+      footerHeight: 19.2,
     });
 
     this.initFrameDetails(healing, resources);

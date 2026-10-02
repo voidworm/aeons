@@ -19,10 +19,10 @@ export class CreatureCard extends Card {
       name: name,
       flavor: flavor,
       faceColor: 0xad3d2b,
-      artHeight: 170,
+      artHeight: 136,
       shadow: 'flat',
       italicText: true,
-      footerHeight: 24,
+      footerHeight: 19.2,
     });
 
     this.initFrameDetails(maxHealth, health, damage);

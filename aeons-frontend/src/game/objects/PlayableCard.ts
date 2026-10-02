@@ -18,15 +18,15 @@ export class PlayableCard extends Card {
       name: cardname,
       flavor: flavor,
       faceColor: 0x8b5e34,
-      artHeight: 170,
+      artHeight: 136,
       shadow: 'hovers',
     });
 
-    const cx = Card.WIDTH - Card.INSET - 13;
-    const cy = Card.TITLE_Y + 11;
+    const cx = Card.WIDTH - Card.INSET - 10.4;
+    const cy = Card.TITLE_Y + 8.8;
     this.addFrameDetails(
-      new Phaser.GameObjects.Arc(scene, cx, cy, 13, 0, 360, false, 0xc0c0c0),
-      this.label(cx, cy, String(cost), { fontSize: '18px' }).setOrigin(0.5),
+      new Phaser.GameObjects.Arc(scene, cx, cy, 10.4, 0, 360, false, 0xc0c0c0),
+      this.label(cx, cy, String(cost), { fontSize: '14.4px' }).setOrigin(0.5),
     );
   }
 

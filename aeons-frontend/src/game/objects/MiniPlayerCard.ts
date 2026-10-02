@@ -8,7 +8,7 @@ export class MiniPlayerCard extends Card {
       name: name,
       flavor: '',
       faceColor: 0x8b5e34,
-      artHeight: 320,
+      artHeight: 256,
       shadow: 'flat',
       showTextBox: false,
       titleBelowArt: true,

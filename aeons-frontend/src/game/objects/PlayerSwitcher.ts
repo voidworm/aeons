@@ -6,7 +6,7 @@ import type { PlayerCard } from './PlayerCard';
 import { MiniPlayerCard } from './MiniPlayerCard';
 
 export class PlayerSwitcher extends Phaser.GameObjects.Container {
-  private static readonly PREVIEW_SCALE = 0.35;
+  private static readonly PREVIEW_SCALE = 0.45;
   private static readonly PREVIEW_WIDTH = Card.WIDTH * PlayerSwitcher.PREVIEW_SCALE;
   private static readonly PREVIEW_HEIGHT = Card.HEIGHT * PlayerSwitcher.PREVIEW_SCALE;
   private static readonly PREVIEW_OFFSET_X = 16;

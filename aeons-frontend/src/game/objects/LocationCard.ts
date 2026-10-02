@@ -9,7 +9,7 @@ export class LocationCard extends Card {
       name: cardname,
       flavor: cardtext,
       faceColor: 0x105207,
-      artHeight: 270,
+      artHeight: 216,
       shadow: 'flat',
       italicText: true,
     });

@@ -24,11 +24,11 @@ interface ShadowPose {
 }
 
 const SHADOW_REST: Record<ShadowMode, ShadowPose> = {
-  hovers: { x: 14, y: -14, scale: 1, alpha: 0.5 },
+  hovers: { x: 11.2, y: -11.2, scale: 1, alpha: 0.5 },
   flat: { x: 0, y: 0, scale: 1, alpha: 0 },
 };
-const SHADOW_LIFTED: ShadowPose = { x: 25, y: -25, scale: 1.1, alpha: 0.25 };
-const SHADOW_HOVER: ShadowPose = { x: 20, y: -20, scale: 1.025, alpha: 0.35 };
+const SHADOW_LIFTED: ShadowPose = { x: 20, y: -20, scale: 1.1, alpha: 0.25 };
+const SHADOW_HOVER: ShadowPose = { x: 16, y: -16, scale: 1.025, alpha: 0.35 };
 
 const TEXT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
   color: '#000000',
@@ -36,18 +36,18 @@ const TEXT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
 };
 
 export class Card extends Phaser.GameObjects.Container {
-  static readonly WIDTH = 315;
-  static readonly HEIGHT = 440;
+  static readonly WIDTH = 252;
+  static readonly HEIGHT = 352;
 
   // layout, all in top-left card coordinates
-  protected static readonly BORDER = 10;
-  protected static readonly INSET = 30; // border + padding; left/right/bottom margin of art and text box
-  protected static readonly INNER_WIDTH = Card.WIDTH - 2 * Card.INSET; // 255
-  protected static readonly TITLE_Y = 20;
-  protected static readonly ART_Y = 45;
-  protected static readonly GAP = 15;
-  protected static readonly BOTTOM = Card.HEIGHT - Card.INSET; // 410
-  protected static readonly TEXT_PAD = 8;
+  protected static readonly BORDER = 8;
+  protected static readonly INSET = 24; // border + padding; left/right/bottom margin of art and text box
+  protected static readonly INNER_WIDTH = Card.WIDTH - 2 * Card.INSET; // 204
+  protected static readonly TITLE_Y = 16;
+  protected static readonly ART_Y = 36;
+  protected static readonly GAP = 12;
+  protected static readonly BOTTOM = Card.HEIGHT - Card.INSET; // 328
+  protected static readonly TEXT_PAD = 6.4;
 
   public readonly id: number;
   public floating = false; // currently lifted by a drag
@@ -114,12 +114,12 @@ export class Card extends Phaser.GameObjects.Container {
       this.rect(INSET, ART_Y, INNER_WIDTH, artHeight, 0x2ecc71),
       titleBelowArt
         ? this.label(INSET + INNER_WIDTH / 2, (ART_Y + artHeight + BOTTOM) / 2, this.name, {
-            fontSize: '21.6px',
+            fontSize: '17.28px',
             fontStyle: 'bold',
             color: '#ffffff',
           }).setOrigin(0.5)
         : this.label(INSET, TITLE_Y, this.name, {
-            fontSize: '18px',
+            fontSize: '14.4px',
             fontStyle: 'bold',
             color: '#ffffff',
           }),
@@ -130,7 +130,7 @@ export class Card extends Phaser.GameObjects.Container {
       this.surface.add([
         this.rect(INSET, top, INNER_WIDTH, BOTTOM - footerHeight - top, 0xd8c9a3),
         this.label(INSET + TEXT_PAD, top + TEXT_PAD, this.flavor, {
-          fontSize: '14px',
+          fontSize: '11.2px',
           fontStyle: italicText ? 'italic' : 'normal',
           wordWrap: { width: INNER_WIDTH - 2 * TEXT_PAD },
         }),
@@ -160,7 +160,7 @@ export class Card extends Phaser.GameObjects.Container {
     const top = BOTTOM - (this.config.footerHeight ?? 0);
     const y = (top + Card.HEIGHT - BORDER) / 2;
     const x = align === 'center' ? INSET + INNER_WIDTH / 2 : INSET + INNER_WIDTH;
-    return this.label(x, y, content, { fontSize: '16px', color: '#ffffff' }).setOrigin(
+    return this.label(x, y, content, { fontSize: '12.8px', color: '#ffffff' }).setOrigin(
       align === 'center' ? 0.5 : 1,
       0.5,
     );
@@ -206,7 +206,7 @@ export class Card extends Phaser.GameObjects.Container {
     this.tweensManager.add({
       targets: this.cardFrame,
       scale: lifted ? 1.05 : 1,
-      y: lifted ? -10 : 0,
+      y: lifted ? -8 : 0,
       duration: 150,
       ease: 'Sine.easeOut',
     });
@@ -273,7 +273,7 @@ export class Card extends Phaser.GameObjects.Container {
     this.tweensManager.add({
       targets: this.cardFrame,
       scale: 1.015,
-      y: -6,
+      y: -4.8,
       duration: 260,
       ease: 'Sine.easeOut',
       onComplete: settle,

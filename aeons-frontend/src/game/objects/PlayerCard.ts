@@ -19,7 +19,7 @@ export class PlayerCard extends Card {
       name: cardname,
       flavor: '',
       faceColor: 0x8b5e34,
-      artHeight: 320,
+      artHeight: 256,
       shadow: 'hovers',
       showTextBox: false,
       titleBelowArt: true,

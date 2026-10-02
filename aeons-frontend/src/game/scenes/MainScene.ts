@@ -11,11 +11,11 @@ import { HandContainer } from '../objects/HandContainer';
 import { PlayerSwitcher } from '../objects/PlayerSwitcher';
 
 export class MainScene extends Phaser.Scene {
-  private static readonly CARD_WIDTH = 315; // rendered card width
-  private static readonly CARD_STEP = 157.5; // center-to-center distance (overlap)
-  private static readonly ROW_STEP = 220;
+  private static readonly CARD_WIDTH = 252; // rendered card width
+  private static readonly CARD_STEP = 126; // center-to-center distance (overlap)
+  private static readonly ROW_STEP = 176;
   private static readonly MARGIN = 50;
-  private static readonly CARD_HEIGHT = 440;
+  private static readonly CARD_HEIGHT = 352;
 
   private slot = 0;
   private row = 0;
@@ -214,7 +214,7 @@ export class MainScene extends Phaser.Scene {
 
   private nextSlot(factor: number): { x: number; y: number } {
     const margin = MainScene.MARGIN * factor;
-    const step = MainScene.CARD_STEP * factor + 10 * factor;
+    const step = MainScene.CARD_STEP * factor + 8 * factor;
     const halfWidth = (MainScene.CARD_WIDTH * factor) / 2;
     const halfHeight = (MainScene.CARD_HEIGHT * factor) / 2;
 

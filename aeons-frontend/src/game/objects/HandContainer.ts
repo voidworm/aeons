@@ -12,10 +12,10 @@ interface Hand {
 }
 
 export class HandContainer extends Phaser.GameObjects.Container {
-  static readonly HEIGHT = 260;
-  static readonly PADDING = 100;
+  static readonly HEIGHT = 220;
+  static readonly PADDING = 40;
   private static readonly ARC_LIFT = 60; // shifts the circle up, so it is wider at the bottom corners
-  private static readonly CARD_Y = 200;
+  private static readonly CARD_Y = 160;
   private static readonly STEP = Card.WIDTH / 1.5;
   private static readonly OFFSCREEN_Y = HandContainer.HEIGHT + Card.HEIGHT; //movement goal for outside the screen
   private static readonly MIN_SCALE = 0.3;
