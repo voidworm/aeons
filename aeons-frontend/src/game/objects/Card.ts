@@ -127,13 +127,15 @@ export class Card extends Phaser.GameObjects.Container {
 
     if (showTextBox) {
       const top = ART_Y + artHeight + GAP;
+      const boxHeight = BOTTOM - footerHeight - top;
       this.surface.add([
-        this.rect(INSET, top, INNER_WIDTH, BOTTOM - footerHeight - top, 0xd8c9a3),
-        this.label(INSET + TEXT_PAD, top + TEXT_PAD, this.flavor, {
+        this.rect(INSET, top, INNER_WIDTH, boxHeight, 0xd8c9a3),
+        this.label(INSET + INNER_WIDTH / 2, top + boxHeight - TEXT_PAD, this.flavor, {
           fontSize: '11.2px',
           fontStyle: italicText ? 'italic' : 'normal',
+          align: 'center',
           wordWrap: { width: INNER_WIDTH - 2 * TEXT_PAD },
-        }),
+        }).setOrigin(0.5, 1),
       ]);
     }
 
