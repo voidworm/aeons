@@ -53,6 +53,7 @@ export class Card extends Phaser.GameObjects.Container {
   public floating = false; // currently lifted by a drag
   public flavor: string;
   public isHovering = false;
+  private isDropTarget = false;
 
   protected readonly config: CardConfig;
   protected tween: Phaser.Tweens.Tween | null = null;
@@ -228,8 +229,12 @@ export class Card extends Phaser.GameObjects.Container {
 
     if (this.parentContainer) this.parentContainer.bringToTop(this);
     this.isHovering = true;
-    if (this.tween?.isPlaying()) return;
+    this.startWiggle();
+    this.emit('cardPointerOver', this);
+  }
 
+  private startWiggle(): void {
+    if (this.tween?.isPlaying()) return;
     this.tween = this.tweensManager.add({
       targets: this,
       angle: { from: -0.5, to: 0.5 },
@@ -238,10 +243,18 @@ export class Card extends Phaser.GameObjects.Container {
       repeat: -1,
       ease: 'Sine.easeInOut',
       onRepeat: () => {
-        if (!this.isHovering) this.finishHover();
+        if (!this.isHovering && !this.isDropTarget) this.finishHover();
       },
     });
-    this.emit('cardPointerOver', this);
+  }
+
+  // wiggles while a playable card is dragged over it; disabled cards are no valid target
+  setDropTarget(on: boolean): void {
+    on = on && !this.isDisabled;
+    if (on === this.isDropTarget) return;
+    this.isDropTarget = on;
+    if (on) this.startWiggle();
+    else if (!this.isHovering) this.finishHover();
   }
 
   // on hover the card pops up (with its shadow) and settles back to rest, the wiggle signals the hover from there

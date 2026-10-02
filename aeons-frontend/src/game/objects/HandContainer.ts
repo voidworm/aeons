@@ -24,6 +24,7 @@ export class HandContainer extends Phaser.GameObjects.Container {
 
   private background: Phaser.GameObjects.Arc; // one big circle, only its top cap is on screen
   private hands = new Map<number, Hand>();
+  private dragOrigins = new Map<PlayableCard, { x: number; y: number }>();
   private activeId: number | null = null;
   private containerWidth = 0;
 
@@ -60,6 +61,52 @@ export class HandContainer extends Phaser.GameObjects.Container {
     hand.cards = hand.cards.filter((c) => c !== card);
     hand.layer.remove(card, destroy);
     this.layout(hand);
+  }
+
+  startDrag(card: PlayableCard): void {
+    const hand = this.handHolding(card);
+    if (!hand) return;
+
+    this.dragOrigins.set(card, { x: card.x, y: card.y });
+    const { tx, ty } = card.getWorldTransformMatrix();
+    hand.layer.remove(card);
+    this.scene.add.existing(card);
+    card.setPosition(tx, ty);
+  }
+
+  //snap a card back to the hand after being dropped.
+  returnCard(card: PlayableCard): void {
+    const hand = this.handHolding(card);
+    if (!hand || card.parentContainer === hand.layer) return;
+
+    const pointer = this.scene.input.activePointer;
+    const inHandArea = this.containsPoint(pointer.worldX, pointer.worldY);
+    const local = hand.layer.getWorldTransformMatrix().applyInverse(card.x, card.y);
+    hand.layer.add(card);
+    card.setPosition(local.x, local.y);
+    hand.cards.forEach((c) => hand.layer.bringToTop(c)); // keeps the original stacking order
+
+    const origin = this.dragOrigins.get(card);
+    this.dragOrigins.delete(card);
+    if (inHandArea || !origin) return; // free placement inside the hand area
+
+    this.scene.tweens.add({
+      targets: card,
+      x: origin.x,
+      y: origin.y,
+      duration: 250,
+      ease: 'Sine.easeOut',
+    });
+  }
+
+  //hand area = the visible cap of the background circle
+  private containsPoint(x: number, y: number): boolean {
+    const { tx: cx, ty: cy } = this.background.getWorldTransformMatrix();
+    return Phaser.Math.Distance.Between(x, y, cx, cy) <= this.background.radius;
+  }
+
+  private handHolding(card: PlayableCard): Hand | undefined {
+    return [...this.hands.values()].find((h) => h.cards.includes(card));
   }
 
   //includes animation for hand flying
@@ -124,9 +171,13 @@ export class HandContainer extends Phaser.GameObjects.Container {
   }
 
   private layout(hand: Hand): void {
-    const span = (hand.cards.length - 1) * HandContainer.STEP;
     hand.cards.forEach((card, i) => {
-      card.setPosition(i * HandContainer.STEP - span / 2, 0);
+      card.setPosition(this.slotX(hand, i), 0);
     });
+  }
+
+  private slotX(hand: Hand, index: number): number {
+    const span = (hand.cards.length - 1) * HandContainer.STEP;
+    return index * HandContainer.STEP - span / 2;
   }
 }

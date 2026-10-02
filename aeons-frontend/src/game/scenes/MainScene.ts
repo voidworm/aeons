@@ -106,6 +106,7 @@ export class MainScene extends Phaser.Scene {
       c.on('cardDragEnd', this.onCardDrop, this);
       c.on('cardPointerOver', this.onCardPointerOver, this);
       c.on('cardDragStart', this.onCardDrag, this);
+      c.on('cardDragged', this.onCardDragged, this);
       this.playableCards.push(c);
     }
   }
@@ -113,7 +114,6 @@ export class MainScene extends Phaser.Scene {
   initPlayers(inputGameState: GameStateDTO) {
     const factor = this.factor();
 
-    var firstPlayerSet = false;
     for (const player of inputGameState.players) {
       const { x, y } = this.stackAnchor(factor);
 
@@ -141,12 +141,13 @@ export class MainScene extends Phaser.Scene {
       c.on('cardDragEnd', this.onCardDrop, this);
       c.on('cardPointerOver', this.onCardPointerOver, this);
       c.on('cardDragStart', this.onCardDrag, this);
+      c.on('cardDragged', this.onCardDragged, this);
       c.setScale(this.factor());
       this.locationCards.push(c);
     }
   }
 
-  initHarvestables(inputGameState: GameStateDTO) {
+  initHarvestNodes(inputGameState: GameStateDTO) {
     const factor = this.factor();
     for (const harvestable of inputGameState.harvestNodes) {
       const { x, y } = this.stackAnchor(factor);
@@ -157,6 +158,7 @@ export class MainScene extends Phaser.Scene {
       c.on('cardDragEnd', this.onCardDrop, this);
       c.on('cardPointerOver', this.onCardPointerOver, this);
       c.on('cardDragStart', this.onCardDrag, this);
+      c.on('cardDragged', this.onCardDragged, this);
     }
   }
 
@@ -171,6 +173,7 @@ export class MainScene extends Phaser.Scene {
       c.on('cardDragEnd', this.onCardDrop, this);
       c.on('cardPointerOver', this.onCardPointerOver, this);
       c.on('cardDragStart', this.onCardDrag, this);
+      c.on('cardDragged', this.onCardDragged, this);
     }
   }
 
@@ -184,7 +187,7 @@ export class MainScene extends Phaser.Scene {
     this.initPlayers(inputGameState);
     this.initLocations(inputGameState);
     this.initCreatures(inputGameState);
-    this.initHarvestables(inputGameState);
+    this.initHarvestNodes(inputGameState);
     this.initFirstActivePlayer();
   }
 
@@ -208,12 +211,28 @@ export class MainScene extends Phaser.Scene {
   }
 
   //disables the regular hover-response behaviour on other cards
-  onCardDrag(_card: Card) {
+  onCardDrag(card: Card) {
     this.inDragging = true;
+    if (card instanceof PlayableCard) this.handContainer.startDrag(card);
+  }
+
+  //wiggles every enabled card under the pointer while a playable card is dragged
+  onCardDragged(card: Card) {
+    if (!(card instanceof PlayableCard)) return;
+    const { worldX, worldY } = this.input.activePointer;
+    for (const target of this.dropTargets()) {
+      target.setDropTarget(target.getHitbox().contains(worldX, worldY));
+    }
+  }
+
+  private dropTargets(): Card[] {
+    return [...this.locationCards, ...this.creatureCards, ...this.harvestableCards];
   }
 
   onCardDrop(card: Card) {
     this.inDragging = false;
+    this.dropTargets().forEach((t) => t.setDropTarget(false));
+    if (card instanceof PlayableCard) this.handContainer.returnCard(card);
 
     const locationHighlighted = this.locationCards.find((loc) => loc.isHovering);
     if (locationHighlighted) {
