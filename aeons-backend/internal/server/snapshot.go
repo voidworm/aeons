@@ -11,8 +11,8 @@ type GameStateDTO struct {
 	Locations []LocationDTO `json:"locations"`
 	Players []PlayerDTO `json:"players"`
 	Creatures []CreatureDTO `json:"creatures"`
-	Harvestables []HarvestableDTO `json:"harvestables"`
-	PlayableCards []PlayableCardDTO `json:"playables"`
+	HarvestNodes []HarvestableDTO `json:"harvestNodes"`
+	CardsInHand []PlayableCardDTO `json:"cardsInHand"`
 }
 
 type LocationDTO struct {
@@ -132,7 +132,7 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 	}
 
 	for _, h := range gs.HarvestUnits {
-		out.Harvestables = append(out.Harvestables, HarvestableDTO{
+		out.HarvestNodes = append(out.HarvestNodes, HarvestableDTO{
 			ID: h.ID, Name: h.Name, Flavor: h.Flavor, LocationID: h.StaticLocation.ID,
 			Healing:   yieldDTO(h.HealYieldConfig),
 			Resources: yieldDTO(h.ResourceYieldConfig),
@@ -140,7 +140,7 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 	}
 
 	for _, c := range gs.PlayableCards {
-		out.PlayableCards = append(out.PlayableCards, playableCardDTO(c))
+		out.CardsInHand = append(out.CardsInHand, playableCardDTO(c))
 	}
 
 	return out

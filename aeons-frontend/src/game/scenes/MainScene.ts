@@ -12,13 +12,11 @@ import { PlayerSwitcher } from '../objects/PlayerSwitcher';
 
 export class MainScene extends Phaser.Scene {
   private static readonly CARD_WIDTH = 252; // rendered card width
-  private static readonly CARD_STEP = 126; // center-to-center distance (overlap)
-  private static readonly ROW_STEP = 176;
   private static readonly MARGIN = 50;
   private static readonly CARD_HEIGHT = 352;
 
-  private slot = 0;
-  private row = 0;
+  private static readonly GRID_GAP = 75;
+  private static readonly GRID_COLUMNS = 4;
 
   private handContainer!: HandContainer;
   private playerSwitcher!: PlayerSwitcher;
@@ -102,33 +100,26 @@ export class MainScene extends Phaser.Scene {
 
   handleCardDragStart(_card: Card) {}
 
-  handleGameStart(inputGameState: GameStateDTO) {
-    this.slot = 0;
-    this.row = 0;
-    const factor = this.factor();
-
-    console.log(inputGameState);
-
-    for (const card of inputGameState.playables) {
+  initHands(inputGameState: GameStateDTO) {
+    for (const card of inputGameState.cardsInHand) {
       const c = PlayableCard.fromDto(this, 0, 0, card);
       c.on('cardDragEnd', this.onCardDrop, this);
       c.on('cardPointerOver', this.onCardPointerOver, this);
       c.on('cardDragStart', this.onCardDrag, this);
       this.playableCards.push(c);
     }
+  }
+
+  initPlayers(inputGameState: GameStateDTO) {
+    const factor = this.factor();
 
     var firstPlayerSet = false;
     for (const player of inputGameState.players) {
-      const { x, y } = this.nextSlot(factor);
+      const { x, y } = this.stackAnchor(factor);
 
       const c = PlayerCard.fromDto(this, x, y, player);
       c.setScale(this.factor());
       c.on('cardPointerOver', this.onCardPointerOver, this);
-
-      if (!firstPlayerSet) {
-        firstPlayerSet = true;
-        c.setActivePlayer(true);
-      }
 
       this.players.push(c);
     }
@@ -139,29 +130,12 @@ export class MainScene extends Phaser.Scene {
         this.handContainer.addCard(player.id, card);
       }
     }
+  }
 
-    for (const creature of inputGameState.creatures) {
-      const { x, y } = this.nextSlot(factor);
-
-      const c = CreatureCard.fromDto(this, x, y, creature);
-      c.setScale(this.factor());
-      this.creatureCards.push(c);
-      c.on('cardDragEnd', this.onCardDrop, this);
-      c.on('cardPointerOver', this.onCardPointerOver, this);
-      c.on('cardDragStart', this.onCardDrag, this);
-    }
-    for (const harvestable of inputGameState.harvestables) {
-      const { x, y } = this.nextSlot(factor);
-
-      const c = HarvestableCard.fromDto(this, x, y, harvestable);
-      c.setScale(this.factor());
-      this.harvestableCards.push(c);
-      c.on('cardDragEnd', this.onCardDrop, this);
-      c.on('cardPointerOver', this.onCardPointerOver, this);
-      c.on('cardDragStart', this.onCardDrag, this);
-    }
-    for (const location of inputGameState.locations) {
-      const { x, y } = this.nextSlot(factor);
+  initLocations(inputGameState: GameStateDTO) {
+    const factor = this.factor();
+    for (const [i, location] of inputGameState.locations.entries()) {
+      const { x, y } = this.gridSlot(i, factor);
 
       const c = LocationCard.fromDto(this, x, y, location);
       c.on('cardDragEnd', this.onCardDrop, this);
@@ -170,9 +144,48 @@ export class MainScene extends Phaser.Scene {
       c.setScale(this.factor());
       this.locationCards.push(c);
     }
+  }
 
-    const active = this.players.find((p) => p.activePlayer);
-    if (active) this.updateActivePCharacterTo(active.id);
+  initHarvestables(inputGameState: GameStateDTO) {
+    const factor = this.factor();
+    for (const harvestable of inputGameState.harvestNodes) {
+      const { x, y } = this.stackAnchor(factor);
+
+      const c = HarvestableCard.fromDto(this, x, y, harvestable);
+      c.setScale(this.factor());
+      this.harvestableCards.push(c);
+      c.on('cardDragEnd', this.onCardDrop, this);
+      c.on('cardPointerOver', this.onCardPointerOver, this);
+      c.on('cardDragStart', this.onCardDrag, this);
+    }
+  }
+
+  initCreatures(inputGameState: GameStateDTO) {
+    const factor = this.factor();
+    for (const creature of inputGameState.creatures) {
+      const { x, y } = this.stackAnchor(factor);
+
+      const c = CreatureCard.fromDto(this, x, y, creature);
+      c.setScale(this.factor());
+      this.creatureCards.push(c);
+      c.on('cardDragEnd', this.onCardDrop, this);
+      c.on('cardPointerOver', this.onCardPointerOver, this);
+      c.on('cardDragStart', this.onCardDrag, this);
+    }
+  }
+
+  initFirstActivePlayer() {
+    this.players[0].setActivePlayer(true);
+    this.updateActivePCharacterTo(this.players[0].id);
+  }
+
+  handleGameStart(inputGameState: GameStateDTO) {
+    this.initHands(inputGameState);
+    this.initPlayers(inputGameState);
+    this.initLocations(inputGameState);
+    this.initCreatures(inputGameState);
+    this.initHarvestables(inputGameState);
+    this.initFirstActivePlayer();
   }
 
   switchActivePlayer() {
@@ -212,21 +225,30 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
-  private nextSlot(factor: number): { x: number; y: number } {
+  //temporary helper
+  private stackAnchor(factor: number): { x: number; y: number } {
     const margin = MainScene.MARGIN * factor;
-    const step = MainScene.CARD_STEP * factor + 8 * factor;
     const halfWidth = (MainScene.CARD_WIDTH * factor) / 2;
     const halfHeight = (MainScene.CARD_HEIGHT * factor) / 2;
 
-    let x = margin + halfWidth + step * this.slot;
-    if (x + halfWidth > this.scale.width) {
-      this.slot = 0;
-      this.row++;
-      x = margin + halfWidth;
-    }
+    return { x: margin + halfWidth, y: this.scale.height - margin - halfHeight };
+  }
 
-    const y = margin + halfHeight + MainScene.ROW_STEP * factor * this.row;
-    this.slot++;
-    return { x, y };
+  //grid for initial location placement
+  private gridSlot(index: number, factor: number): { x: number; y: number } {
+    const margin = MainScene.MARGIN * factor;
+    const gap = MainScene.GRID_GAP * factor;
+    const cardWidth = MainScene.CARD_WIDTH * factor;
+    const cardHeight = MainScene.CARD_HEIGHT * factor;
+
+    const cols = MainScene.GRID_COLUMNS;
+    const stepX = cardWidth + gap;
+    const stepY = cardHeight + gap;
+    const left = (this.scale.width - (cols * stepX - gap)) / 2;
+
+    return {
+      x: left + cardWidth / 2 + (index % cols) * stepX,
+      y: margin + cardHeight / 2 + Math.floor(index / cols) * stepY,
+    };
   }
 }

@@ -1,11 +1,3 @@
-export interface YieldDTO {
-  capacity: number;
-  maxCapacity: number;
-  yieldAmount: number;
-  respawnTicks: number;
-  currentTicks: number;
-}
-
 export interface LocationDTO {
   id: number;
   name: string;
@@ -35,13 +27,21 @@ export interface CreatureDTO {
   flavor: string;
 }
 
-export interface HarvestableDTO {
+export interface HarvestNodeDTO {
   id: number;
   name: string;
   flavor: string;
   locationId: number;
-  healing: YieldDTO;
-  resources: YieldDTO;
+  healing: HarvestYieldDTO;
+  resources: HarvestYieldDTO;
+}
+
+export interface HarvestYieldDTO {
+  capacity: number;
+  maxCapacity: number;
+  yieldAmount: number;
+  respawnTicks: number;
+  currentTicks: number;
 }
 
 export interface PlayableCardDTO {
@@ -61,6 +61,6 @@ export interface GameStateDTO {
   locations: LocationDTO[];
   players: PlayerDTO[];
   creatures: CreatureDTO[];
-  harvestables: HarvestableDTO[];
-  playables: PlayableCardDTO[];
+  harvestNodes: HarvestNodeDTO[];
+  cardsInHand: PlayableCardDTO[];
 }

@@ -1,10 +1,10 @@
 import type { MainScene } from '../scenes/MainScene';
 import { Card } from './Card';
-import type { HarvestableDTO, YieldDTO } from './GameState';
+import type { HarvestNodeDTO, HarvestYieldDTO } from './GameState';
 
 const percent = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
 
-const yieldText = (y: YieldDTO, name: string) =>
+const yieldText = (y: HarvestYieldDTO, name: string) =>
   y.maxCapacity > 0 ? `${percent(y.capacity, y.maxCapacity)}% ${name}` : `No ${name}`;
 
 export class HarvestableCard extends Card {
@@ -15,8 +15,8 @@ export class HarvestableCard extends Card {
     id: number,
     name: string,
     flavor: string,
-    healing: YieldDTO,
-    resources: YieldDTO,
+    healing: HarvestYieldDTO,
+    resources: HarvestYieldDTO,
   ) {
     super(scene, x, y, {
       id: id,
@@ -32,13 +32,13 @@ export class HarvestableCard extends Card {
     this.initFrameDetails(healing, resources);
   }
 
-  initFrameDetails(healing: YieldDTO, resources: YieldDTO) {
+  initFrameDetails(healing: HarvestYieldDTO, resources: HarvestYieldDTO) {
     const food = yieldText(healing, 'Food');
     const material = yieldText(resources, 'Material');
     this.addFrameDetails(this.footer(`${food}    ·    ${material}`, 'center'));
   }
 
-  static fromDto(scene: MainScene, x: number, y: number, dto: HarvestableDTO) {
+  static fromDto(scene: MainScene, x: number, y: number, dto: HarvestNodeDTO) {
     return new HarvestableCard(
       scene,
       x,
