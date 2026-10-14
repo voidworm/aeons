@@ -149,7 +149,7 @@ export class MainScene extends Phaser.Scene {
 
   update(_timer: number, _delta: number) {
     this.connector?.redraw();
-    if (this.inDragging) this.game.canvas.style.cursor = CURSOR_GRAB; // phaser swaps it on every hover change
+    if (this.inDragging || this.panLast) this.game.canvas.style.cursor = CURSOR_GRAB; // phaser swaps it on every hover change
   }
 
   handleCardDragStart(_card: Card) {}
@@ -402,8 +402,14 @@ export class MainScene extends Phaser.Scene {
       (pointer: Phaser.Input.Pointer, _over: unknown[], _dx: number, deltaY: number) =>
         this.zoomAt(pointer, deltaY),
     );
-    this.input.on('pointerup', () => (this.panLast = null));
-    this.input.on('pointerupoutside', () => (this.panLast = null));
+    this.input.on('pointerup', () => this.endPan());
+    this.input.on('pointerupoutside', () => this.endPan());
+  }
+
+  private endPan() {
+    if (!this.panLast) return;
+    this.panLast = null;
+    this.restoreCursor();
   }
 
   //zooms the main camera towards the pointer, keeping the board point under it in place

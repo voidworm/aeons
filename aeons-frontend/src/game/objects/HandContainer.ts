@@ -35,6 +35,10 @@ export class HandContainer extends Phaser.GameObjects.Container {
     super(scene, 0, 0);
 
     this.background = new Phaser.GameObjects.Arc(scene, 0, 0, 0, 0, 360, false, 0x04140a, 0.9);
+    this.background.setInteractive({
+      hitArea: {},
+      hitAreaCallback: (_area: unknown, x: number, y: number) => this.insideBackground(x, y),
+    }); // only there so board cards underneath don't register hovers through the hand
     this.add(this.background);
 
     this.setDepth(HandContainer.DEPTH);
@@ -109,6 +113,12 @@ export class HandContainer extends Phaser.GameObjects.Container {
       duration: 250,
       ease: 'Sine.easeOut',
     });
+  }
+
+  //x and y are local to the circle's bounding box
+  private insideBackground(x: number, y: number): boolean {
+    const { radius } = this.background;
+    return Phaser.Math.Distance.Between(x, y, radius, radius) <= radius;
   }
 
   //hand area = the visible cap of the background circle
