@@ -15,9 +15,9 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
   private static readonly EDGE_INSET = 240; // shifts the whole bundle left, away from the screen edge
   private static readonly LABEL_GAP = 6; // between the stack and the name button below it
   private static readonly BUTTON_GAP = 8; // between the stacked buttons
-  // room reserved under the stack for the two buttons
+  // room reserved under the stack for the three buttons
   private static readonly LABEL_AREA =
-    PlayerSwitcher.LABEL_GAP + 2 * ControlButton.HEIGHT + PlayerSwitcher.BUTTON_GAP;
+    PlayerSwitcher.LABEL_GAP + 3 * ControlButton.HEIGHT + 2 * PlayerSwitcher.BUTTON_GAP;
   private static readonly BACK_PREVIEW_OFFSET_Y = 24; // the back preview sits this much higher than the front one
 
   // the origin is the bottom centre of the stack, the name button and the creature phase button hang below it
@@ -36,7 +36,7 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
   private nameButton: ControlButton; // shows the active player, click switches
   private labelTween: Phaser.Tweens.Tween | null = null;
 
-  constructor(scene: MainScene, onSwitch: () => void, onCreaturePhase: () => void) {
+  constructor(scene: MainScene, onSwitch: () => void, onCreaturePhase: () => void, onUpkeepPhase: () => void) {
     super(scene, 0, 0);
     const { PREVIEW_HEIGHT, BACK_PREVIEW_OFFSET_Y: OFFSET_Y } = PlayerSwitcher;
 
@@ -59,7 +59,10 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
     const phaseButton = new ControlButton(scene, 'Creature phase', onCreaturePhase);
     phaseButton.setY(LABEL_GAP + HEIGHT + BUTTON_GAP + HEIGHT / 2);
 
-    this.add([clickZone, this.nameButton, phaseButton]);
+    const upkeepButton = new ControlButton(scene, 'Upkeep phase', onUpkeepPhase);
+    upkeepButton.setY(LABEL_GAP + 2 * (HEIGHT + BUTTON_GAP) + HEIGHT / 2);
+
+    this.add([clickZone, this.nameButton, phaseButton, upkeepButton]);
     this.setDepth(1000); //if i dont do this the stupid things keeps moving in front of the cards
     this.resize(scene.scale.width, scene.scale.height);
     scene.add.existing(this);

@@ -42,6 +42,7 @@ type CreatureDTO struct {
 	MaxHealth  int    `json:"maxHealth"`
 	Damage     int    `json:"damage"`
 	Flavor     string `json:"flavor"`
+	Exhausted  bool   `json:"exhausted"`
 }
 
 type PlayableCardDTO struct {
@@ -127,7 +128,7 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 	for _, c := range gs.Creatures {
 		out.Creatures = append(out.Creatures, CreatureDTO{
 			ID: c.ID, Name: c.Name, Flavor: c.Flavor, LocationID: c.CurrentLocation.ID,
-			Health: c.CurrentHealth, MaxHealth: c.MaxHealth, Damage: c.Damage,
+			Health: c.CurrentHealth, MaxHealth: c.MaxHealth, Damage: c.Damage, Exhausted: c.Exhausted,
 		})
 	}
 

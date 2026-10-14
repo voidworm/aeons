@@ -9,6 +9,7 @@ const (
 	MsgPlayCard = "play_card"
 	MsgChooseTarget = "choose_target"
 	MsgTriggerCreaturePhase = "trigger_creature_phase"
+	MsgTriggerUpkeepPhase = "trigger_upkeep_phase"
 
 	//server to client messages
 	MsgInitialGameState = "initial_game_state"
@@ -16,6 +17,7 @@ const (
 	MsgHAnd = "hand"
 	MsgTargets = "targets"
 	MsgCreaturePhase = "creature_phase"
+	MsgUpkeepPhase = "upkeep_phase"
 	MsgError = "error"
 
 	//poc messages
@@ -65,6 +67,15 @@ type CreatureEventDTO struct {
 	FromLocationID int                 `json:"fromLocationId"`
 	ToLocationID   int                 `json:"toLocationId"`
 	Attacks        []CreatureAttackDTO `json:"attacks"`
+	Exhausted      bool                `json:"exhausted"`
+}
+
+type UpkeepPhasePayload struct {
+	Events []UpkeepEventDTO `json:"events"`
+}
+
+type UpkeepEventDTO struct {
+	CreatureID int `json:"creatureId"`
 }
 
 type CreatureAttackDTO struct {

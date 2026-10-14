@@ -57,6 +57,13 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 			}
 			s.send(ctx, conn, MsgCreaturePhase, creaturePhasePayload(gs.ResolveCreaturePhase()))
 			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
+		case MsgTriggerUpkeepPhase:
+			if gs == nil {
+				s.send(ctx, conn, MsgError, "no game running")
+				continue
+			}
+			s.send(ctx, conn, MsgUpkeepPhase, upkeepPhasePayload(gs.ResolveUpkeepPhase()))
+			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
 		case MsgPocHello:
 			log.Print("Received a hello!")
 			s.send(ctx,conn, MsgPocReply, "...")
@@ -90,8 +97,16 @@ func creaturePhasePayload(events []game.CreatureEvent) CreaturePhasePayload {
 		}
 		out.Events = append(out.Events, CreatureEventDTO{
 			CreatureID: e.CreatureID, FromLocationID: e.FromLocationID,
-			ToLocationID: e.ToLocationID, Attacks: attacks,
+			ToLocationID: e.ToLocationID, Attacks: attacks, Exhausted: e.Exhausted,
 		})
+	}
+	return out
+}
+
+func upkeepPhasePayload(events []game.UpkeepEvent) UpkeepPhasePayload {
+	out := UpkeepPhasePayload{Events: make([]UpkeepEventDTO, 0, len(events))}
+	for _, e := range events {
+		out.Events = append(out.Events, UpkeepEventDTO{CreatureID: e.CreatureID})
 	}
 	return out
 }

@@ -24,6 +24,7 @@ type CreatureEvent struct {
 	FromLocationID int
 	ToLocationID   int
 	Attacks        []CreatureAttack
+	Exhausted      bool // the creature became exhausted during this event
 }
 
 // ResolveCreaturePhase runs the creature phase and returns what happened, in order.
@@ -32,6 +33,7 @@ func (gs *GameState) ResolveCreaturePhase() []CreatureEvent {
 
 	for _, v := range gs.Creatures {
 		from := v.CurrentLocation.ID
+		wasExhausted := v.Exhausted
 		gs.ResolveCreatureMovement(v)
 		attacks := gs.ResolveCreatureAttack(v)
 		gs.ReconcileDefeats()
@@ -45,7 +47,12 @@ func (gs *GameState) ResolveCreaturePhase() []CreatureEvent {
 			FromLocationID: from,
 			ToLocationID:   to,
 			Attacks:        attacks,
+			Exhausted:      !wasExhausted && v.Exhausted,
 		})
+	}
+
+	for _, p := range gs.Players {
+		gs.EvaluatePlayerHandPlayability(p)
 	}
 	return events
 }

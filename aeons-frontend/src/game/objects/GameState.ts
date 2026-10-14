@@ -25,6 +25,7 @@ export interface CreatureDTO {
   maxHealth: number;
   damage: number;
   flavor: string;
+  exhausted: boolean;
 }
 
 export interface HarvestNodeDTO {
@@ -75,8 +76,17 @@ export interface CreatureEventDTO {
   fromLocationId: number;
   toLocationId: number;
   attacks: CreatureAttackDTO[];
+  exhausted: boolean; // the creature became exhausted during this event
 }
 
 export interface CreaturePhaseDTO {
   events: CreatureEventDTO[];
+}
+
+export interface UpkeepEventDTO {
+  creatureId: number; // the creature recovers from exhaustion
+}
+
+export interface UpkeepPhaseDTO {
+  events: UpkeepEventDTO[];
 }

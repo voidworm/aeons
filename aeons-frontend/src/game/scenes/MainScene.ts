@@ -5,7 +5,7 @@ import { Card } from '../objects/Card';
 import { connect } from '../../net/socket';
 import { CreatureCard } from '../objects/CreatureCard';
 import { HarvestableCard } from '../objects/HarvestableCard';
-import type { CreatureEventDTO, GameStateDTO } from '../objects/GameState';
+import type { CreatureEventDTO, GameStateDTO, UpkeepEventDTO } from '../objects/GameState';
 import { PlayerCard } from '../objects/PlayerCard';
 import { HandContainer } from '../objects/HandContainer';
 import { PlayerSwitcher } from '../objects/PlayerSwitcher';
@@ -22,7 +22,8 @@ export class MainScene extends Phaser.Scene {
   private handContainer!: HandContainer;
   private playerSwitcher!: PlayerSwitcher;
   private gameStarted = false;
-  private creaturePhaseRunning = false;
+  private phaseRunning = false; // a creature or upkeep phase is being animated
+  private pendingState: GameStateDTO | null = null; // an update that arrived mid creature phase
 
   private playableCards: PlayableCard[] = [];
   private locationCards: LocationCard[] = [];
@@ -57,6 +58,7 @@ export class MainScene extends Phaser.Scene {
       this,
       () => this.switchActivePlayer(),
       () => this.triggerCreaturePhase(),
+      () => this.triggerUpkeepPhase(),
     );
     this.uiCamera = this.cameras.add();
     this.initPanning();
@@ -71,6 +73,9 @@ export class MainScene extends Phaser.Scene {
           break;
         case 'creature_phase':
           void this.playCreaturePhase(msg.payload.events);
+          break;
+        case 'upkeep_phase':
+          void this.playUpkeepPhase(msg.payload.events);
           break;
         case 'poc_reply':
           this.send('poc_ack');
@@ -237,21 +242,61 @@ export class MainScene extends Phaser.Scene {
     this.hideFrom(this.cameras.main, this.playerSwitcher);
   }
 
-  //TODO: sync health etc. onto the existing cards, once the creature phase animation is done
-  private handleGameStateUpdate(_state: GameStateDTO) {}
+  //TODO: sync health etc. onto the existing cards too
+  //the update arrives right behind the creature phase events, so it waits until the animation is done
+  private handleGameStateUpdate(state: GameStateDTO) {
+    if (this.phaseRunning) {
+      this.pendingState = state;
+      return;
+    }
+    this.syncState(state);
+  }
+
+  private syncState(state: GameStateDTO) {
+    for (const dto of state.cardsInHand) {
+      this.playableCards.find((c) => c.id === dto.id)?.setDisabled(!dto.canBeCast);
+    }
+    for (const dto of state.creatures) {
+      void this.creatureCards.find((c) => c.id === dto.id)?.setExhausted(dto.exhausted);
+    }
+  }
 
   private triggerCreaturePhase() {
-    if (!this.gameStarted || this.creaturePhaseRunning) return;
-    this.creaturePhaseRunning = true;
+    if (!this.gameStarted || this.phaseRunning) return;
+    this.phaseRunning = true;
     this.send('trigger_creature_phase');
   }
 
-  //one creature after another, each waits for the previous one to arrive
+  private triggerUpkeepPhase() {
+    if (!this.gameStarted || this.phaseRunning) return;
+    this.phaseRunning = true;
+    this.send('trigger_upkeep_phase');
+  }
+
+  //one creature after another, each waits for the previous one to arrive and, if it exhausted, to turn
   private async playCreaturePhase(events: CreatureEventDTO[]) {
     for (const event of events) {
       await this.moveCreature(event);
+      if (event.exhausted)
+        await this.creatureCards.find((c) => c.id === event.creatureId)?.setExhausted(true);
     }
-    this.creaturePhaseRunning = false;
+    this.finishPhase();
+  }
+
+  //exhausted creatures turn upright again, one after another
+  private async playUpkeepPhase(events: UpkeepEventDTO[]) {
+    for (const event of events) {
+      await this.creatureCards.find((c) => c.id === event.creatureId)?.setExhausted(false);
+    }
+    this.finishPhase();
+  }
+
+  private finishPhase() {
+    this.phaseRunning = false;
+    if (this.pendingState) {
+      this.syncState(this.pendingState);
+      this.pendingState = null;
+    }
   }
 
   private moveCreature(event: CreatureEventDTO): Promise<void> {
