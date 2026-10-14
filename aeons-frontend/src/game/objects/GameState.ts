@@ -2,6 +2,7 @@
 export const EFFECT_PLAYER_MOVE = 0;
 export const EFFECT_PLAYER_DISTRACT = 1;
 export const EFFECT_PLAYER_ATTACK = 2;
+export const EFFECT_PLAYER_HARVEST = 3;
 
 export interface LocationDTO {
   id: number;
@@ -91,6 +92,12 @@ export interface CreaturePhaseDTO {
 
 export interface UpkeepEventDTO {
   creatureId: number; // the creature recovers from exhaustion
+}
+
+export interface HarvestResultDTO {
+  harvestableId: number;
+  healing: number;
+  resources: number;
 }
 
 export interface UpkeepPhaseDTO {

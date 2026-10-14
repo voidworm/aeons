@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
 import type { LocationCard } from './LocationCard';
+import { CURSOR_INTERACTIVE } from '../cursors';
 
 export type ShadowMode = 'hovers' | 'flat';
 
@@ -83,6 +84,7 @@ export class Card extends Phaser.GameObjects.Container {
   protected disabledLayer!: Phaser.GameObjects.Rectangle;
 
   private dragLast = new Phaser.Math.Vector2();
+  private dragTarget: Phaser.Math.Vector2 | null = null; // where the pointer wants the card, even if a constraint holds the card back
 
   constructor(scene: MainScene, x: number, y: number, config: CardConfig) {
     super(scene, x, y);
@@ -113,7 +115,7 @@ export class Card extends Phaser.GameObjects.Container {
     this.buildSurface();
 
     this.hitbox = new Phaser.GameObjects.Zone(scene, 0, 0, this.cardWidth, this.cardHeight);
-    this.hitbox.setInteractive({ draggable: true });
+    this.hitbox.setInteractive({ draggable: true, cursor: CURSOR_INTERACTIVE });
     this.bindInput();
 
     this.add([this.shadow, this.cardFrame, this.hitbox]);
@@ -231,6 +233,7 @@ export class Card extends Phaser.GameObjects.Container {
   onDragStart(pointer: Phaser.Input.Pointer) {
     if (this.isInactive()) return;
     this.cancelHoverZoom();
+    this.dragTarget = null;
     this.dragLast.set(pointer.x, pointer.y); // screen space: unaffected by which camera the pointer is currently over
     this.setFloating(true);
     this.emit('cardDragStart', this);
@@ -239,8 +242,10 @@ export class Card extends Phaser.GameObjects.Container {
   onDrag(pointer: Phaser.Input.Pointer) {
     if (this.isInactive()) return;
     const zoom = this.dragZoom();
-    this.x += (pointer.x - this.dragLast.x) / zoom;
-    this.y += (pointer.y - this.dragLast.y) / zoom;
+    this.dragTarget ??= new Phaser.Math.Vector2(this.x, this.y);
+    this.dragTarget.x += (pointer.x - this.dragLast.x) / zoom;
+    this.dragTarget.y += (pointer.y - this.dragLast.y) / zoom;
+    this.setPosition(this.dragTarget.x, this.dragTarget.y);
     this.dragLast.set(pointer.x, pointer.y);
     this.emit('cardDragged', this);
   }

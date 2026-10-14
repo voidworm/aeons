@@ -12,7 +12,7 @@ import (
 
 // harvestable interface
 type Harvestable interface {
-	HarvestBy(*player.Unit)
+	HarvestBy(*player.Unit) *Yield
 	GenerateYield() *Yield
 }
 
@@ -95,12 +95,13 @@ func GenerateFruitTree(id int, location *location.Unit) *Unit {
 	}
 }
 
-func (u *Unit) HarvestBy(player *player.Unit) {
+func (u *Unit) HarvestBy(player *player.Unit) *Yield {
 	yield := u.GenerateYield()
 	player.ResourcesAvailable += yield.Resources
 	player.CurrentHealth += yield.Healing
 	player.CurrentHealth = min(player.CurrentHealth, player.MaxHealth)
 	log.Printf("[HARVESTING] %s was harvested by %s for %d healing and %d resources\n", u.Name, player.Name, yield.Healing, yield.Resources)
+	return yield
 }
 
 func (u *Unit) GenerateYield() *Yield {
@@ -204,10 +205,11 @@ type Yield struct {
 type Effect struct {
 	Player            *player.Unit
 	TargetHarvestable Harvestable
+	Yield             *Yield
 }
 
 func (e *Effect) Apply() {
-	e.TargetHarvestable.HarvestBy(e.Player)
+	e.Yield = e.TargetHarvestable.HarvestBy(e.Player)
 }
 
 

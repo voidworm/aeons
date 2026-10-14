@@ -5,6 +5,7 @@ import { HandContainer } from './HandContainer';
 import type { PlayerCard } from './PlayerCard';
 import { MiniPlayerCard } from './MiniPlayerCard';
 import { ControlButton } from './ControlButton';
+import { CURSOR_INTERACTIVE } from '../cursors';
 import { PlayerStatsPanel } from './PlayerStatsPanel';
 import type { PlayerStats } from './PlayerStatsPanel';
 
@@ -54,7 +55,7 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
       -PREVIEW_HEIGHT / 2 - OFFSET_Y / 2,
       STACK_WIDTH,
       PREVIEW_HEIGHT + OFFSET_Y,
-    ).setInteractive({ useHandCursor: true });
+    ).setInteractive({ cursor: CURSOR_INTERACTIVE });
 
     clickZone.on('pointerover', () => this.startWiggle());
     clickZone.on('pointerout', () => this.stopWiggle());

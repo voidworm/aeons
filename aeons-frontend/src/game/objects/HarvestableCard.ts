@@ -1,3 +1,4 @@
+import type Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
 import { Card } from './Card';
 import type { HarvestNodeDTO, HarvestYieldDTO } from './GameState';
@@ -8,6 +9,8 @@ const yieldText = (y: HarvestYieldDTO, name: string) =>
   y.maxCapacity > 0 ? `${percent(y.capacity, y.maxCapacity)}% ${name}` : `No ${name}`;
 
 export class HarvestableCard extends Card {
+  private yields!: Phaser.GameObjects.Text;
+
   constructor(
     scene: MainScene,
     x: number,
@@ -33,9 +36,16 @@ export class HarvestableCard extends Card {
   }
 
   initFrameDetails(healing: HarvestYieldDTO, resources: HarvestYieldDTO) {
-    const food = yieldText(healing, 'Food');
-    const material = yieldText(resources, 'Material');
-    this.addFrameDetails(this.footer(`${food}    ·    ${material}`, 'center'));
+    this.yields = this.footer(this.yieldsText(healing, resources), 'center');
+    this.addFrameDetails(this.yields);
+  }
+
+  setYields(healing: HarvestYieldDTO, resources: HarvestYieldDTO) {
+    this.yields.setText(this.yieldsText(healing, resources));
+  }
+
+  private yieldsText(healing: HarvestYieldDTO, resources: HarvestYieldDTO) {
+    return `${yieldText(healing, 'Food')}    ·    ${yieldText(resources, 'Material')}`;
   }
 
   static fromDto(scene: MainScene, x: number, y: number, dto: HarvestNodeDTO) {

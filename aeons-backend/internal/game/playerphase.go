@@ -13,40 +13,50 @@ import (
 )
 
 // PlayCard casts a card from a player's hand on the target with the given id.
-// Move, distract and attack cards are implemented so far.
-func (gs *GameState) PlayCard(cardID, targetID int) error {
+// Move, distract, attack and harvest cards are implemented so far.
+// Harvest cards return what the harvestable dropped, all others return nil.
+func (gs *GameState) PlayCard(cardID, targetID int) (*harvesting.Yield, error) {
 	c, owner := gs.findCardInHands(cardID)
 	if c == nil {
-		return fmt.Errorf("card %d is not in any hand", cardID)
+		return nil, fmt.Errorf("card %d is not in any hand", cardID)
 	}
 	if !c.CanBeCast {
-		return fmt.Errorf("%s cannot be cast right now", c.Name)
+		return nil, fmt.Errorf("%s cannot be cast right now", c.Name)
 	}
 	if owner.Energy < c.Cost {
-		return fmt.Errorf("%s costs %d energy, %s has %d", c.Name, c.Cost, owner.Name, owner.Energy)
+		return nil, fmt.Errorf("%s costs %d energy, %s has %d", c.Name, c.Cost, owner.Name, owner.Energy)
 	}
 
 	switch c.Type {
 	case card.PlayerMove:
 		target, ok := getEntryWithID(gs.Locations, targetID).(*location.Unit)
 		if !ok {
-			return fmt.Errorf("%d is not a location", targetID)
+			return nil, fmt.Errorf("%d is not a location", targetID)
 		}
 		if !slices.Contains(owner.CurrentLocation.OutgoingConnections, target) {
-			return fmt.Errorf("%s is not connected to %s", owner.CurrentLocation.Name, target.Name)
+			return nil, fmt.Errorf("%s is not connected to %s", owner.CurrentLocation.Name, target.Name)
 		}
 		c.Target = target
 	case card.PlayerDistract, card.PlayerAttack:
 		target, ok := getEntryWithID(gs.Creatures, targetID).(*creature.Unit)
 		if !ok {
-			return fmt.Errorf("%d is not a creature", targetID)
+			return nil, fmt.Errorf("%d is not a creature", targetID)
 		}
 		if target.CurrentLocation != owner.CurrentLocation {
-			return fmt.Errorf("%s is not at %s", target.Name, owner.CurrentLocation.Name)
+			return nil, fmt.Errorf("%s is not at %s", target.Name, owner.CurrentLocation.Name)
+		}
+		c.Target = target
+	case card.PlayerHarvest:
+		target, ok := getEntryWithID(gs.HarvestUnits, targetID).(*harvesting.Unit)
+		if !ok {
+			return nil, fmt.Errorf("%d is not a harvestable", targetID)
+		}
+		if target.StaticLocation != owner.CurrentLocation {
+			return nil, fmt.Errorf("%s is not at %s", target.Name, owner.CurrentLocation.Name)
 		}
 		c.Target = target
 	default:
-		return fmt.Errorf("%s cannot be played yet", c.Name)
+		return nil, fmt.Errorf("%s cannot be played yet", c.Name)
 	}
 
 	owner.Energy -= c.Cost
@@ -57,7 +67,15 @@ func (gs *GameState) PlayCard(cardID, targetID int) error {
 	for _, p := range gs.Players {
 		gs.EvaluatePlayerHandPlayability(p)
 	}
-	return nil
+	return harvestYield(c), nil
+}
+
+func harvestYield(c *card.PlayableCard) *harvesting.Yield {
+	harvest, ok := c.Effect.(*harvesting.Effect)
+	if !ok {
+		return nil
+	}
+	return harvest.Yield
 }
 
 func (gs *GameState) findCardInHands(cardID int) (*card.PlayableCard, *player.Unit) {

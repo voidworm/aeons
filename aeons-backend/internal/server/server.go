@@ -60,8 +60,13 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 				s.send(ctx, conn, MsgError, "bad play_card payload: "+err.Error())
 				continue
 			}
-			if err := gs.PlayCard(payload.CardID, payload.TargetID); err != nil {
+			harvested, err := gs.PlayCard(payload.CardID, payload.TargetID)
+			if err != nil {
 				s.send(ctx, conn, MsgError, err.Error())
+			} else if harvested != nil {
+				s.send(ctx, conn, MsgHarvestResult, HarvestResultPayload{
+					HarvestableID: payload.TargetID, Healing: harvested.Healing, Resources: harvested.Resources,
+				})
 			}
 			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
 		case MsgTriggerCreaturePhase:

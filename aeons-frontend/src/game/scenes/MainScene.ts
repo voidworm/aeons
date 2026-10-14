@@ -5,12 +5,25 @@ import { Card } from '../objects/Card';
 import { connect } from '../../net/socket';
 import { CreatureCard } from '../objects/CreatureCard';
 import { HarvestableCard } from '../objects/HarvestableCard';
-import { EFFECT_PLAYER_ATTACK, EFFECT_PLAYER_DISTRACT, EFFECT_PLAYER_MOVE } from '../objects/GameState';
-import type { CreatureEventDTO, GameStateDTO, PlayerDTO, UpkeepEventDTO } from '../objects/GameState';
+import {
+  EFFECT_PLAYER_ATTACK,
+  EFFECT_PLAYER_DISTRACT,
+  EFFECT_PLAYER_HARVEST,
+  EFFECT_PLAYER_MOVE,
+} from '../objects/GameState';
+import type {
+  CreatureEventDTO,
+  GameStateDTO,
+  HarvestResultDTO,
+  PlayerDTO,
+  UpkeepEventDTO,
+} from '../objects/GameState';
 import { PlayerCard } from '../objects/PlayerCard';
 import { HandContainer } from '../objects/HandContainer';
 import { PlayerSwitcher } from '../objects/PlayerSwitcher';
+import { HarvestResultPopup } from '../objects/HarvestResultPopup';
 import { LocationConnector } from '../objects/LocationConnector';
+import { CURSOR_DEFAULT, CURSOR_GRAB, CURSOR_INTERACTIVE } from '../cursors';
 
 export class MainScene extends Phaser.Scene {
   private static readonly CARD_WIDTH = 252; // rendered card width
@@ -54,6 +67,7 @@ export class MainScene extends Phaser.Scene {
 
   async create() {
     this.events.once(Phaser.Scenes.Events.DESTROY, () => this.socket.close());
+    this.input.setDefaultCursor(CURSOR_DEFAULT);
     this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this);
 
     this.handContainer = new HandContainer(this);
@@ -79,6 +93,9 @@ export class MainScene extends Phaser.Scene {
           break;
         case 'upkeep_phase':
           void this.playUpkeepPhase(msg.payload.events);
+          break;
+        case 'harvest_result':
+          this.showHarvestResult(msg.payload);
           break;
         case 'poc_reply':
           this.send('poc_ack');
@@ -132,6 +149,7 @@ export class MainScene extends Phaser.Scene {
 
   update(_timer: number, _delta: number) {
     this.connector?.redraw();
+    if (this.inDragging) this.game.canvas.style.cursor = CURSOR_GRAB; // phaser swaps it on every hover change
   }
 
   handleCardDragStart(_card: Card) {}
@@ -267,11 +285,20 @@ export class MainScene extends Phaser.Scene {
       card?.setHealth(dto.health);
       void card?.setExhausted(dto.exhausted);
     }
+    for (const dto of state.harvestNodes) {
+      this.harvestableCards.find((h) => h.id === dto.id)?.setYields(dto.healing, dto.resources);
+    }
     for (const dto of state.players) {
       const card = this.players.find((p) => p.id === dto.id);
       const to = this.locationCards.find((l) => l.id === dto.locationId);
       if (card && to) void this.moveCardToLocation(card, to);
     }
+  }
+
+  private showHarvestResult(result: HarvestResultDTO) {
+    const harvestable = this.harvestableCards.find((h) => h.id === result.harvestableId);
+    const popup = new HarvestResultPopup(this, harvestable?.name ?? '', result.healing, result.resources);
+    this.hideFrom(this.cameras.main, popup);
   }
 
   private triggerCreaturePhase() {
@@ -490,6 +517,11 @@ export class MainScene extends Phaser.Scene {
     if (card instanceof LocationCard) card.raiseContents();
   }
 
+  private restoreCursor() {
+    const hovering = this.input.hitTestPointer(this.input.activePointer).length > 0;
+    this.game.canvas.style.cursor = hovering ? CURSOR_INTERACTIVE : CURSOR_DEFAULT;
+  }
+
   //disables the regular hover-response behaviour on other cards
   onCardDrag(card: Card) {
     this.inDragging = true;
@@ -499,10 +531,15 @@ export class MainScene extends Phaser.Scene {
   }
 
   private hasTargetRestriction(card: PlayableCard): boolean {
-    return [EFFECT_PLAYER_MOVE, EFFECT_PLAYER_DISTRACT, EFFECT_PLAYER_ATTACK].includes(card.effectType);
+    return [
+      EFFECT_PLAYER_MOVE,
+      EFFECT_PLAYER_DISTRACT,
+      EFFECT_PLAYER_ATTACK,
+      EFFECT_PLAYER_HARVEST,
+    ].includes(card.effectType);
   }
 
-  //while a move, distract or attack card is dragged only its legal targets stay enabled
+  //while a move, distract, attack or harvest card is dragged only its legal targets stay enabled
   private suppressAllButLegalTargets(dragged: PlayableCard) {
     const legal = this.legalTargets(dragged);
     this.dragSuppressed = [
@@ -519,6 +556,9 @@ export class MainScene extends Phaser.Scene {
     const here = this.players.find((p) => p.activePlayer)?.homeLocation;
     if (card.effectType === EFFECT_PLAYER_MOVE) {
       return this.locationCards.filter((l) => here?.connections.includes(l.id));
+    }
+    if (card.effectType === EFFECT_PLAYER_HARVEST) {
+      return this.harvestableCards.filter((h) => h.homeLocation === here);
     }
     return this.creatureCards.filter((c) => c.homeLocation === here);
   }
@@ -551,6 +591,7 @@ export class MainScene extends Phaser.Scene {
 
   onCardDrop(card: Card) {
     this.inDragging = false;
+    this.restoreCursor();
     this.dropTargets().forEach((t) => t.setDropTarget(false));
     if (!(card instanceof PlayableCard)) return;
     this.handContainer.returnCard(card);

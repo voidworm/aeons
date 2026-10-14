@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
+import { CURSOR_INTERACTIVE } from '../cursors';
 
 //a game control button, same palette as the location connectors; centred on its own origin
 export class ControlButton extends Phaser.GameObjects.Container {
@@ -17,7 +18,7 @@ export class ControlButton extends Phaser.GameObjects.Container {
 
     const background = new Phaser.GameObjects.Rectangle(scene, 0, 0, WIDTH, HEIGHT, COLOR)
       .setStrokeStyle(4, OUTLINE_COLOR)
-      .setInteractive({ useHandCursor: true });
+      .setInteractive({ cursor: CURSOR_INTERACTIVE });
     this.label = new Phaser.GameObjects.Text(scene, 0, 0, text, {
       fontSize: '26px',
       fontStyle: 'bold',
