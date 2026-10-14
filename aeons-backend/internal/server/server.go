@@ -21,7 +21,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Connection request from %s", r.RemoteAddr)
 
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		OriginPatterns: []string{"localhost:5173"},
+		OriginPatterns: []string{"localhost:1337"},
 	})
 	if err != nil {
 		log.Printf("caught error: %v", err)
