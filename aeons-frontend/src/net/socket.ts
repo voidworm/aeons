@@ -11,6 +11,7 @@ export type ServerMessage =
   | { type: 'creature_phase'; payload: CreaturePhaseDTO }
   | { type: 'upkeep_phase'; payload: UpkeepPhaseDTO }
   | { type: 'harvest_result'; payload: HarvestResultDTO }
+  | { type: 'log'; payload: { entries: string[] } }
   | { type: 'poc_reply'; payload: string }
   | { type: 'poc_done'; payload: string }
   | { type: 'error'; payload: string };

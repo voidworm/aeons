@@ -9,6 +9,7 @@ type UpkeepEvent struct {
 
 // ResolveUpkeepPhase runs the upkeep phase and returns what happened, in order.
 func (gs *GameState) ResolveUpkeepPhase() []UpkeepEvent {
+	gs.Logf("-- Upkeep phase --")
 	gs.ResolveResourceRespawn()
 	gs.ResolvePlayerRefresh()
 	events := gs.ResolveCreatureRecovery()
@@ -29,6 +30,7 @@ func (gs *GameState) ResolvePlayerRefresh() {
 	for _, v := range gs.Players {
 		v.RemainingActions = 3
 		v.Energy = UpkeepEnergy
+		gs.Logf("%s refreshes to %d energy", v.Name, UpkeepEnergy)
 	}
 }
 
@@ -38,6 +40,7 @@ func (gs *GameState) ResolveCreatureRecovery() []UpkeepEvent {
 	for _, v := range gs.Creatures {
 		if v.Distracted {
 			events = append(events, UpkeepEvent{CreatureID: v.ID})
+			gs.Logf("%s recovers from exhaustion", v.Name)
 		}
 		v.Tick()
 	}

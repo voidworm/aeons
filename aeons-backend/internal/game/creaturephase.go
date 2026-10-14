@@ -30,6 +30,7 @@ type CreatureEvent struct {
 // ResolveCreaturePhase runs the creature phase and returns what happened, in order.
 func (gs *GameState) ResolveCreaturePhase() []CreatureEvent {
 	events := []CreatureEvent{}
+	gs.Logf("-- Creature phase --")
 
 	for _, v := range gs.Creatures {
 		from := v.CurrentLocation.ID
@@ -76,6 +77,7 @@ func (gs *GameState) ResolveCreatureMovement(input *creature.Unit) {
 	moveEffect := moving.MoveEffect{Entity: input, Target: target}
 	moveEffect.Apply()
 	log.Printf("[CREATURE PHASE] %s is moving to %s.", input.Name, input.CurrentLocation.Name)
+	gs.Logf("%s moves to %s", input.Name, input.CurrentLocation.Name)
 
 }
 
@@ -162,6 +164,16 @@ func (gs *GameState) ResolveAttackForCreature(creature *creature.Unit) []Creatur
 		effect.Apply()
 		log.Printf("[CREATURE PHASE] %s attacks %s for %d damage.", creature.Name, target.Name, creature.Damage)
 		attacks = append(attacks, CreatureAttack{TargetPlayerID: target.ID, Damage: creature.Damage})
+		gs.logCreatureAttack(creature.Name, target, creature.Damage)
 	}
+	gs.Logf("%s is exhausted", creature.Name)
 	return attacks
+}
+
+func (gs *GameState) logCreatureAttack(attackerName string, target *player.Unit, damage int) {
+	if target.CurrentHealth == 0 {
+		gs.Logf("%s attacks %s for %d, %s is defeated", attackerName, target.Name, damage, target.Name)
+		return
+	}
+	gs.Logf("%s attacks %s for %d (%d/%d)", attackerName, target.Name, damage, target.CurrentHealth, target.MaxHealth)
 }

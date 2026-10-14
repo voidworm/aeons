@@ -10,6 +10,7 @@ import (
 
 type GameState struct {
 	nextID int
+	eventLog []string
 	Locations    []*location.Unit
 	Players      []*player.Unit
 	Creatures    []*creature.Unit

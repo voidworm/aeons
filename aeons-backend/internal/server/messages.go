@@ -19,6 +19,7 @@ const (
 	MsgCreaturePhase = "creature_phase"
 	MsgUpkeepPhase = "upkeep_phase"
 	MsgHarvestResult = "harvest_result"
+	MsgLog = "log"
 	MsgError = "error"
 
 	//poc messages
@@ -78,6 +79,10 @@ type UpkeepPhasePayload struct {
 
 type UpkeepEventDTO struct {
 	CreatureID int `json:"creatureId"`
+}
+
+type LogPayload struct {
+	Entries []string `json:"entries"`
 }
 
 type HarvestResultPayload struct {

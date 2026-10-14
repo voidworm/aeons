@@ -21,6 +21,7 @@ import type {
 import { PlayerCard } from '../objects/PlayerCard';
 import { HandContainer } from '../objects/HandContainer';
 import { PlayerSwitcher } from '../objects/PlayerSwitcher';
+import { EventLog } from '../objects/EventLog';
 import { HarvestResultPopup } from '../objects/HarvestResultPopup';
 import { LocationConnector } from '../objects/LocationConnector';
 import { CURSOR_DEFAULT, CURSOR_GRAB, CURSOR_INTERACTIVE } from '../cursors';
@@ -35,6 +36,7 @@ export class MainScene extends Phaser.Scene {
 
   private handContainer!: HandContainer;
   private playerSwitcher!: PlayerSwitcher;
+  private eventLog!: EventLog;
   private gameStarted = false;
   private phaseRunning = false; // a creature or upkeep phase is being animated
   private dragSuppressed: Card[] = []; // cards disabled for the duration of a drag
@@ -77,6 +79,7 @@ export class MainScene extends Phaser.Scene {
       () => this.triggerCreaturePhase(),
       () => this.triggerUpkeepPhase(),
     );
+    this.eventLog = new EventLog(this);
     this.uiCamera = this.cameras.add();
     this.initPanning();
 
@@ -94,6 +97,9 @@ export class MainScene extends Phaser.Scene {
         case 'upkeep_phase':
           void this.playUpkeepPhase(msg.payload.events);
           break;
+        case 'log':
+          this.eventLog.append(msg.payload.entries);
+          break;
         case 'harvest_result':
           this.showHarvestResult(msg.payload);
           break;
@@ -102,6 +108,7 @@ export class MainScene extends Phaser.Scene {
           break;
         case 'error':
           console.error(msg.payload);
+          this.eventLog.append([`Error: ${msg.payload}`]);
           break;
       }
     });
@@ -262,6 +269,7 @@ export class MainScene extends Phaser.Scene {
   private hideUiFromMainCamera() {
     this.hideFrom(this.cameras.main, this.handContainer);
     this.hideFrom(this.cameras.main, this.playerSwitcher);
+    this.hideFrom(this.cameras.main, this.eventLog);
   }
 
   //TODO: sync health etc. onto the existing cards too
@@ -415,6 +423,7 @@ export class MainScene extends Phaser.Scene {
   //zooms the main camera towards the pointer, keeping the board point under it in place
   private zoomAt(pointer: Phaser.Input.Pointer, deltaY: number) {
     if (this.handContainer.containsPoint(pointer.x, pointer.y)) return;
+    if (this.eventLog.containsPoint(pointer.x, pointer.y)) return;
     const cam = this.cameras.main;
     const oldZoom = cam.zoom;
     const newZoom = Phaser.Math.Clamp(
@@ -490,6 +499,7 @@ export class MainScene extends Phaser.Scene {
   switchActivePlayer() {
     const inactivePlayer = this.players.find((p) => !p.activePlayer)!;
     this.updateActivePCharacterTo(inactivePlayer.id);
+    this.eventLog.append([`Switching to ${inactivePlayer.name}`]);
   }
 
   updateActivePCharacterTo(ident: number) {

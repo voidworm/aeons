@@ -62,6 +62,7 @@ func (gs *GameState) PlayCard(cardID, targetID int) (*harvesting.Yield, error) {
 	owner.Energy -= c.Cost
 	gs.fillEffectForCard(c, owner)
 	c.Play()
+	gs.logPlayedCard(c, owner)
 	gs.ReconcileDefeats()
 
 	for _, p := range gs.Players {

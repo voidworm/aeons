@@ -68,6 +68,7 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 					HarvestableID: payload.TargetID, Healing: harvested.Healing, Resources: harvested.Resources,
 				})
 			}
+			s.sendLog(ctx, conn, gs)
 			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
 		case MsgTriggerCreaturePhase:
 			if gs == nil {
@@ -75,6 +76,7 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 				continue
 			}
 			s.send(ctx, conn, MsgCreaturePhase, creaturePhasePayload(gs.ResolveCreaturePhase()))
+			s.sendLog(ctx, conn, gs)
 			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
 		case MsgTriggerUpkeepPhase:
 			if gs == nil {
@@ -82,6 +84,7 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 				continue
 			}
 			s.send(ctx, conn, MsgUpkeepPhase, upkeepPhasePayload(gs.ResolveUpkeepPhase()))
+			s.sendLog(ctx, conn, gs)
 			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
 		case MsgPocHello:
 			log.Print("Received a hello!")
@@ -105,6 +108,14 @@ func (s *Server) send(ctx context.Context, conn *websocket.Conn, typ string, pay
 	if err := wsjson.Write(ctx, conn, Envelope{Type: typ, Payload: raw}); err != nil {
 		log.Printf("write %s: %v", typ, err)
 	}
+}
+
+func (s *Server) sendLog(ctx context.Context, conn *websocket.Conn, gs *game.GameState) {
+	entries := gs.DrainEventLog()
+	if len(entries) == 0 {
+		return
+	}
+	s.send(ctx, conn, MsgLog, LogPayload{Entries: entries})
 }
 
 func creaturePhasePayload(events []game.CreatureEvent) CreaturePhasePayload {
