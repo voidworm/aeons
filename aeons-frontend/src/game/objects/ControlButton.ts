@@ -1,40 +1,33 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
-import { HandContainer } from './HandContainer';
 
-//a game control button that lives in the hand area, bottom left
+//a game control button, same palette as the location connectors; centred on its own origin
 export class ControlButton extends Phaser.GameObjects.Container {
-  private static readonly WIDTH = 220;
-  private static readonly HEIGHT = 48;
-  private static readonly MARGIN_BOTTOM = 20;
+  static readonly WIDTH = 230;
+  static readonly HEIGHT = 48;
+  private static readonly COLOR = 0x5c3b1f;
+  private static readonly COLOR_HOVER = 0x74492a;
+  private static readonly OUTLINE_COLOR = 0x2a1809;
 
-  constructor(scene: MainScene, label: string, onClick: () => void) {
+  readonly label: Phaser.GameObjects.Text;
+
+  constructor(scene: MainScene, text: string, onClick: () => void) {
     super(scene, 0, 0);
-    const { WIDTH, HEIGHT } = ControlButton;
+    const { WIDTH, HEIGHT, COLOR, COLOR_HOVER, OUTLINE_COLOR } = ControlButton;
 
-    const background = new Phaser.GameObjects.Rectangle(scene, 0, 0, WIDTH, HEIGHT, 0x8b5e34)
-      .setStrokeStyle(2, 0xf3e3c3)
+    const background = new Phaser.GameObjects.Rectangle(scene, 0, 0, WIDTH, HEIGHT, COLOR)
+      .setStrokeStyle(4, OUTLINE_COLOR)
       .setInteractive({ useHandCursor: true });
-    const text = new Phaser.GameObjects.Text(scene, 0, 0, label, {
-      fontSize: '20px',
+    this.label = new Phaser.GameObjects.Text(scene, 0, 0, text, {
+      fontSize: '26px',
       fontStyle: 'bold',
       color: '#f3e3c3',
     }).setOrigin(0.5);
 
-    background.on('pointerover', () => background.setFillStyle(0xa97544));
-    background.on('pointerout', () => background.setFillStyle(0x8b5e34));
+    background.on('pointerover', () => background.setFillStyle(COLOR_HOVER));
+    background.on('pointerout', () => background.setFillStyle(COLOR));
     background.on('pointerup', onClick);
 
-    this.add([background, text]);
-    this.setDepth(1000); // same layer as the player switcher, above the hand
-    this.resize(scene.scale.width, scene.scale.height);
-    scene.add.existing(this);
-  }
-
-  resize(_width: number, height: number): void {
-    this.setPosition(
-      HandContainer.PADDING + ControlButton.WIDTH / 2,
-      height - ControlButton.MARGIN_BOTTOM - ControlButton.HEIGHT / 2,
-    );
+    this.add([background, this.label]);
   }
 }

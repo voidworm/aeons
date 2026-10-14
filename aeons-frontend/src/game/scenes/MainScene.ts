@@ -10,7 +10,6 @@ import { PlayerCard } from '../objects/PlayerCard';
 import { HandContainer } from '../objects/HandContainer';
 import { PlayerSwitcher } from '../objects/PlayerSwitcher';
 import { LocationConnector } from '../objects/LocationConnector';
-import { ControlButton } from '../objects/ControlButton';
 
 export class MainScene extends Phaser.Scene {
   private static readonly CARD_WIDTH = 252; // rendered card width
@@ -22,7 +21,6 @@ export class MainScene extends Phaser.Scene {
 
   private handContainer!: HandContainer;
   private playerSwitcher!: PlayerSwitcher;
-  private creaturePhaseButton!: ControlButton;
   private gameStarted = false;
   private creaturePhaseRunning = false;
 
@@ -55,9 +53,10 @@ export class MainScene extends Phaser.Scene {
     this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this);
 
     this.handContainer = new HandContainer(this);
-    this.playerSwitcher = new PlayerSwitcher(this, () => this.switchActivePlayer());
-    this.creaturePhaseButton = new ControlButton(this, 'Trigger creature phase', () =>
-      this.triggerCreaturePhase(),
+    this.playerSwitcher = new PlayerSwitcher(
+      this,
+      () => this.switchActivePlayer(),
+      () => this.triggerCreaturePhase(),
     );
     this.uiCamera = this.cameras.add();
     this.initPanning();
@@ -117,7 +116,6 @@ export class MainScene extends Phaser.Scene {
 
     this.handContainer.resize(gameSize.width, gameSize.height);
     this.playerSwitcher.resize(gameSize.width, gameSize.height);
-    this.creaturePhaseButton.resize(gameSize.width, gameSize.height);
   }
 
   factor(): integer {
@@ -237,7 +235,6 @@ export class MainScene extends Phaser.Scene {
   private hideUiFromMainCamera() {
     this.hideFrom(this.cameras.main, this.handContainer);
     this.hideFrom(this.cameras.main, this.playerSwitcher);
-    this.hideFrom(this.cameras.main, this.creaturePhaseButton);
   }
 
   //TODO: sync health etc. onto the existing cards, once the creature phase animation is done

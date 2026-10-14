@@ -4,17 +4,23 @@ import { Card } from './Card';
 import { HandContainer } from './HandContainer';
 import type { PlayerCard } from './PlayerCard';
 import { MiniPlayerCard } from './MiniPlayerCard';
+import { ControlButton } from './ControlButton';
 
 export class PlayerSwitcher extends Phaser.GameObjects.Container {
   private static readonly PREVIEW_SCALE = 0.45;
   private static readonly PREVIEW_WIDTH = Card.WIDTH * PlayerSwitcher.PREVIEW_SCALE;
   private static readonly PREVIEW_HEIGHT = Card.HEIGHT * PlayerSwitcher.PREVIEW_SCALE;
   private static readonly PREVIEW_OFFSET_X = 16;
-  private static readonly LABEL_GAP = 6; // between the stack and the name below it
-  private static readonly LABEL_AREA = 44; // room reserved under the stack for the name
+  static readonly STACK_WIDTH = PlayerSwitcher.PREVIEW_WIDTH + 2 * PlayerSwitcher.PREVIEW_OFFSET_X;
+  private static readonly EDGE_INSET = 240; // shifts the whole bundle left, away from the screen edge
+  private static readonly LABEL_GAP = 6; // between the stack and the name button below it
+  private static readonly BUTTON_GAP = 8; // between the stacked buttons
+  // room reserved under the stack for the two buttons
+  private static readonly LABEL_AREA =
+    PlayerSwitcher.LABEL_GAP + 2 * ControlButton.HEIGHT + PlayerSwitcher.BUTTON_GAP;
   private static readonly BACK_PREVIEW_OFFSET_Y = 24; // the back preview sits this much higher than the front one
 
-  // the origin is the bottom centre of the stack, the name label hangs below it
+  // the origin is the bottom centre of the stack, the name button and the creature phase button hang below it
   // the active preview sits front-left and lower, the inactive one behind it, up and to the right
   private static readonly FRONT_SLOT = {
     x: -PlayerSwitcher.PREVIEW_OFFSET_X,
@@ -27,11 +33,10 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
 
   private previews = new Map<number, MiniPlayerCard>();
   private tweens: Phaser.Tweens.Tween[] = [];
-  private activePlayerLabel: Phaser.GameObjects.Text;
+  private nameButton: ControlButton; // shows the active player, click switches
   private labelTween: Phaser.Tweens.Tween | null = null;
-  private readonly stackWidth = PlayerSwitcher.PREVIEW_WIDTH + 2 * PlayerSwitcher.PREVIEW_OFFSET_X;
 
-  constructor(scene: MainScene, onSwitch: () => void) {
+  constructor(scene: MainScene, onSwitch: () => void, onCreaturePhase: () => void) {
     super(scene, 0, 0);
     const { PREVIEW_HEIGHT, BACK_PREVIEW_OFFSET_Y: OFFSET_Y } = PlayerSwitcher;
 
@@ -39,7 +44,7 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
       scene,
       0,
       -PREVIEW_HEIGHT / 2 - OFFSET_Y / 2,
-      this.stackWidth,
+      PlayerSwitcher.STACK_WIDTH,
       PREVIEW_HEIGHT + OFFSET_Y,
     ).setInteractive({ useHandCursor: true });
 
@@ -47,13 +52,14 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
     clickZone.on('pointerout', () => this.stopWiggle());
     clickZone.on('pointerup', onSwitch);
 
-    this.activePlayerLabel = new Phaser.GameObjects.Text(scene, 0, PlayerSwitcher.LABEL_GAP, '', {
-      fontSize: '26px',
-      fontStyle: 'bold',
-      color: '#f3e3c3',
-    }).setOrigin(0.5, 0);
+    const { LABEL_GAP, BUTTON_GAP } = PlayerSwitcher;
+    const { HEIGHT } = ControlButton;
+    this.nameButton = new ControlButton(scene, '', onSwitch);
+    this.nameButton.setY(LABEL_GAP + HEIGHT / 2);
+    const phaseButton = new ControlButton(scene, 'Creature phase', onCreaturePhase);
+    phaseButton.setY(LABEL_GAP + HEIGHT + BUTTON_GAP + HEIGHT / 2);
 
-    this.add([clickZone, this.activePlayerLabel]);
+    this.add([clickZone, this.nameButton, phaseButton]);
     this.setDepth(1000); //if i dont do this the stupid things keeps moving in front of the cards
     this.resize(scene.scale.width, scene.scale.height);
     scene.add.existing(this);
@@ -61,7 +67,7 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
 
   resize(width: number, height: number): void {
     this.setPosition(
-      width - HandContainer.PADDING - this.stackWidth / 2,
+      width - HandContainer.PADDING - PlayerSwitcher.EDGE_INSET - PlayerSwitcher.STACK_WIDTH / 2,
       height - 20 - PlayerSwitcher.LABEL_AREA,
     );
   }
@@ -86,21 +92,21 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
   }
 
   private setActiveName(name: string, animate: boolean): void {
-    if (this.activePlayerLabel.text === name) return;
+    if (this.nameButton.label.text === name) return;
     this.labelTween?.stop();
 
     if (!animate) {
-      this.activePlayerLabel.setText(name).setAlpha(1);
+      this.nameButton.label.setText(name).setAlpha(1);
       return;
     }
     this.labelTween = this.scene.tweens.add({
-      targets: this.activePlayerLabel,
+      targets: this.nameButton.label,
       alpha: 0,
       duration: 125,
       onComplete: () => {
-        this.activePlayerLabel.setText(name);
+        this.nameButton.label.setText(name);
         this.labelTween = this.scene.tweens.add({
-          targets: this.activePlayerLabel,
+          targets: this.nameButton.label,
           alpha: 1,
           duration: 125,
         });
