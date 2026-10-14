@@ -4,6 +4,8 @@ import Phaser from 'phaser';
 import type { PlayableCardDTO } from './GameState';
 
 export class PlayableCard extends Card {
+  public effectType = -1;
+
   constructor(
     scene: MainScene,
     x: number,
@@ -32,6 +34,7 @@ export class PlayableCard extends Card {
 
   static fromDto(scene: MainScene, x: integer, y: integer, dto: PlayableCardDTO) {
     const r = new PlayableCard(scene, x, y, dto.id, dto.name, dto.effectText, dto.cost);
+    r.effectType = dto.effectType;
     r.setDisabled(!dto.canBeCast);
     return r;
   }

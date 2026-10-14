@@ -73,6 +73,7 @@ export class Card extends Phaser.GameObjects.Container {
   protected tween: Phaser.Tweens.Tween | null = null;
   protected tweensManager: Phaser.Tweens.TweenManager;
   protected isDisabled = false;
+  private suppressed = false;
 
   protected shadow: Phaser.GameObjects.Rectangle;
   protected cardFrame: Phaser.GameObjects.Container; // lift/scale target, sits at card centre
@@ -227,7 +228,7 @@ export class Card extends Phaser.GameObjects.Container {
   }
 
   onDragStart(pointer: Phaser.Input.Pointer) {
-    if (this.isDisabled) return;
+    if (this.isInactive()) return;
     this.cancelHoverZoom();
     this.dragLast.set(pointer.x, pointer.y); // screen space: unaffected by which camera the pointer is currently over
     this.setFloating(true);
@@ -235,7 +236,7 @@ export class Card extends Phaser.GameObjects.Container {
   }
 
   onDrag(pointer: Phaser.Input.Pointer) {
-    if (this.isDisabled) return;
+    if (this.isInactive()) return;
     const zoom = this.dragZoom();
     this.x += (pointer.x - this.dragLast.x) / zoom;
     this.y += (pointer.y - this.dragLast.y) / zoom;
@@ -250,7 +251,7 @@ export class Card extends Phaser.GameObjects.Container {
   }
 
   onDragend() {
-    if (this.isDisabled) return;
+    if (this.isInactive()) return;
     this.setFloating(false);
     this.emit('cardDragEnd', this);
   }
@@ -340,7 +341,7 @@ export class Card extends Phaser.GameObjects.Container {
 
   // wiggles while a playable card is dragged over it; disabled cards are no valid target
   setDropTarget(on: boolean): void {
-    on = on && !this.isDisabled;
+    on = on && !this.isInactive();
     if (on === this.isDropTarget) return;
     this.isDropTarget = on;
     if (on) this.startWiggle();
@@ -404,7 +405,21 @@ export class Card extends Phaser.GameObjects.Container {
 
   setDisabled(on: boolean) {
     this.isDisabled = on;
-    this.disabledLayer.setVisible(on);
+    this.refreshDisabledLayer();
+  }
+
+  // a temporary disable on top of the game-rule one, e.g. while a card is dragged that this one is no target of
+  setSuppressed(on: boolean) {
+    this.suppressed = on;
+    this.refreshDisabledLayer();
+  }
+
+  protected isInactive(): boolean {
+    return this.isDisabled || this.suppressed;
+  }
+
+  private refreshDisabledLayer() {
+    this.disabledLayer.setVisible(this.isInactive());
   }
 
   getHitbox(): Phaser.Geom.Rectangle {

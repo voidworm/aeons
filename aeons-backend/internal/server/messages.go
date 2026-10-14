@@ -40,7 +40,8 @@ type SelectPlayerPayload struct {
 }
 
 type PlayCardPayload struct {
-	CardID int `json:"cardId"`
+	CardID   int `json:"cardId"`
+	TargetID int `json:"targetId"`
 }
 
 type ChooseTargetPayload struct {

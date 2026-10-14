@@ -50,6 +50,20 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 			log.Print("Received new game request, initalising....")
 			gs.Init()
 			s.send(ctx, conn, MsgInitialGameState, Snapshot(gs))
+		case MsgPlayCard:
+			if gs == nil {
+				s.send(ctx, conn, MsgError, "no game running")
+				continue
+			}
+			var payload PlayCardPayload
+			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+				s.send(ctx, conn, MsgError, "bad play_card payload: "+err.Error())
+				continue
+			}
+			if err := gs.PlayCard(payload.CardID, payload.TargetID); err != nil {
+				s.send(ctx, conn, MsgError, err.Error())
+			}
+			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
 		case MsgTriggerCreaturePhase:
 			if gs == nil {
 				s.send(ctx, conn, MsgError, "no game running")

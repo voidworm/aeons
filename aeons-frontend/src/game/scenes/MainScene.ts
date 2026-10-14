@@ -5,6 +5,7 @@ import { Card } from '../objects/Card';
 import { connect } from '../../net/socket';
 import { CreatureCard } from '../objects/CreatureCard';
 import { HarvestableCard } from '../objects/HarvestableCard';
+import { EFFECT_PLAYER_MOVE } from '../objects/GameState';
 import type { CreatureEventDTO, GameStateDTO, UpkeepEventDTO } from '../objects/GameState';
 import { PlayerCard } from '../objects/PlayerCard';
 import { HandContainer } from '../objects/HandContainer';
@@ -23,6 +24,7 @@ export class MainScene extends Phaser.Scene {
   private playerSwitcher!: PlayerSwitcher;
   private gameStarted = false;
   private phaseRunning = false; // a creature or upkeep phase is being animated
+  private dragSuppressed: Card[] = []; // cards disabled for the duration of a drag
   private pendingState: GameStateDTO | null = null; // an update that arrived mid creature phase
 
   private playableCards: PlayableCard[] = [];
@@ -259,6 +261,11 @@ export class MainScene extends Phaser.Scene {
     for (const dto of state.creatures) {
       void this.creatureCards.find((c) => c.id === dto.id)?.setExhausted(dto.exhausted);
     }
+    for (const dto of state.players) {
+      const card = this.players.find((p) => p.id === dto.id);
+      const to = this.locationCards.find((l) => l.id === dto.locationId);
+      if (card && to) void this.moveCardToLocation(card, to);
+    }
   }
 
   private triggerCreaturePhase() {
@@ -301,9 +308,15 @@ export class MainScene extends Phaser.Scene {
 
   private moveCreature(event: CreatureEventDTO): Promise<void> {
     const card = this.creatureCards.find((c) => c.id === event.creatureId);
-    const from = this.locationCards.find((l) => l.id === event.fromLocationId);
     const to = this.locationCards.find((l) => l.id === event.toLocationId);
-    if (!card || !from || !to || from === to) return Promise.resolve();
+    if (!card || !to) return Promise.resolve();
+    return this.moveCardToLocation(card, to);
+  }
+
+  //re-homes the card to the location and glides it over from where it stands now
+  private moveCardToLocation(card: Card, to: LocationCard): Promise<void> {
+    const from = card.homeLocation;
+    if (!from || from === to) return Promise.resolve();
 
     const start = { x: card.x, y: card.y };
     from.removeContent(card);
@@ -459,7 +472,27 @@ export class MainScene extends Phaser.Scene {
   //disables the regular hover-response behaviour on other cards
   onCardDrag(card: Card) {
     this.inDragging = true;
-    if (card instanceof PlayableCard) this.handContainer.startDrag(card);
+    if (!(card instanceof PlayableCard)) return;
+    this.handContainer.startDrag(card);
+    if (card.effectType === EFFECT_PLAYER_MOVE) this.suppressAllButMoveTargets(card);
+  }
+
+  //while a move card is dragged only the locations the active player can reach stay enabled
+  private suppressAllButMoveTargets(dragged: PlayableCard) {
+    const legal = this.legalMoveTargets();
+    this.dragSuppressed = [
+      ...this.playableCards,
+      ...this.locationCards,
+      ...this.players,
+      ...this.creatureCards,
+      ...this.harvestableCards,
+    ].filter((c) => c !== dragged && !legal.includes(c as LocationCard));
+    this.dragSuppressed.forEach((c) => c.setSuppressed(true));
+  }
+
+  private legalMoveTargets(): LocationCard[] {
+    const here = this.players.find((p) => p.activePlayer)?.homeLocation;
+    return this.locationCards.filter((l) => here?.connections.includes(l.id));
   }
 
   //wiggles every enabled card under the pointer while a playable card is dragged
@@ -479,6 +512,11 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
+  private releaseSuppressed() {
+    this.dragSuppressed.forEach((c) => c.setSuppressed(false));
+    this.dragSuppressed = [];
+  }
+
   private dropTargets(): Card[] {
     return [...this.locationCards, ...this.creatureCards, ...this.harvestableCards];
   }
@@ -491,6 +529,12 @@ export class MainScene extends Phaser.Scene {
 
     // a dragged hand card lives on the ui camera, so board cards never receive pointerover for it
     const { x, y } = this.boardPoint();
+    if (card.effectType === EFFECT_PLAYER_MOVE) {
+      const target = this.legalMoveTargets().find((loc) => loc.getHitbox().contains(x, y));
+      this.releaseSuppressed();
+      if (target) this.send('play_card', { cardId: card.id, targetId: target.id });
+      return;
+    }
     const locationHighlighted = this.locationCards.find((loc) => loc.getHitbox().contains(x, y));
     if (locationHighlighted) {
       this.send('poc_hello', {

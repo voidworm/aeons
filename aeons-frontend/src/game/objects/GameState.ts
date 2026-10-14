@@ -1,3 +1,5 @@
+export const EFFECT_PLAYER_MOVE = 0; // PlayableCardDTO.effectType of a move card
+
 export interface LocationDTO {
   id: number;
   name: string;

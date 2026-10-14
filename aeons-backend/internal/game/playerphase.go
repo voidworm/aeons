@@ -1,13 +1,62 @@
 package game
 
 import (
+	"aeons/internal/card"
 	"aeons/internal/combat"
 	"aeons/internal/creature"
 	"aeons/internal/harvesting"
 	"aeons/internal/location"
 	"aeons/internal/player"
+	"fmt"
 	"log"
+	"slices"
 )
+
+// PlayCard casts a card from a player's hand on the target with the given id.
+// Only move cards are implemented so far.
+func (gs *GameState) PlayCard(cardID, targetID int) error {
+	c, owner := gs.findCardInHands(cardID)
+	if c == nil {
+		return fmt.Errorf("card %d is not in any hand", cardID)
+	}
+	if !c.CanBeCast {
+		return fmt.Errorf("%s cannot be cast right now", c.Name)
+	}
+
+	switch c.Type {
+	case card.PlayerMove:
+		target, ok := getEntryWithID(gs.Locations, targetID).(*location.Unit)
+		if !ok {
+			return fmt.Errorf("%d is not a location", targetID)
+		}
+		if !slices.Contains(owner.CurrentLocation.OutgoingConnections, target) {
+			return fmt.Errorf("%s is not connected to %s", owner.CurrentLocation.Name, target.Name)
+		}
+		c.Target = target
+	default:
+		return fmt.Errorf("%s cannot be played yet", c.Name)
+	}
+
+	gs.fillEffectForCard(c, owner)
+	c.Play()
+	gs.ReconcileDefeats()
+
+	for _, p := range gs.Players {
+		gs.EvaluatePlayerHandPlayability(p)
+	}
+	return nil
+}
+
+func (gs *GameState) findCardInHands(cardID int) (*card.PlayableCard, *player.Unit) {
+	for _, p := range gs.Players {
+		for _, c := range p.CardsInHand {
+			if c.ID == cardID {
+				return c, p
+			}
+		}
+	}
+	return nil, nil
+}
 
 func (gs *GameState) ResolvePlayerPhaseStep() error {
 	

@@ -12,6 +12,7 @@ export class LocationCard extends Card {
   private static readonly SLOT_GAP = 12;
   private static readonly ROW_SPILL = 150; // how far the initial row may exceed the location's width before cards start to overlap
 
+  public connections: number[] = []; // ids of the locations reachable from here
   private contents: Card[] = [];
   private offsets = new Map<Card, Phaser.Math.Vector2>(); // card centre relative to the location centre, unscaled
 
@@ -41,7 +42,9 @@ export class LocationCard extends Card {
   }
 
   static fromDto(scene: MainScene, x: number, y: number, dto: LocationDTO) {
-    return new LocationCard(scene, x, y, dto.id, dto.name, dto.flavor);
+    const location = new LocationCard(scene, x, y, dto.id, dto.name, dto.flavor);
+    location.connections = dto.connections;
+    return location;
   }
 
   // lays the cards out in a row straddling the lower border; from then on they are free to move
