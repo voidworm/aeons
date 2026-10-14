@@ -1,4 +1,7 @@
-export const EFFECT_PLAYER_MOVE = 0; // PlayableCardDTO.effectType of a move card
+// PlayableCardDTO.effectType of the card kinds
+export const EFFECT_PLAYER_MOVE = 0;
+export const EFFECT_PLAYER_DISTRACT = 1;
+export const EFFECT_PLAYER_ATTACK = 2;
 
 export interface LocationDTO {
   id: number;

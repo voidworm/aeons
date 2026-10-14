@@ -33,7 +33,7 @@ func (gs *GameState) ResolveCreaturePhase() []CreatureEvent {
 
 	for _, v := range gs.Creatures {
 		from := v.CurrentLocation.ID
-		wasExhausted := v.Exhausted
+		wasExhausted := v.Distracted
 		gs.ResolveCreatureMovement(v)
 		attacks := gs.ResolveCreatureAttack(v)
 		gs.ReconcileDefeats()
@@ -47,7 +47,7 @@ func (gs *GameState) ResolveCreaturePhase() []CreatureEvent {
 			FromLocationID: from,
 			ToLocationID:   to,
 			Attacks:        attacks,
-			Exhausted:      !wasExhausted && v.Exhausted,
+			Exhausted:      !wasExhausted && v.Distracted,
 		})
 	}
 
@@ -65,7 +65,7 @@ func (gs *GameState) ResolveCreatureMovement(input *creature.Unit) {
 
 	target := gs.DetermineMovementTargetForCreature(input)
 	if target == input.CurrentLocation {
-		if input.Exhausted {
+		if input.Distracted {
 			log.Printf("[CREATURE PHASE] %s is exhausted and can not move.", input.Name)
 		} else {
 			log.Printf("[CREATURE PHASE] %s would move but is already at its target.", input.Name)
@@ -137,11 +137,11 @@ func (gs *GameState) DetermineMovementForCuriousCreature(creature *creature.Unit
 }
 
 func (gs *GameState) ResolveCreatureAttack(creature *creature.Unit) []CreatureAttack {
-	if !creature.Aloof && !creature.Exhausted {
+	if !creature.Aloof && !creature.Distracted {
 		return gs.ResolveAttackForCreature(creature)
 	} else if creature.Aloof {
 		log.Printf("[CREATURE PHASE] %s is aloof and doesn't attack.", creature.Name)
-	} else if creature.Exhausted {
+	} else if creature.Distracted {
 		log.Printf("[CREATURE PHASE] %s is exhausted and doesn't attack.", creature.Name)
 	}
 	return nil
@@ -158,7 +158,7 @@ func (gs *GameState) ResolveAttackForCreature(creature *creature.Unit) []Creatur
 	attacks := []CreatureAttack{}
 	for _, target := range inRange {
 		effect := combat.DamageEffect{Source: creature, Target: target}
-		creature.Exhausted = true
+		creature.Distracted = true
 		effect.Apply()
 		log.Printf("[CREATURE PHASE] %s attacks %s for %d damage.", creature.Name, target.Name, creature.Damage)
 		attacks = append(attacks, CreatureAttack{TargetPlayerID: target.ID, Damage: creature.Damage})

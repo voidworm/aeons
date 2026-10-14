@@ -33,7 +33,7 @@ func (gs *GameState) ResolvePlayerRefresh() {
 func (gs *GameState) ResolveCreatureRecovery() []UpkeepEvent {
 	events := []UpkeepEvent{}
 	for _, v := range gs.Creatures {
-		if v.Exhausted {
+		if v.Distracted {
 			events = append(events, UpkeepEvent{CreatureID: v.ID})
 		}
 		v.Tick()

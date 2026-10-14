@@ -6,6 +6,9 @@ import type { CreatureDTO } from './GameState';
 export class CreatureCard extends Card {
   private exhausted = false;
   private turnTween: Phaser.Tweens.Tween | null = null;
+  private stats!: Phaser.GameObjects.Text;
+  private maxHealth: number;
+  private damage: number;
 
   constructor(
     scene: MainScene,
@@ -29,7 +32,9 @@ export class CreatureCard extends Card {
       footerHeight: 19.2,
     });
 
-    this.initFrameDetails(maxHealth, health, damage);
+    this.maxHealth = maxHealth;
+    this.damage = damage;
+    this.initFrameDetails(health);
   }
 
   // an exhausted creature lies on its side; the hitbox turns with it
@@ -55,9 +60,18 @@ export class CreatureCard extends Card {
     });
   }
 
-  initFrameDetails(maxHealth: integer, currentHealth: integer, damage: integer) {
-    const hpPct = maxHealth > 0 ? Math.round((currentHealth / maxHealth) * 100) : 0;
-    this.addFrameDetails(this.footer(`${hpPct}% HP    ·    ${damage} DMG`, 'center'));
+  initFrameDetails(currentHealth: integer) {
+    this.stats = this.footer(this.statsText(currentHealth), 'center');
+    this.addFrameDetails(this.stats);
+  }
+
+  setHealth(health: number) {
+    this.stats.setText(this.statsText(health));
+  }
+
+  private statsText(health: number): string {
+    const hpPct = this.maxHealth > 0 ? Math.round((health / this.maxHealth) * 100) : 0;
+    return `${hpPct}% HP    ·    ${this.damage} DMG`;
   }
 
   static fromDto(scene: MainScene, x: number, y: number, dto: CreatureDTO) {

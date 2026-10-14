@@ -74,6 +74,7 @@ export class Card extends Phaser.GameObjects.Container {
   protected tweensManager: Phaser.Tweens.TweenManager;
   protected isDisabled = false;
   private suppressed = false;
+  private hoverTweens: Phaser.Tweens.Tween[] = []; // the lift tweens only, so stopping them leaves e.g. a creature's turn alone
 
   protected shadow: Phaser.GameObjects.Rectangle;
   protected cardFrame: Phaser.GameObjects.Container; // lift/scale target, sits at card centre
@@ -352,23 +353,25 @@ export class Card extends Phaser.GameObjects.Container {
   private setHoverLift(lifted: boolean): void {
     if (this.floating) return; //floating means it's beging dragged
     const restShadow = SHADOW_REST[this.config.shadow];
-    this.tweensManager.killTweensOf(this.cardFrame);
-    this.tweensManager.killTweensOf(this.shadow);
+    this.hoverTweens.forEach((t) => t.stop());
+    this.hoverTweens = [];
 
     const settle = () => {
-      this.tweensManager.add({
-        targets: this.cardFrame,
-        scale: 1,
-        y: 0,
-        duration: 350,
-        ease: 'Sine.easeInOut',
-      });
-      this.tweensManager.add({
-        targets: this.shadow,
-        ...restShadow,
-        duration: 350,
-        ease: 'Sine.easeInOut',
-      });
+      this.hoverTweens = [
+        this.tweensManager.add({
+          targets: this.cardFrame,
+          scale: 1,
+          y: 0,
+          duration: 350,
+          ease: 'Sine.easeInOut',
+        }),
+        this.tweensManager.add({
+          targets: this.shadow,
+          ...restShadow,
+          duration: 350,
+          ease: 'Sine.easeInOut',
+        }),
+      ];
     };
 
     if (!lifted) {
@@ -376,20 +379,22 @@ export class Card extends Phaser.GameObjects.Container {
       return;
     }
 
-    this.tweensManager.add({
-      targets: this.cardFrame,
-      scale: 1.015,
-      y: -4.8,
-      duration: 260,
-      ease: 'Sine.easeOut',
-      onComplete: settle,
-    });
-    this.tweensManager.add({
-      targets: this.shadow,
-      ...SHADOW_HOVER,
-      duration: 260,
-      ease: 'Sine.easeOut',
-    });
+    this.hoverTweens = [
+      this.tweensManager.add({
+        targets: this.cardFrame,
+        scale: 1.015,
+        y: -4.8,
+        duration: 260,
+        ease: 'Sine.easeOut',
+        onComplete: settle,
+      }),
+      this.tweensManager.add({
+        targets: this.shadow,
+        ...SHADOW_HOVER,
+        duration: 260,
+        ease: 'Sine.easeOut',
+      }),
+    ];
   }
 
   finishHover() {

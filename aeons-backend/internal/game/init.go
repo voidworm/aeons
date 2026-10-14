@@ -4,7 +4,7 @@ import (
 	"aeons/internal/card"
 	"aeons/internal/combat"
 	"aeons/internal/creature"
-	"aeons/internal/evading"
+	"aeons/internal/distracting"
 	"aeons/internal/harvesting"
 	"aeons/internal/location"
 	"aeons/internal/moving"
@@ -222,9 +222,9 @@ func (gs *GameState) fillEffectForCard(c *card.PlayableCard, owner *player.Unit)
 			if !ok {
 				//shouldnt happen
 			}
-			c.Effect = &evading.Effect {
-				EvadingPlayer: owner,
-				EvadedCreature: target,
+			c.Effect = &distracting.Effect {
+				DistractingPlayer: owner,
+				DistractedCreature: target,
 			}
 		case card.PlayerHarvest:
 			target,ok := c.Target.(*harvesting.Unit)

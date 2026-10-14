@@ -13,7 +13,7 @@ import (
 )
 
 // PlayCard casts a card from a player's hand on the target with the given id.
-// Only move cards are implemented so far.
+// Move, distract and attack cards are implemented so far.
 func (gs *GameState) PlayCard(cardID, targetID int) error {
 	c, owner := gs.findCardInHands(cardID)
 	if c == nil {
@@ -31,6 +31,15 @@ func (gs *GameState) PlayCard(cardID, targetID int) error {
 		}
 		if !slices.Contains(owner.CurrentLocation.OutgoingConnections, target) {
 			return fmt.Errorf("%s is not connected to %s", owner.CurrentLocation.Name, target.Name)
+		}
+		c.Target = target
+	case card.PlayerDistract, card.PlayerAttack:
+		target, ok := getEntryWithID(gs.Creatures, targetID).(*creature.Unit)
+		if !ok {
+			return fmt.Errorf("%d is not a creature", targetID)
+		}
+		if target.CurrentLocation != owner.CurrentLocation {
+			return fmt.Errorf("%s is not at %s", target.Name, owner.CurrentLocation.Name)
 		}
 		c.Target = target
 	default:

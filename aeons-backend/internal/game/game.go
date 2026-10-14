@@ -83,7 +83,7 @@ func (gs *GameState) LocationCanBeLeft(le *location.Unit) bool {
 
 	for _, v := range gs.Creatures {
 		if le == v.CurrentLocation {
-			creatureBlocksMovement := !v.Aloof && !v.Exhausted
+			creatureBlocksMovement := !v.Aloof && !v.Distracted
 			if creatureBlocksMovement {
 				return false
 			}

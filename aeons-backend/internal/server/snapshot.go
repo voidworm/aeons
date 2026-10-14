@@ -128,7 +128,7 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 	for _, c := range gs.Creatures {
 		out.Creatures = append(out.Creatures, CreatureDTO{
 			ID: c.ID, Name: c.Name, Flavor: c.Flavor, LocationID: c.CurrentLocation.ID,
-			Health: c.CurrentHealth, MaxHealth: c.MaxHealth, Damage: c.Damage, Exhausted: c.Exhausted,
+			Health: c.CurrentHealth, MaxHealth: c.MaxHealth, Damage: c.Damage, Exhausted: c.Distracted,
 		})
 	}
 

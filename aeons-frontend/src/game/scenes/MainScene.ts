@@ -5,7 +5,7 @@ import { Card } from '../objects/Card';
 import { connect } from '../../net/socket';
 import { CreatureCard } from '../objects/CreatureCard';
 import { HarvestableCard } from '../objects/HarvestableCard';
-import { EFFECT_PLAYER_MOVE } from '../objects/GameState';
+import { EFFECT_PLAYER_ATTACK, EFFECT_PLAYER_DISTRACT, EFFECT_PLAYER_MOVE } from '../objects/GameState';
 import type { CreatureEventDTO, GameStateDTO, UpkeepEventDTO } from '../objects/GameState';
 import { PlayerCard } from '../objects/PlayerCard';
 import { HandContainer } from '../objects/HandContainer';
@@ -259,7 +259,9 @@ export class MainScene extends Phaser.Scene {
       this.playableCards.find((c) => c.id === dto.id)?.setDisabled(!dto.canBeCast);
     }
     for (const dto of state.creatures) {
-      void this.creatureCards.find((c) => c.id === dto.id)?.setExhausted(dto.exhausted);
+      const card = this.creatureCards.find((c) => c.id === dto.id);
+      card?.setHealth(dto.health);
+      void card?.setExhausted(dto.exhausted);
     }
     for (const dto of state.players) {
       const card = this.players.find((p) => p.id === dto.id);
@@ -474,25 +476,32 @@ export class MainScene extends Phaser.Scene {
     this.inDragging = true;
     if (!(card instanceof PlayableCard)) return;
     this.handContainer.startDrag(card);
-    if (card.effectType === EFFECT_PLAYER_MOVE) this.suppressAllButMoveTargets(card);
+    if (this.hasTargetRestriction(card)) this.suppressAllButLegalTargets(card);
   }
 
-  //while a move card is dragged only the locations the active player can reach stay enabled
-  private suppressAllButMoveTargets(dragged: PlayableCard) {
-    const legal = this.legalMoveTargets();
+  private hasTargetRestriction(card: PlayableCard): boolean {
+    return [EFFECT_PLAYER_MOVE, EFFECT_PLAYER_DISTRACT, EFFECT_PLAYER_ATTACK].includes(card.effectType);
+  }
+
+  //while a move, distract or attack card is dragged only its legal targets stay enabled
+  private suppressAllButLegalTargets(dragged: PlayableCard) {
+    const legal = this.legalTargets(dragged);
     this.dragSuppressed = [
       ...this.playableCards,
       ...this.locationCards,
       ...this.players,
       ...this.creatureCards,
       ...this.harvestableCards,
-    ].filter((c) => c !== dragged && !legal.includes(c as LocationCard));
+    ].filter((c) => c !== dragged && !legal.includes(c));
     this.dragSuppressed.forEach((c) => c.setSuppressed(true));
   }
 
-  private legalMoveTargets(): LocationCard[] {
+  private legalTargets(card: PlayableCard): Card[] {
     const here = this.players.find((p) => p.activePlayer)?.homeLocation;
-    return this.locationCards.filter((l) => here?.connections.includes(l.id));
+    if (card.effectType === EFFECT_PLAYER_MOVE) {
+      return this.locationCards.filter((l) => here?.connections.includes(l.id));
+    }
+    return this.creatureCards.filter((c) => c.homeLocation === here);
   }
 
   //wiggles every enabled card under the pointer while a playable card is dragged
@@ -529,8 +538,8 @@ export class MainScene extends Phaser.Scene {
 
     // a dragged hand card lives on the ui camera, so board cards never receive pointerover for it
     const { x, y } = this.boardPoint();
-    if (card.effectType === EFFECT_PLAYER_MOVE) {
-      const target = this.legalMoveTargets().find((loc) => loc.getHitbox().contains(x, y));
+    if (this.hasTargetRestriction(card)) {
+      const target = this.legalTargets(card).find((t) => t.getHitbox().contains(x, y));
       this.releaseSuppressed();
       if (target) this.send('play_card', { cardId: card.id, targetId: target.id });
       return;

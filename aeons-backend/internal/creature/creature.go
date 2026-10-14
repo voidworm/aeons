@@ -52,7 +52,7 @@ func GenerateIdleConfig() *CreatureMovementConfig {
 func GenerateDefaultTurnStateConfig() *CreatureTurnStateConfig {
 	return &CreatureTurnStateConfig{
 		Enraged:   false,
-		Exhausted: false,
+		Distracted: false,
 	}
 }
 
@@ -67,12 +67,12 @@ type CreatureMovementConfig struct {
 
 type CreatureTurnStateConfig struct {
 	Enraged   bool //creatures enrage on damage, overwrites aloof for the turn
-	Exhausted bool //creatures exhaust on evade or attack, putting them to functional aloof for the turn
+	Distracted bool //creatures exhaust on evade or attack, putting them to functional aloof for the turn
 }
 
 func (u *Unit) Tick() {
 	u.Enraged = false
-	u.Exhausted = false
+	u.Distracted = false
 }
 
 func (u *Unit) TakeDamage(amount int) int {
@@ -87,7 +87,7 @@ func (ee *Unit) OutgoingDamage() int {
 
 func (u *Unit) IsEvadable() bool {
 
-	if u.Exhausted {
+	if u.Distracted {
 		return false
 	}
 
