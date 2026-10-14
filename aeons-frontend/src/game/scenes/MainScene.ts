@@ -5,11 +5,12 @@ import { Card } from '../objects/Card';
 import { connect } from '../../net/socket';
 import { CreatureCard } from '../objects/CreatureCard';
 import { HarvestableCard } from '../objects/HarvestableCard';
-import type { GameStateDTO } from '../objects/GameState';
+import type { CreatureEventDTO, GameStateDTO } from '../objects/GameState';
 import { PlayerCard } from '../objects/PlayerCard';
 import { HandContainer } from '../objects/HandContainer';
 import { PlayerSwitcher } from '../objects/PlayerSwitcher';
 import { LocationConnector } from '../objects/LocationConnector';
+import { ControlButton } from '../objects/ControlButton';
 
 export class MainScene extends Phaser.Scene {
   private static readonly CARD_WIDTH = 252; // rendered card width
@@ -21,6 +22,9 @@ export class MainScene extends Phaser.Scene {
 
   private handContainer!: HandContainer;
   private playerSwitcher!: PlayerSwitcher;
+  private creaturePhaseButton!: ControlButton;
+  private gameStarted = false;
+  private creaturePhaseRunning = false;
 
   private playableCards: PlayableCard[] = [];
   private locationCards: LocationCard[] = [];
@@ -52,13 +56,22 @@ export class MainScene extends Phaser.Scene {
 
     this.handContainer = new HandContainer(this);
     this.playerSwitcher = new PlayerSwitcher(this, () => this.switchActivePlayer());
+    this.creaturePhaseButton = new ControlButton(this, 'Trigger creature phase', () =>
+      this.triggerCreaturePhase(),
+    );
     this.uiCamera = this.cameras.add();
     this.initPanning();
 
     this.socket = connect((msg) => {
       switch (msg.type) {
-        case 'game_state':
+        case 'initial_game_state':
           this.handleGameStart(msg.payload);
+          break;
+        case 'updated_game_state':
+          this.handleGameStateUpdate(msg.payload);
+          break;
+        case 'creature_phase':
+          void this.playCreaturePhase(msg.payload.events);
           break;
         case 'poc_reply':
           this.send('poc_ack');
@@ -104,6 +117,7 @@ export class MainScene extends Phaser.Scene {
 
     this.handContainer.resize(gameSize.width, gameSize.height);
     this.playerSwitcher.resize(gameSize.width, gameSize.height);
+    this.creaturePhaseButton.resize(gameSize.width, gameSize.height);
   }
 
   factor(): integer {
@@ -208,6 +222,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   handleGameStart(inputGameState: GameStateDTO) {
+    this.gameStarted = true;
     this.initHands(inputGameState);
     this.initPlayers(inputGameState);
     this.initLocations(inputGameState);
@@ -222,6 +237,50 @@ export class MainScene extends Phaser.Scene {
   private hideUiFromMainCamera() {
     this.hideFrom(this.cameras.main, this.handContainer);
     this.hideFrom(this.cameras.main, this.playerSwitcher);
+    this.hideFrom(this.cameras.main, this.creaturePhaseButton);
+  }
+
+  //TODO: sync health etc. onto the existing cards, once the creature phase animation is done
+  private handleGameStateUpdate(_state: GameStateDTO) {}
+
+  private triggerCreaturePhase() {
+    if (!this.gameStarted || this.creaturePhaseRunning) return;
+    this.creaturePhaseRunning = true;
+    this.send('trigger_creature_phase');
+  }
+
+  //one creature after another, each waits for the previous one to arrive
+  private async playCreaturePhase(events: CreatureEventDTO[]) {
+    for (const event of events) {
+      await this.moveCreature(event);
+    }
+    this.creaturePhaseRunning = false;
+  }
+
+  private moveCreature(event: CreatureEventDTO): Promise<void> {
+    const card = this.creatureCards.find((c) => c.id === event.creatureId);
+    const from = this.locationCards.find((l) => l.id === event.fromLocationId);
+    const to = this.locationCards.find((l) => l.id === event.toLocationId);
+    if (!card || !from || !to || from === to) return Promise.resolve();
+
+    const start = { x: card.x, y: card.y };
+    from.removeContent(card);
+    to.addContent(card); // snaps the card to its new slot, so we can read the destination
+    const end = { x: card.x, y: card.y };
+    card.setPosition(start.x, start.y);
+    to.raiseContents();
+    this.children.bringToTop(card); // travels above everything
+
+    return new Promise((resolve) => {
+      this.tweens.add({
+        targets: card,
+        x: end.x,
+        y: end.y,
+        duration: 500,
+        ease: 'Sine.easeInOut',
+        onComplete: () => resolve(),
+      });
+    });
   }
 
   private hideFromUiCamera(card: Card) {

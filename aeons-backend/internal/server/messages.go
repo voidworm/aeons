@@ -8,11 +8,14 @@ const (
 	MsgSelectPlayer = "select_player"
 	MsgPlayCard = "play_card"
 	MsgChooseTarget = "choose_target"
+	MsgTriggerCreaturePhase = "trigger_creature_phase"
 
 	//server to client messages
-	MsgGameState = "game_state"
+	MsgInitialGameState = "initial_game_state"
+	MsgUpdatedGameState = "updated_game_state"
 	MsgHAnd = "hand"
 	MsgTargets = "targets"
+	MsgCreaturePhase = "creature_phase"
 	MsgError = "error"
 
 	//poc messages
@@ -51,4 +54,20 @@ type HandPayload struct {
 type TargetsPayload struct {
 	CardID    int   `json:"cardId"`
 	TargetIDs []int `json:"targetIds"`
+}
+
+type CreaturePhasePayload struct {
+	Events []CreatureEventDTO `json:"events"`
+}
+
+type CreatureEventDTO struct {
+	CreatureID     int                 `json:"creatureId"`
+	FromLocationID int                 `json:"fromLocationId"`
+	ToLocationID   int                 `json:"toLocationId"`
+	Attacks        []CreatureAttackDTO `json:"attacks"`
+}
+
+type CreatureAttackDTO struct {
+	TargetPlayerID int `json:"targetPlayerId"`
+	Damage         int `json:"damage"`
 }

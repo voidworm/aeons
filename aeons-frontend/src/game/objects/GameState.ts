@@ -64,3 +64,19 @@ export interface GameStateDTO {
   harvestNodes: HarvestNodeDTO[];
   cardsInHand: PlayableCardDTO[];
 }
+
+export interface CreatureAttackDTO {
+  targetPlayerId: number;
+  damage: number;
+}
+
+export interface CreatureEventDTO {
+  creatureId: number;
+  fromLocationId: number;
+  toLocationId: number;
+  attacks: CreatureAttackDTO[];
+}
+
+export interface CreaturePhaseDTO {
+  events: CreatureEventDTO[];
+}

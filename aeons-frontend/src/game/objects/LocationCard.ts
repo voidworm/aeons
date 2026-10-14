@@ -60,6 +60,17 @@ export class LocationCard extends Card {
     this.syncContents();
   }
 
+  removeContent(card: Card): void {
+    this.contents = this.contents.filter((c) => c !== card);
+    this.offsets.delete(card);
+    card.homeLocation = null;
+  }
+
+  // lays the row out again with the card included, which also snaps the card to its slot
+  addContent(card: Card): void {
+    this.setContents([...this.contents, card]);
+  }
+
   // keeps the contents on top of the location in the display list
   raiseContents(): void {
     for (const card of this.contents) this.scene.children.bringToTop(card);

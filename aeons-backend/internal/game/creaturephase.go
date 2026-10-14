@@ -11,13 +11,43 @@ import (
 	"math/rand/v2"
 )
 
-func (gs *GameState) ResolveCreaturePhase() {
+// CreatureAttack is the damage one creature dealt to one player.
+type CreatureAttack struct {
+	TargetPlayerID int
+	Damage         int
+}
+
+// CreatureEvent records what one creature did in the creature phase.
+// Creatures that neither moved nor attacked produce no event.
+type CreatureEvent struct {
+	CreatureID     int
+	FromLocationID int
+	ToLocationID   int
+	Attacks        []CreatureAttack
+}
+
+// ResolveCreaturePhase runs the creature phase and returns what happened, in order.
+func (gs *GameState) ResolveCreaturePhase() []CreatureEvent {
+	events := []CreatureEvent{}
 
 	for _, v := range gs.Creatures {
+		from := v.CurrentLocation.ID
 		gs.ResolveCreatureMovement(v)
-		gs.ResolveCreatureAttack(v)
+		attacks := gs.ResolveCreatureAttack(v)
 		gs.ReconcileDefeats()
+
+		to := v.CurrentLocation.ID
+		if from == to && len(attacks) == 0 {
+			continue
+		}
+		events = append(events, CreatureEvent{
+			CreatureID:     v.ID,
+			FromLocationID: from,
+			ToLocationID:   to,
+			Attacks:        attacks,
+		})
 	}
+	return events
 }
 
 func (gs *GameState) ResolveCreatureMovement(input *creature.Unit) {
@@ -99,28 +129,32 @@ func (gs *GameState) DetermineMovementForCuriousCreature(creature *creature.Unit
 	return lowestPlayers[selectedIndex].CurrentLocation
 }
 
-func (gs *GameState) ResolveCreatureAttack(creature *creature.Unit) {
+func (gs *GameState) ResolveCreatureAttack(creature *creature.Unit) []CreatureAttack {
 	if !creature.Aloof && !creature.Exhausted {
-		gs.ResolveAttackForCreature(creature)
+		return gs.ResolveAttackForCreature(creature)
 	} else if creature.Aloof {
 		log.Printf("[CREATURE PHASE] %s is aloof and doesn't attack.", creature.Name)
 	} else if creature.Exhausted {
 		log.Printf("[CREATURE PHASE] %s is exhausted and doesn't attack.", creature.Name)
 	}
+	return nil
 }
 
-func (gs *GameState) ResolveAttackForCreature(creature *creature.Unit) {
+func (gs *GameState) ResolveAttackForCreature(creature *creature.Unit) []CreatureAttack {
 	inRange := gs.PlayersAtLocation(creature)
 
 	if len(inRange) == 0 {
 		log.Printf("[CREATURE PHASE] %s has no targets for an attack.\n", creature.Name)
-		return
+		return nil
 	}
 
+	attacks := []CreatureAttack{}
 	for _, target := range inRange {
 		effect := combat.DamageEffect{Source: creature, Target: target}
 		creature.Exhausted = true
 		effect.Apply()
 		log.Printf("[CREATURE PHASE] %s attacks %s for %d damage.", creature.Name, target.Name, creature.Damage)
+		attacks = append(attacks, CreatureAttack{TargetPlayerID: target.ID, Damage: creature.Damage})
 	}
+	return attacks
 }

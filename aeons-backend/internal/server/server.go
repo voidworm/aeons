@@ -49,7 +49,14 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 			gs = &game.GameState{}
 			log.Print("Received new game request, initalising....")
 			gs.Init()
-			s.send(ctx, conn, MsgGameState, Snapshot(gs))
+			s.send(ctx, conn, MsgInitialGameState, Snapshot(gs))
+		case MsgTriggerCreaturePhase:
+			if gs == nil {
+				s.send(ctx, conn, MsgError, "no game running")
+				continue
+			}
+			s.send(ctx, conn, MsgCreaturePhase, creaturePhasePayload(gs.ResolveCreaturePhase()))
+			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
 		case MsgPocHello:
 			log.Print("Received a hello!")
 			s.send(ctx,conn, MsgPocReply, "...")
@@ -72,4 +79,19 @@ func (s *Server) send(ctx context.Context, conn *websocket.Conn, typ string, pay
 	if err := wsjson.Write(ctx, conn, Envelope{Type: typ, Payload: raw}); err != nil {
 		log.Printf("write %s: %v", typ, err)
 	}
+}
+
+func creaturePhasePayload(events []game.CreatureEvent) CreaturePhasePayload {
+	out := CreaturePhasePayload{Events: make([]CreatureEventDTO, 0, len(events))}
+	for _, e := range events {
+		attacks := make([]CreatureAttackDTO, 0, len(e.Attacks))
+		for _, a := range e.Attacks {
+			attacks = append(attacks, CreatureAttackDTO{TargetPlayerID: a.TargetPlayerID, Damage: a.Damage})
+		}
+		out.Events = append(out.Events, CreatureEventDTO{
+			CreatureID: e.CreatureID, FromLocationID: e.FromLocationID,
+			ToLocationID: e.ToLocationID, Attacks: attacks,
+		})
+	}
+	return out
 }
