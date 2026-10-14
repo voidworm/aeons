@@ -1,5 +1,7 @@
 package game
 
+const UpkeepEnergy = 4
+
 // UpkeepEvent records one creature recovering from exhaustion in the upkeep phase.
 type UpkeepEvent struct {
 	CreatureID int
@@ -26,6 +28,7 @@ func (gs *GameState) ResolveResourceRespawn() {
 func (gs *GameState) ResolvePlayerRefresh() {
 	for _, v := range gs.Players {
 		v.RemainingActions = 3
+		v.Energy = UpkeepEnergy
 	}
 }
 

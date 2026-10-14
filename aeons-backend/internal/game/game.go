@@ -251,5 +251,8 @@ func (gs *GameState) EvaluatePlayerHandPlayability(p *player.Unit) {
 			default:
 				v.CanBeCast = true
 		}
+		if p.Energy < v.Cost {
+			v.CanBeCast = false
+		}
 	}
 }	

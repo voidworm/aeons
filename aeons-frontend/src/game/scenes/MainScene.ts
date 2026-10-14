@@ -6,7 +6,7 @@ import { connect } from '../../net/socket';
 import { CreatureCard } from '../objects/CreatureCard';
 import { HarvestableCard } from '../objects/HarvestableCard';
 import { EFFECT_PLAYER_ATTACK, EFFECT_PLAYER_DISTRACT, EFFECT_PLAYER_MOVE } from '../objects/GameState';
-import type { CreatureEventDTO, GameStateDTO, UpkeepEventDTO } from '../objects/GameState';
+import type { CreatureEventDTO, GameStateDTO, PlayerDTO, UpkeepEventDTO } from '../objects/GameState';
 import { PlayerCard } from '../objects/PlayerCard';
 import { HandContainer } from '../objects/HandContainer';
 import { PlayerSwitcher } from '../objects/PlayerSwitcher';
@@ -32,6 +32,7 @@ export class MainScene extends Phaser.Scene {
   private harvestableCards: HarvestableCard[] = [];
   private creatureCards: CreatureCard[] = [];
   private players: PlayerCard[] = [];
+  private playerStates: PlayerDTO[] = []; // latest server state, feeds the stats panel
 
   private inDragging: boolean = false;
   private uiCamera!: Phaser.Cameras.Scene2D.Camera; // fixed camera for the hand and player switcher; the main camera pans over the board
@@ -228,6 +229,7 @@ export class MainScene extends Phaser.Scene {
 
   handleGameStart(inputGameState: GameStateDTO) {
     this.gameStarted = true;
+    this.playerStates = inputGameState.players;
     this.initHands(inputGameState);
     this.initPlayers(inputGameState);
     this.initLocations(inputGameState);
@@ -255,6 +257,8 @@ export class MainScene extends Phaser.Scene {
   }
 
   private syncState(state: GameStateDTO) {
+    this.playerStates = state.players;
+    this.refreshStatsPanel();
     for (const dto of state.cardsInHand) {
       this.playableCards.find((c) => c.id === dto.id)?.setDisabled(!dto.canBeCast);
     }
@@ -461,6 +465,21 @@ export class MainScene extends Phaser.Scene {
     }
     this.handContainer.setPlayerActive(ident);
     this.playerSwitcher.showActive(ident);
+    this.refreshStatsPanel();
+  }
+
+  private refreshStatsPanel() {
+    const active = this.players.find((p) => p.activePlayer);
+    const state = this.playerStates.find((p) => p.id === active?.id);
+    if (!state) return;
+    const location = this.locationCards.find((l) => l.id === state.locationId);
+    this.playerSwitcher.setStats({
+      energy: state.energy,
+      health: state.health,
+      maxHealth: state.maxHealth,
+      resources: state.resources,
+      location: location?.name ?? '',
+    });
   }
 
   //once we want to highlight cards that are legal targets of a drag this needs to change

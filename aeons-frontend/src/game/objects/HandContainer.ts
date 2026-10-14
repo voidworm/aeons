@@ -18,6 +18,7 @@ export class HandContainer extends Phaser.GameObjects.Container {
   private static readonly CARD_Y = 160;
   private static readonly STEP = Card.WIDTH / 1.5;
   private static readonly OFFSCREEN_Y = HandContainer.HEIGHT + Card.HEIGHT; //movement goal for outside the screen
+  private static readonly EXPECTED_HAND_SIZE = 7; // hands rarely get bigger than this for now
   private static readonly MIN_SCALE = 0.3;
   private static readonly FLY_DURATION = 350;
   private static readonly ENTER_DELAY = 200; // lets the previous hand leave first
@@ -39,6 +40,12 @@ export class HandContainer extends Phaser.GameObjects.Container {
     this.setDepth(HandContainer.DEPTH);
     this.resize(scene.scale.width, scene.scale.height);
     scene.add.existing(this);
+  }
+
+  //distance from the screen centre to the outer edge of the outermost card of an expected-size hand
+  static expectedHalfWidth(): number {
+    const span = (HandContainer.EXPECTED_HAND_SIZE - 1) * HandContainer.STEP;
+    return span / 2 + Card.WIDTH / 2;
   }
 
   resize(width: number, height: number): void {

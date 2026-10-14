@@ -68,8 +68,9 @@ func (gs *GameState) InitPlayers() {
 		ID:                 gs.NextID(),
 		Name:               "Druid",
 		CardsInHand:        []*card.PlayableCard{},
-		ResourcesAvailable: 5,
+		ResourcesAvailable: 0,
 		RemainingActions:   3,
+		Energy:             UpkeepEnergy,
 		Damage:             1,
 	}
 
@@ -80,8 +81,9 @@ func (gs *GameState) InitPlayers() {
 		ID:                 gs.NextID(),
 		Name:               "Scoundrel",
 		CardsInHand:        []*card.PlayableCard{},
-		ResourcesAvailable: 5,
+		ResourcesAvailable: 0,
 		RemainingActions:   3,
+		Energy:             UpkeepEnergy,
 		Damage:             1,
 	}
 	gs.Players = append(gs.Players, Druid, Scoundrel)
@@ -115,7 +117,7 @@ func (gs *GameState) GenerateBasicMoveCard() *card.PlayableCard {
 		Candidates: []card.Targetable{},
 		Effect: nil,
 		Range: 1,
-		Cost: 0,
+		Cost: 1,
 	}
 
 	BasicMoveTargetLocationSpec := &card.TargetSpec {
@@ -138,7 +140,7 @@ func (gs *GameState) GenerateBasicAttackCard() *card.PlayableCard {
 		Candidates: []card.Targetable{},
 		Effect: nil,
 		Range: 1,
-		Cost: 0,
+		Cost: 1,
 	}
 
 	BasicAttackTargetCreatureSpec := &card.TargetSpec {
@@ -161,7 +163,7 @@ func (gs *GameState) GenerateBasicDistractCard() *card.PlayableCard {
 		Candidates: []card.Targetable{},
 		Effect: nil,
 		Range: 1,
-		Cost: 0,
+		Cost: 1,
 	}
 
 	BasicDistractTargetCreatureSpec := &card.TargetSpec {
@@ -184,7 +186,7 @@ func (gs *GameState) GenerateBasicHarvestCard() *card.PlayableCard {
 		Candidates: []card.Targetable{},
 		Effect: nil,
 		Range: 1,
-		Cost: 0,
+		Cost: 1,
 	}
 
 	BasicHarvestTargetHarvestable := &card.TargetSpec {

@@ -22,6 +22,9 @@ func (gs *GameState) PlayCard(cardID, targetID int) error {
 	if !c.CanBeCast {
 		return fmt.Errorf("%s cannot be cast right now", c.Name)
 	}
+	if owner.Energy < c.Cost {
+		return fmt.Errorf("%s costs %d energy, %s has %d", c.Name, c.Cost, owner.Name, owner.Energy)
+	}
 
 	switch c.Type {
 	case card.PlayerMove:
@@ -46,6 +49,7 @@ func (gs *GameState) PlayCard(cardID, targetID int) error {
 		return fmt.Errorf("%s cannot be played yet", c.Name)
 	}
 
+	owner.Energy -= c.Cost
 	gs.fillEffectForCard(c, owner)
 	c.Play()
 	gs.ReconcileDefeats()

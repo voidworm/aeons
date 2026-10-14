@@ -14,6 +14,7 @@ type Unit struct {
 	CardsInHand        []*card.PlayableCard
 	ResourcesAvailable int
 	RemainingActions   int
+	Energy             int
 	Damage             int
 }
 

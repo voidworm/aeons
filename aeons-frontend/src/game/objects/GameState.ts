@@ -19,6 +19,7 @@ export interface PlayerDTO {
   actions: number;
   hand: number[];
   resources: number;
+  energy: number;
   damage: number;
 }
 

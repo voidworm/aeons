@@ -31,6 +31,7 @@ type PlayerDTO struct {
 	Actions    int    `json:"actions"`
 	Hand       []int  `json:"hand"`
 	Resources  int    `json:"resources"`
+	Energy     int    `json:"energy"`
 	Damage     int    `json:"damage"`
 }
 
@@ -120,7 +121,7 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 		out.Players = append(out.Players, PlayerDTO{
 			ID: p.ID, Name: p.Name, LocationID: p.CurrentLocation.ID,
 			Health: p.CurrentHealth, MaxHealth: p.MaxHealth,
-			Actions: p.RemainingActions, Hand: hand, Resources: p.ResourcesAvailable,
+			Actions: p.RemainingActions, Hand: hand, Resources: p.ResourcesAvailable, Energy: p.Energy,
 			Damage: p.Damage,
 		})
 	}
