@@ -98,7 +98,7 @@ export class MainScene extends Phaser.Scene {
       if (card.floating) continue;
       card.setPosition(card.x * ratioX, card.y * ratioY);
     }
-    for (const location of this.locationCards) location.layoutContents();
+    for (const location of this.locationCards) location.syncContents();
     this.updateBoardBounds();
     this.clampScroll();
 
@@ -330,7 +330,6 @@ export class MainScene extends Phaser.Scene {
         ...cardsOf(this.creatureCards, inputGameState.creatures),
         ...cardsOf(this.harvestableCards, inputGameState.harvestNodes),
       ]);
-      location.layoutContents();
       location.raiseContents();
     }
   }
@@ -365,11 +364,11 @@ export class MainScene extends Phaser.Scene {
   //wiggles every enabled card under the pointer while a playable card is dragged
   onCardDragged(card: Card) {
     if (card.homeLocation) {
-      card.homeLocation.reorderAround(card);
+      card.homeLocation.constrainDrag(card);
       return;
     }
     if (card instanceof LocationCard) {
-      card.layoutContents();
+      card.syncContents();
       return;
     }
     if (!(card instanceof PlayableCard)) return;
@@ -386,7 +385,6 @@ export class MainScene extends Phaser.Scene {
   onCardDrop(card: Card) {
     this.inDragging = false;
     this.dropTargets().forEach((t) => t.setDropTarget(false));
-    card.homeLocation?.layoutContents(undefined, true);
     if (!(card instanceof PlayableCard)) return;
     this.handContainer.returnCard(card);
 

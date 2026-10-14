@@ -10,10 +10,10 @@ export class LocationCard extends Card {
   static readonly OVERLAP = 30;
 
   private static readonly SLOT_GAP = 12;
-  private static readonly ROW_SPILL = 150; // how far the row may exceed the location's width before cards start to overlap
+  private static readonly ROW_SPILL = 150; // how far the initial row may exceed the location's width before cards start to overlap
 
   private contents: Card[] = [];
-  private slotTweens = new Map<Card, { tween: Phaser.Tweens.Tween; x: number; y: number }>();
+  private offsets = new Map<Card, Phaser.Math.Vector2>(); // card centre relative to the location centre, unscaled
 
   constructor(
     scene: MainScene,
@@ -44,9 +44,20 @@ export class LocationCard extends Card {
     return new LocationCard(scene, x, y, dto.id, dto.name, dto.flavor);
   }
 
+  // lays the cards out in a row straddling the lower border; from then on they are free to move
   setContents(cards: Card[]): void {
     this.contents = [...cards];
-    for (const card of this.contents) card.homeLocation = this;
+    this.offsets.clear();
+
+    const step = this.slotStep();
+    const n = this.contents.length;
+    this.contents.forEach((card, i) => {
+      card.homeLocation = this;
+      const x = (i - (n - 1) / 2) * step;
+      const y = LocationCard.LOC_HEIGHT / 2 - LocationCard.OVERLAP + card.cardHeight / 2;
+      this.offsets.set(card, new Phaser.Math.Vector2(x, y));
+    });
+    this.syncContents();
   }
 
   // keeps the contents on top of the location in the display list
@@ -55,37 +66,22 @@ export class LocationCard extends Card {
     this.scene.children.queueDepthSort();
   }
 
-  // places the contents in a row straddling the lower border; `skip` is the card currently held by the pointer
-  layoutContents(skip?: Card, animate = false): void {
-    const step = this.slotStep();
-    const n = this.contents.length;
-    this.contents.forEach((card, i) => {
-      if (card === skip) return;
-      const offset = (i - (n - 1) / 2) * step;
-      this.moveToSlot(card, this.x + offset * this.scaleX, this.slotY(card), animate);
-    });
+  // moves the contents along with the location
+  syncContents(): void {
+    for (const [card, offset] of this.offsets) {
+      card.setPosition(this.x + offset.x * this.scaleX, this.y + offset.y * this.scaleX);
+    }
   }
 
-  // while a contained card is dragged: lock it to the row and re-sort the others around it
-  reorderAround(card: Card): void {
-    const halfSpan = (this.rowSpan() / 2) * this.scaleX;
-    card.x = Phaser.Math.Clamp(card.x, this.x - halfSpan, this.x + halfSpan);
-    card.y = this.slotY(card);
-    this.contents.sort((a, b) => a.x - b.x);
-    this.layoutContents(card, true);
-  }
-
-  private slotY(card: Card): number {
-    return (
-      this.y +
-      (LocationCard.LOC_HEIGHT / 2 - LocationCard.OVERLAP + card.cardHeight / 2) * this.scaleX
-    );
-  }
-
-  private rowSpan(): number {
-    const cardWidth = this.contents[0]?.cardWidth ?? Card.WIDTH;
-    const step = this.slotStep();
-    return cardWidth + (this.contents.length - 1) * step;
+  // while a contained card is dragged: it may go anywhere as long as it still touches the location
+  constrainDrag(card: Card): void {
+    const s = this.scaleX;
+    const reachX = ((LocationCard.LOC_WIDTH + card.cardWidth) / 2) * s;
+    const reachY = ((LocationCard.LOC_HEIGHT + card.cardHeight) / 2) * s;
+    const dx = Phaser.Math.Clamp(card.x - this.x, -reachX, reachX);
+    const dy = Phaser.Math.Clamp(card.y - this.y, -reachY, reachY);
+    card.setPosition(this.x + dx, this.y + dy);
+    this.offsets.get(card)?.set(dx / s, dy / s);
   }
 
   private slotStep(): number {
@@ -94,26 +90,5 @@ export class LocationCard extends Card {
     const cardWidth = this.contents[0].cardWidth;
     const maxSpan = LocationCard.LOC_WIDTH + LocationCard.ROW_SPILL;
     return Math.min(cardWidth + LocationCard.SLOT_GAP, (maxSpan - cardWidth) / (n - 1));
-  }
-
-  private moveToSlot(card: Card, x: number, y: number, animate: boolean): void {
-    const running = this.slotTweens.get(card);
-    if (running && running.x === x && running.y === y) return;
-    running?.tween.stop();
-    this.slotTweens.delete(card);
-
-    if (!animate) {
-      card.setPosition(x, y);
-      return;
-    }
-    const tween = this.scene.tweens.add({
-      targets: card,
-      x,
-      y,
-      duration: 150,
-      ease: 'Sine.easeOut',
-      onComplete: () => this.slotTweens.delete(card),
-    });
-    this.slotTweens.set(card, { tween, x, y });
   }
 }
