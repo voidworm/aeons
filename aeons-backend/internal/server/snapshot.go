@@ -7,19 +7,19 @@ import (
 )
 
 type GameStateDTO struct {
-	TurnCounter int `json:"turnCounter"`
-	Locations []LocationDTO `json:"locations"`
-	Players []PlayerDTO `json:"players"`
-	Creatures []CreatureDTO `json:"creatures"`
-	HarvestNodes []HarvestableDTO `json:"harvestNodes"`
-	CardsInHand []PlayableCardDTO `json:"cardsInHand"`
+	TurnCounter  int               `json:"turnCounter"`
+	Locations    []LocationDTO     `json:"locations"`
+	Players      []PlayerDTO       `json:"players"`
+	Creatures    []CreatureDTO     `json:"creatures"`
+	HarvestNodes []HarvestableDTO  `json:"harvestNodes"`
+	CardsInHand  []PlayableCardDTO `json:"cardsInHand"`
 }
 
 type LocationDTO struct {
-	ID	int `json:"id"`
-	Name string `json:"name"`
-	Connections []int `json:"connections"`
-	Flavor string `json:"flavor"`
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Connections []int  `json:"connections"`
+	Flavor      string `json:"flavor"`
 }
 
 type PlayerDTO struct {
@@ -41,13 +41,13 @@ type CreatureDTO struct {
 	Health     int    `json:"health"`
 	MaxHealth  int    `json:"maxHealth"`
 	Damage     int    `json:"damage"`
-	Flavor		string `json:"flavor"`
+	Flavor     string `json:"flavor"`
 }
 
 type PlayableCardDTO struct {
 	ID           int    `json:"id"`
 	Name         string `json:"name"`
-	Cost int `json:"cost"`
+	Cost         int    `json:"cost"`
 	EffectText   string `json:"effectText"`
 	EffectType   int    `json:"effectType"`
 	CanBeCast    bool   `json:"canBeCast"`
@@ -57,12 +57,12 @@ type PlayableCardDTO struct {
 }
 
 type HarvestableDTO struct {
-	ID         int          `json:"id"`
-	Name       string       `json:"name"`
-	LocationID int          `json:"locationId"`
-	Healing    YieldDTO     `json:"healing"`
-	Resources  YieldDTO     `json:"resources"`
-	Flavor	string	`json:"flavor"`
+	ID         int      `json:"id"`
+	Name       string   `json:"name"`
+	LocationID int      `json:"locationId"`
+	Healing    YieldDTO `json:"healing"`
+	Resources  YieldDTO `json:"resources"`
+	Flavor     string   `json:"flavor"`
 }
 
 type YieldDTO struct {
@@ -86,7 +86,7 @@ func yieldDTO(yc *harvesting.YieldConfig) YieldDTO {
 func playableCardDTO(c *card.PlayableCard) PlayableCardDTO {
 	out := PlayableCardDTO{
 		ID: c.ID, Name: c.Name, EffectText: c.EffectText,
-		Cost: c.Cost,
+		Cost:       c.Cost,
 		EffectType: int(c.Type), CanBeCast: c.CanBeCast, Range: c.Range,
 		CandidateIDs: make([]int, 0, len(c.Candidates)),
 	}

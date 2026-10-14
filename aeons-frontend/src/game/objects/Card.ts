@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
+import type { LocationCard } from './LocationCard';
 
 export type ShadowMode = 'hovers' | 'flat';
 
@@ -13,7 +14,12 @@ export interface CardConfig {
   showTextBox?: boolean; // default true; the text box fills the space below the art
   italicText?: boolean; // default false
   titleBelowArt?: boolean; // default false; centred, bold, 20% larger, beneath the art instead of above it
+  centerTitle?: boolean; // default false; centres the title horizontally at the top
+  centerText?: boolean; // default false; centres the text box text horizontally and vertically
   footerHeight?: number; // default 0; shrinks the text box to make room for a footer line beneath it
+  width?: number; // default Card.WIDTH
+  height?: number; // default Card.HEIGHT
+  textBoxRect?: { x: number; y: number; w: number; h: number }; // overrides the default text box placement, top-left card coordinates
 }
 
 interface ShadowPose {
@@ -50,9 +56,12 @@ export class Card extends Phaser.GameObjects.Container {
   protected static readonly TEXT_PAD = 6.4;
 
   public readonly id: number;
+  public readonly cardWidth: number;
+  public readonly cardHeight: number;
   public floating = false; // currently lifted by a drag
   public flavor: string;
   public isHovering = false;
+  public homeLocation: LocationCard | null = null; // set on cards that live at a location
   private isDropTarget = false;
 
   protected readonly config: CardConfig;
@@ -71,6 +80,8 @@ export class Card extends Phaser.GameObjects.Container {
   constructor(scene: MainScene, x: number, y: number, config: CardConfig) {
     super(scene, x, y);
     this.config = config;
+    this.cardWidth = config.width ?? Card.WIDTH;
+    this.cardHeight = config.height ?? Card.HEIGHT;
     this.id = config.id;
     this.name = config.name;
     this.flavor = config.flavor;
@@ -81,16 +92,20 @@ export class Card extends Phaser.GameObjects.Container {
       scene,
       rest.x,
       rest.y,
-      Card.WIDTH,
-      Card.HEIGHT,
+      this.cardWidth,
+      this.cardHeight,
       0x000000,
     ).setAlpha(rest.alpha);
 
-    this.surface = new Phaser.GameObjects.Container(scene, -Card.WIDTH / 2, -Card.HEIGHT / 2);
+    this.surface = new Phaser.GameObjects.Container(
+      scene,
+      -this.cardWidth / 2,
+      -this.cardHeight / 2,
+    );
     this.cardFrame = new Phaser.GameObjects.Container(scene, 0, 0, [this.surface]);
     this.buildSurface();
 
-    this.hitbox = new Phaser.GameObjects.Zone(scene, 0, 0, Card.WIDTH, Card.HEIGHT);
+    this.hitbox = new Phaser.GameObjects.Zone(scene, 0, 0, this.cardWidth, this.cardHeight);
     this.hitbox.setInteractive({ draggable: true });
     this.bindInput();
 
@@ -99,7 +114,9 @@ export class Card extends Phaser.GameObjects.Container {
   }
 
   private buildSurface(): void {
-    const { BORDER, INSET, INNER_WIDTH, TITLE_Y, ART_Y, GAP, BOTTOM, TEXT_PAD } = Card;
+    const { BORDER, INSET, TITLE_Y, ART_Y, GAP, TEXT_PAD } = Card;
+    const INNER_WIDTH = this.cardWidth - 2 * INSET;
+    const BOTTOM = this.cardHeight - INSET;
     const {
       faceColor,
       artHeight,
@@ -107,11 +124,20 @@ export class Card extends Phaser.GameObjects.Container {
       italicText = false,
       footerHeight = 0,
       titleBelowArt = false,
+      centerTitle = false,
+      centerText = false,
+      textBoxRect,
     } = this.config;
 
     this.surface.add([
-      this.rect(0, 0, Card.WIDTH, Card.HEIGHT, 0x000000),
-      this.rect(BORDER, BORDER, Card.WIDTH - 2 * BORDER, Card.HEIGHT - 2 * BORDER, faceColor),
+      this.rect(0, 0, this.cardWidth, this.cardHeight, 0x000000),
+      this.rect(
+        BORDER,
+        BORDER,
+        this.cardWidth - 2 * BORDER,
+        this.cardHeight - 2 * BORDER,
+        faceColor,
+      ),
       this.rect(INSET, ART_Y, INNER_WIDTH, artHeight, 0x2ecc71),
       titleBelowArt
         ? this.label(INSET + INNER_WIDTH / 2, (ART_Y + artHeight + BOTTOM) / 2, this.name, {
@@ -119,28 +145,40 @@ export class Card extends Phaser.GameObjects.Container {
             fontStyle: 'bold',
             color: '#ffffff',
           }).setOrigin(0.5)
-        : this.label(INSET, TITLE_Y, this.name, {
+        : this.label(centerTitle ? this.cardWidth / 2 : INSET, TITLE_Y, this.name, {
             fontSize: '14.4px',
             fontStyle: 'bold',
             color: '#ffffff',
-          }),
+          }).setOrigin(centerTitle ? 0.5 : 0, 0),
     ]);
 
     if (showTextBox) {
       const top = ART_Y + artHeight + GAP;
-      const boxHeight = BOTTOM - footerHeight - top;
+      const box = textBoxRect ?? {
+        x: INSET,
+        y: top,
+        w: INNER_WIDTH,
+        h: BOTTOM - footerHeight - top,
+      };
       this.surface.add([
-        this.rect(INSET, top, INNER_WIDTH, boxHeight, 0xd8c9a3),
-        this.label(INSET + INNER_WIDTH / 2, top + boxHeight - TEXT_PAD, this.flavor, {
-          fontSize: '11.2px',
-          fontStyle: italicText ? 'italic' : 'normal',
-          align: 'center',
-          wordWrap: { width: INNER_WIDTH - 2 * TEXT_PAD },
-        }).setOrigin(0.5, 1),
+        this.rect(box.x, box.y, box.w, box.h, 0xd8c9a3),
+        this.label(
+          box.x + box.w / 2,
+          box.y + (centerText ? box.h / 2 : box.h - TEXT_PAD),
+          this.flavor,
+          {
+            fontSize: '11.2px',
+            fontStyle: italicText ? 'italic' : 'normal',
+            align: 'center',
+            wordWrap: { width: box.w - 2 * TEXT_PAD },
+          },
+        ).setOrigin(0.5, centerText ? 0.5 : 1),
       ]);
     }
 
-    this.disabledLayer = this.rect(0, 0, Card.WIDTH, Card.HEIGHT, 0x111111, 0.5).setVisible(false);
+    this.disabledLayer = this.rect(0, 0, this.cardWidth, this.cardHeight, 0x111111, 0.5).setVisible(
+      false,
+    );
     this.surface.add(this.disabledLayer);
   }
 
@@ -159,9 +197,10 @@ export class Card extends Phaser.GameObjects.Container {
 
   // footer line between the text box and the card edge; align 'right' sits flush with the art's right edge
   protected footer(content: string, align: 'center' | 'right'): Phaser.GameObjects.Text {
-    const { BORDER, INSET, BOTTOM, INNER_WIDTH } = Card;
-    const top = BOTTOM - (this.config.footerHeight ?? 0);
-    const y = (top + Card.HEIGHT - BORDER) / 2;
+    const { BORDER, INSET } = Card;
+    const INNER_WIDTH = this.cardWidth - 2 * INSET;
+    const top = this.cardHeight - INSET - (this.config.footerHeight ?? 0);
+    const y = (top + this.cardHeight - BORDER) / 2;
     const x = align === 'center' ? INSET + INNER_WIDTH / 2 : INSET + INNER_WIDTH;
     return this.label(x, y, content, { fontSize: '12.8px', color: '#ffffff' }).setOrigin(
       align === 'center' ? 0.5 : 1,
@@ -184,17 +223,24 @@ export class Card extends Phaser.GameObjects.Container {
 
   onDragStart(pointer: Phaser.Input.Pointer) {
     if (this.isDisabled) return;
-    this.dragLast.set(pointer.worldX, pointer.worldY);
+    this.dragLast.set(pointer.x, pointer.y); // screen space: unaffected by which camera the pointer is currently over
     this.setFloating(true);
     this.emit('cardDragStart', this);
   }
 
   onDrag(pointer: Phaser.Input.Pointer) {
     if (this.isDisabled) return;
-    this.x += pointer.worldX - this.dragLast.x;
-    this.y += pointer.worldY - this.dragLast.y;
-    this.dragLast.set(pointer.worldX, pointer.worldY);
+    const zoom = this.dragZoom();
+    this.x += (pointer.x - this.dragLast.x) / zoom;
+    this.y += (pointer.y - this.dragLast.y) / zoom;
+    this.dragLast.set(pointer.x, pointer.y);
     this.emit('cardDragged', this);
+  }
+
+  // screen pixels per world pixel: board cards are seen through the zoomed main camera, hand cards through the ui camera
+  private dragZoom(): number {
+    const main = this.scene.cameras.main;
+    return this.cameraFilter & main.id ? 1 : main.zoom;
   }
 
   onDragend() {

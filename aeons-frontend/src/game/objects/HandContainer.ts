@@ -21,6 +21,8 @@ export class HandContainer extends Phaser.GameObjects.Container {
   private static readonly MIN_SCALE = 0.3;
   private static readonly FLY_DURATION = 350;
   private static readonly ENTER_DELAY = 200; // lets the previous hand leave first
+  private static readonly DEPTH = 900; // above the board, below the player switcher
+  private static readonly DRAG_DEPTH = 950; // a card pulled out of the hand stays above the hand area
 
   private background: Phaser.GameObjects.Arc; // one big circle, only its top cap is on screen
   private hands = new Map<number, Hand>();
@@ -31,9 +33,10 @@ export class HandContainer extends Phaser.GameObjects.Container {
   constructor(scene: MainScene) {
     super(scene, 0, 0);
 
-    this.background = new Phaser.GameObjects.Arc(scene, 0, 0, 0, 0, 360, false, 0x000000, 0.1);
+    this.background = new Phaser.GameObjects.Arc(scene, 0, 0, 0, 0, 360, false, 0x04140a, 0.9);
     this.add(this.background);
 
+    this.setDepth(HandContainer.DEPTH);
     this.resize(scene.scale.width, scene.scale.height);
     scene.add.existing(this);
   }
@@ -71,6 +74,7 @@ export class HandContainer extends Phaser.GameObjects.Container {
     const { tx, ty } = card.getWorldTransformMatrix();
     hand.layer.remove(card);
     this.scene.add.existing(card);
+    card.setDepth(HandContainer.DRAG_DEPTH);
     card.setPosition(tx, ty);
   }
 
@@ -80,9 +84,10 @@ export class HandContainer extends Phaser.GameObjects.Container {
     if (!hand || card.parentContainer === hand.layer) return;
 
     const pointer = this.scene.input.activePointer;
-    const inHandArea = this.containsPoint(pointer.worldX, pointer.worldY);
+    const inHandArea = this.containsPoint(pointer.x, pointer.y);
     const local = hand.layer.getWorldTransformMatrix().applyInverse(card.x, card.y);
     hand.layer.add(card);
+    card.setDepth(0);
     card.setPosition(local.x, local.y);
     hand.cards.forEach((c) => hand.layer.bringToTop(c)); // keeps the original stacking order
 
@@ -100,7 +105,7 @@ export class HandContainer extends Phaser.GameObjects.Container {
   }
 
   //hand area = the visible cap of the background circle
-  private containsPoint(x: number, y: number): boolean {
+  containsPoint(x: number, y: number): boolean {
     const { tx: cx, ty: cy } = this.background.getWorldTransformMatrix();
     return Phaser.Math.Distance.Between(x, y, cx, cy) <= this.background.radius;
   }

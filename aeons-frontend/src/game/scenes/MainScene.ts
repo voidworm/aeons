@@ -9,6 +9,7 @@ import type { GameStateDTO } from '../objects/GameState';
 import { PlayerCard } from '../objects/PlayerCard';
 import { HandContainer } from '../objects/HandContainer';
 import { PlayerSwitcher } from '../objects/PlayerSwitcher';
+import { LocationConnector } from '../objects/LocationConnector';
 
 export class MainScene extends Phaser.Scene {
   private static readonly CARD_WIDTH = 252; // rendered card width
@@ -28,6 +29,14 @@ export class MainScene extends Phaser.Scene {
   private players: PlayerCard[] = [];
 
   private inDragging: boolean = false;
+  private uiCamera!: Phaser.Cameras.Scene2D.Camera; // fixed camera for the hand and player switcher; the main camera pans over the board
+  private boardBounds: Phaser.Geom.Rectangle | null = null;
+  private static readonly ZOOM_MIN = 0.4;
+  private static readonly ZOOM_MAX = 1.5;
+  private static readonly ZOOM_SPEED = 0.001; // per wheel delta unit
+
+  private connector: LocationConnector | null = null;
+  private panLast: Phaser.Math.Vector2 | null = null;
 
   private socket!: WebSocket;
 
@@ -43,6 +52,8 @@ export class MainScene extends Phaser.Scene {
 
     this.handContainer = new HandContainer(this);
     this.playerSwitcher = new PlayerSwitcher(this, () => this.switchActivePlayer());
+    this.uiCamera = this.cameras.add();
+    this.initPanning();
 
     this.socket = connect((msg) => {
       switch (msg.type) {
@@ -87,6 +98,9 @@ export class MainScene extends Phaser.Scene {
       if (card.floating) continue;
       card.setPosition(card.x * ratioX, card.y * ratioY);
     }
+    for (const location of this.locationCards) location.layoutContents();
+    this.updateBoardBounds();
+    this.clampScroll();
 
     this.handContainer.resize(gameSize.width, gameSize.height);
     this.playerSwitcher.resize(gameSize.width, gameSize.height);
@@ -96,7 +110,9 @@ export class MainScene extends Phaser.Scene {
     return Math.min(1, this.scale.width / 1920, this.scale.height / 1080);
   }
 
-  update(_timer: number, _delta: number) {}
+  update(_timer: number, _delta: number) {
+    this.connector?.redraw();
+  }
 
   handleCardDragStart(_card: Card) {}
 
@@ -119,7 +135,11 @@ export class MainScene extends Phaser.Scene {
 
       const c = PlayerCard.fromDto(this, x, y, player);
       c.setScale(this.factor());
+      c.on('cardDragEnd', this.onCardDrop, this);
       c.on('cardPointerOver', this.onCardPointerOver, this);
+      c.on('cardDragStart', this.onCardDrag, this);
+      c.on('cardDragged', this.onCardDragged, this);
+      this.hideFromUiCamera(c);
 
       this.players.push(c);
     }
@@ -143,8 +163,11 @@ export class MainScene extends Phaser.Scene {
       c.on('cardDragStart', this.onCardDrag, this);
       c.on('cardDragged', this.onCardDragged, this);
       c.setScale(this.factor());
+      this.hideFromUiCamera(c);
       this.locationCards.push(c);
     }
+    this.connector = new LocationConnector(this, inputGameState.locations, this.locationCards);
+    this.hideFrom(this.uiCamera, this.connector);
   }
 
   initHarvestNodes(inputGameState: GameStateDTO) {
@@ -154,6 +177,7 @@ export class MainScene extends Phaser.Scene {
 
       const c = HarvestableCard.fromDto(this, x, y, harvestable);
       c.setScale(this.factor());
+      this.hideFromUiCamera(c);
       this.harvestableCards.push(c);
       c.on('cardDragEnd', this.onCardDrop, this);
       c.on('cardPointerOver', this.onCardPointerOver, this);
@@ -169,6 +193,7 @@ export class MainScene extends Phaser.Scene {
 
       const c = CreatureCard.fromDto(this, x, y, creature);
       c.setScale(this.factor());
+      this.hideFromUiCamera(c);
       this.creatureCards.push(c);
       c.on('cardDragEnd', this.onCardDrop, this);
       c.on('cardPointerOver', this.onCardPointerOver, this);
@@ -188,7 +213,126 @@ export class MainScene extends Phaser.Scene {
     this.initLocations(inputGameState);
     this.initCreatures(inputGameState);
     this.initHarvestNodes(inputGameState);
+    this.assignToLocations(inputGameState);
     this.initFirstActivePlayer();
+    this.hideUiFromMainCamera();
+  }
+
+  //camera filters are per object, so everything the hand/switcher own has to be flagged once it exists
+  private hideUiFromMainCamera() {
+    this.hideFrom(this.cameras.main, this.handContainer);
+    this.hideFrom(this.cameras.main, this.playerSwitcher);
+  }
+
+  private hideFromUiCamera(card: Card) {
+    this.hideFrom(this.uiCamera, card);
+  }
+
+  private hideFrom(camera: Phaser.Cameras.Scene2D.Camera, object: Phaser.GameObjects.GameObject) {
+    object.cameraFilter |= camera.id;
+    if (object instanceof Phaser.GameObjects.Container) {
+      for (const child of object.list) this.hideFrom(camera, child);
+    }
+  }
+
+  //dragging empty space pans the board; the hand area and anything interactive don't start a pan
+  private initPanning() {
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer, over: unknown[]) => {
+      if (over.length > 0 || this.handContainer.containsPoint(pointer.x, pointer.y)) return;
+      this.updateBoardBounds();
+      this.panLast = new Phaser.Math.Vector2(pointer.x, pointer.y);
+    });
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (!this.panLast) return;
+      const cam = this.cameras.main;
+      cam.scrollX -= (pointer.x - this.panLast.x) / cam.zoom;
+      cam.scrollY -= (pointer.y - this.panLast.y) / cam.zoom;
+      this.panLast.set(pointer.x, pointer.y);
+      this.clampScroll();
+    });
+    this.input.on(
+      'wheel',
+      (pointer: Phaser.Input.Pointer, _over: unknown[], _dx: number, deltaY: number) =>
+        this.zoomAt(pointer, deltaY),
+    );
+    this.input.on('pointerup', () => (this.panLast = null));
+    this.input.on('pointerupoutside', () => (this.panLast = null));
+  }
+
+  //zooms the main camera towards the pointer, keeping the board point under it in place
+  private zoomAt(pointer: Phaser.Input.Pointer, deltaY: number) {
+    if (this.handContainer.containsPoint(pointer.x, pointer.y)) return;
+    const cam = this.cameras.main;
+    const oldZoom = cam.zoom;
+    const newZoom = Phaser.Math.Clamp(
+      oldZoom * Math.exp(-deltaY * MainScene.ZOOM_SPEED),
+      MainScene.ZOOM_MIN,
+      MainScene.ZOOM_MAX,
+    );
+    // the camera zooms around its centre: world = (screen - centre) / zoom + scroll + centre
+    const halfW = cam.width / 2;
+    const halfH = cam.height / 2;
+    const worldX = (pointer.x - halfW) / oldZoom + cam.scrollX + halfW;
+    const worldY = (pointer.y - halfH) / oldZoom + cam.scrollY + halfH;
+
+    cam.setZoom(newZoom);
+    cam.scrollX = worldX - (pointer.x - halfW) / newZoom - halfW;
+    cam.scrollY = worldY - (pointer.y - halfH) / newZoom - halfH;
+    this.updateBoardBounds();
+    this.clampScroll();
+  }
+
+  private updateBoardBounds() {
+    const cards = [
+      ...this.locationCards,
+      ...this.players,
+      ...this.creatureCards,
+      ...this.harvestableCards,
+    ];
+    if (cards.length === 0) return;
+    this.boardBounds = cards
+      .map((c) => c.getHitbox())
+      .reduce((union, r) => Phaser.Geom.Rectangle.Union(union, r, union), cards[0].getHitbox());
+  }
+
+  //the board is centred and usually fits the screen, so allow dragging its edges up to the screen centre
+  private clampScroll() {
+    if (!this.boardBounds) return;
+    const cam = this.cameras.main;
+    const { left, right, top, bottom } = this.boardBounds;
+    cam.scrollX = Phaser.Math.Clamp(
+      cam.scrollX,
+      Math.min(0, left - cam.width / 2),
+      Math.max(0, right - cam.width / 2),
+    );
+    cam.scrollY = Phaser.Math.Clamp(
+      cam.scrollY,
+      Math.min(0, top - cam.height / 2),
+      Math.max(0, bottom - cam.height / 2),
+    );
+  }
+
+  //pointer position in board coordinates, whichever camera the pointer is currently over
+  private boardPoint(): Phaser.Math.Vector2 {
+    const pointer = this.input.activePointer;
+    return this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+  }
+
+  //links every player/creature/harvestable to the location it holds the id of
+  private assignToLocations(inputGameState: GameStateDTO) {
+    for (const location of this.locationCards) {
+      const here = (dto: { locationId: number }) => dto.locationId === location.id;
+      const cardsOf = <T extends Card>(cards: T[], dtos: { id: number; locationId: number }[]) =>
+        dtos.filter(here).flatMap((dto) => cards.filter((c) => c.id === dto.id));
+
+      location.setContents([
+        ...cardsOf(this.players, inputGameState.players),
+        ...cardsOf(this.creatureCards, inputGameState.creatures),
+        ...cardsOf(this.harvestableCards, inputGameState.harvestNodes),
+      ]);
+      location.layoutContents();
+      location.raiseContents();
+    }
   }
 
   switchActivePlayer() {
@@ -208,6 +352,8 @@ export class MainScene extends Phaser.Scene {
   onCardPointerOver(card: Card) {
     if (this.inDragging) return;
     this.children.bringToTop(card);
+    this.children.queueDepthSort(); // bringToTop alone would put the card above higher-depth objects like the hand
+    if (card instanceof LocationCard) card.raiseContents();
   }
 
   //disables the regular hover-response behaviour on other cards
@@ -218,10 +364,18 @@ export class MainScene extends Phaser.Scene {
 
   //wiggles every enabled card under the pointer while a playable card is dragged
   onCardDragged(card: Card) {
+    if (card.homeLocation) {
+      card.homeLocation.reorderAround(card);
+      return;
+    }
+    if (card instanceof LocationCard) {
+      card.layoutContents();
+      return;
+    }
     if (!(card instanceof PlayableCard)) return;
-    const { worldX, worldY } = this.input.activePointer;
+    const { x, y } = this.boardPoint();
     for (const target of this.dropTargets()) {
-      target.setDropTarget(target.getHitbox().contains(worldX, worldY));
+      target.setDropTarget(target.getHitbox().contains(x, y));
     }
   }
 
@@ -232,15 +386,18 @@ export class MainScene extends Phaser.Scene {
   onCardDrop(card: Card) {
     this.inDragging = false;
     this.dropTargets().forEach((t) => t.setDropTarget(false));
-    if (card instanceof PlayableCard) this.handContainer.returnCard(card);
+    card.homeLocation?.layoutContents(undefined, true);
+    if (!(card instanceof PlayableCard)) return;
+    this.handContainer.returnCard(card);
 
-    const locationHighlighted = this.locationCards.find((loc) => loc.isHovering);
+    // a dragged hand card lives on the ui camera, so board cards never receive pointerover for it
+    const { x, y } = this.boardPoint();
+    const locationHighlighted = this.locationCards.find((loc) => loc.getHitbox().contains(x, y));
     if (locationHighlighted) {
       this.send('poc_hello', {
         played_card: card.name,
         targeted_location: locationHighlighted.name,
       });
-      locationHighlighted.isHovering = false;
     }
   }
 
@@ -257,12 +414,14 @@ export class MainScene extends Phaser.Scene {
   private gridSlot(index: number, factor: number): { x: number; y: number } {
     const margin = MainScene.MARGIN * factor;
     const gap = MainScene.GRID_GAP * factor;
-    const cardWidth = MainScene.CARD_WIDTH * factor;
-    const cardHeight = MainScene.CARD_HEIGHT * factor;
+    const cardWidth = LocationCard.LOC_WIDTH * factor;
+    const cardHeight = LocationCard.LOC_HEIGHT * factor;
+    // contained cards hang below each location
+    const hangHeight = (Card.HEIGHT - LocationCard.OVERLAP) * factor;
 
     const cols = MainScene.GRID_COLUMNS;
     const stepX = cardWidth + gap;
-    const stepY = cardHeight + gap;
+    const stepY = cardHeight + hangHeight + gap;
     const left = (this.scale.width - (cols * stepX - gap)) / 2;
 
     return {
