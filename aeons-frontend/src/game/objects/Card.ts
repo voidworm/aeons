@@ -44,6 +44,8 @@ const TEXT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
 export class Card extends Phaser.GameObjects.Container {
   static readonly WIDTH = 252;
   static readonly HEIGHT = 352;
+  static readonly HOVER_ZOOM_DELAY = 3000; // ms of uninterrupted hovering before a board card zooms
+  static readonly HOVER_ZOOM_FACTOR = 2.5;
 
   // layout, all in top-left card coordinates
   protected static readonly BORDER = 8;
@@ -63,6 +65,9 @@ export class Card extends Phaser.GameObjects.Container {
   public isHovering = false;
   public homeLocation: LocationCard | null = null; // set on cards that live at a location
   private isDropTarget = false;
+  private zoomTimer: Phaser.Time.TimerEvent | null = null;
+  private zoomTween: Phaser.Tweens.Tween | null = null;
+  private restScale: number | null = null; // the card's scale before the hover zoom; non-null while zoomed
 
   protected readonly config: CardConfig;
   protected tween: Phaser.Tweens.Tween | null = null;
@@ -223,6 +228,7 @@ export class Card extends Phaser.GameObjects.Container {
 
   onDragStart(pointer: Phaser.Input.Pointer) {
     if (this.isDisabled) return;
+    this.cancelHoverZoom();
     this.dragLast.set(pointer.x, pointer.y); // screen space: unaffected by which camera the pointer is currently over
     this.setFloating(true);
     this.emit('cardDragStart', this);
@@ -271,12 +277,50 @@ export class Card extends Phaser.GameObjects.Container {
     this.emit('cardPointerOver', this);
     this.isHovering = true;
     this.setHoverLift(true);
+    this.scheduleHoverZoom();
     if (this.tween?.isPlaying()) return;
 
     if (this.parentContainer) this.parentContainer.bringToTop(this);
     this.isHovering = true;
     this.startWiggle();
     this.emit('cardPointerOver', this);
+  }
+
+  // board cards only; hand cards are seen through the ui camera and the main camera ignores them
+  private isBoardCard(): boolean {
+    return !(this.cameraFilter & this.scene.cameras.main.id);
+  }
+
+  private scheduleHoverZoom(): void {
+    if (this.floating || this.restScale !== null || this.zoomTimer || !this.isBoardCard()) return;
+    this.zoomTimer = this.scene.time.delayedCall(Card.HOVER_ZOOM_DELAY, () => {
+      this.zoomTimer = null;
+      if (!this.active || !this.isHovering || this.floating) return;
+      this.restScale = this.scaleX;
+      this.scene.children.bringToTop(this);
+      this.scene.children.queueDepthSort();
+      this.tweenZoom(this.restScale * Card.HOVER_ZOOM_FACTOR);
+    });
+  }
+
+  // ends the pending zoom or, if the card is already zoomed, shrinks it back to its rest scale
+  private cancelHoverZoom(): void {
+    this.zoomTimer?.remove();
+    this.zoomTimer = null;
+    if (this.restScale === null) return;
+    const target = this.restScale;
+    this.restScale = null;
+    this.tweenZoom(target);
+  }
+
+  private tweenZoom(scale: number): void {
+    this.zoomTween?.stop();
+    this.zoomTween = this.tweensManager.add({
+      targets: this,
+      scale,
+      duration: 250,
+      ease: 'Sine.easeInOut',
+    });
   }
 
   private startWiggle(): void {
@@ -355,6 +399,7 @@ export class Card extends Phaser.GameObjects.Container {
   onPointerOut() {
     this.isHovering = false;
     this.setHoverLift(false);
+    this.cancelHoverZoom();
   }
 
   setDisabled(on: boolean) {
