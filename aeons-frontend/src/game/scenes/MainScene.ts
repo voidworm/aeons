@@ -31,7 +31,7 @@ export class MainScene extends Phaser.Scene {
   private static readonly MARGIN = 50;
   private static readonly CARD_HEIGHT = 352;
 
-  private static readonly GRID_GAP = 75;
+  private static readonly GRID_GAP = 112;
   private static readonly GRID_COLUMNS = 4;
 
   private handContainer!: HandContainer;
@@ -54,6 +54,7 @@ export class MainScene extends Phaser.Scene {
   private boardBounds: Phaser.Geom.Rectangle | null = null;
   private static readonly ZOOM_MIN = 0.4;
   private static readonly ZOOM_MAX = 1.5;
+  private static readonly ZOOM_INITIAL = 0.75;
   private static readonly ZOOM_SPEED = 0.001; // per wheel delta unit
 
   private connector: LocationConnector | null = null;
@@ -81,6 +82,7 @@ export class MainScene extends Phaser.Scene {
     );
     this.eventLog = new EventLog(this);
     this.uiCamera = this.cameras.add();
+    this.cameras.main.setZoom(MainScene.ZOOM_INITIAL);
     this.initPanning();
 
     this.socket = connect((msg) => {
@@ -651,10 +653,13 @@ export class MainScene extends Phaser.Scene {
     const stepX = cardWidth + gap;
     const stepY = cardHeight + hangHeight + gap;
     const left = (this.scale.width - (cols * stepX - gap)) / 2;
+    // the camera zooms around the screen centre, so the world y that appears `margin` below the screen top is further up
+    const centreY = this.scale.height / 2;
+    const top = centreY + (margin - centreY) / MainScene.ZOOM_INITIAL;
 
     return {
       x: left + cardWidth / 2 + (index % cols) * stepX,
-      y: margin + cardHeight / 2 + Math.floor(index / cols) * stepY,
+      y: top + cardHeight / 2 + Math.floor(index / cols) * stepY,
     };
   }
 }
