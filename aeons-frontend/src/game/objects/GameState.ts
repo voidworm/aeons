@@ -3,6 +3,7 @@ export const EFFECT_PLAYER_MOVE = 0;
 export const EFFECT_PLAYER_DISTRACT = 1;
 export const EFFECT_PLAYER_ATTACK = 2;
 export const EFFECT_PLAYER_HARVEST = 3;
+export const EFFECT_PLAYER_BOND = 4;
 
 export interface LocationDTO {
   id: number;
@@ -33,6 +34,7 @@ export interface CreatureDTO {
   maxHealth: number;
   flavor: string;
   exhausted: boolean;
+  bonded: boolean;
 }
 
 export interface HarvestNodeDTO {

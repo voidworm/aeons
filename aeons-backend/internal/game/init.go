@@ -1,6 +1,7 @@
 package game
 
 import (
+	"aeons/internal/bonding"
 	"aeons/internal/card"
 	"aeons/internal/combat"
 	"aeons/internal/creature"
@@ -92,13 +93,9 @@ func (gs *GameState)initHandsForAllPlayers() {
 	}
 }
 
-func (gs *GameState) getRandomLocation() *location.Unit {
-	return gs.Locations[rand.IntN(len(gs.Locations))]
-}
-
 func (gs *GameState) GenerateBasicHand() []*card.PlayableCard {
 	basicHand := []*card.PlayableCard{}
-	basicHand = append(basicHand, gs.GenerateBasicMoveCard(), gs.GenerateBasicAttackCard(), gs.GenerateBasicDistractCard(), gs.GenerateBasicHarvestCard())
+	basicHand = append(basicHand, gs.GenerateBasicMoveCard(), gs.GenerateBasicAttackCard(), gs.GenerateBasicDistractCard(), gs.GenerateBasicHarvestCard(), gs.GenerateBasicBondCard())
 	gs.PlayableCards = append(gs.PlayableCards, basicHand...)
 	return basicHand
 }
@@ -195,6 +192,29 @@ func (gs *GameState) GenerateBasicHarvestCard() *card.PlayableCard {
 	return BasicHarvestCard
 }
 
+func (gs *GameState) GenerateBasicBondCard() *card.PlayableCard {
+	BasicBondCard := &card.PlayableCard {
+		ID: gs.NextID(),
+		Type: card.PlayerBond,
+		Name: "Bond",
+		EffectText: "Bonds with an aloof or exhausted creature at your location.",
+		TargetSpec: nil,
+		Candidates: []card.Targetable{},
+		Effect: nil,
+		Range: 1,
+		Cost: 1,
+	}
+
+	BasicBondTargetCreatureSpec := &card.TargetSpec {
+		Type: card.TargetTypeCreature,
+		Target: nil,
+		Filter: nil,
+	}
+
+	BasicBondCard.TargetSpec = BasicBondTargetCreatureSpec
+	return BasicBondCard
+}
+
 func (gs *GameState) fillEffectForCard(c *card.PlayableCard, owner *player.Unit) {
 		switch c.Type {
 		case card.PlayerMove:
@@ -223,6 +243,15 @@ func (gs *GameState) fillEffectForCard(c *card.PlayableCard, owner *player.Unit)
 				DistractingPlayer: owner,
 				DistractedCreature: target,
 			}
+		case card.PlayerBond:
+			target,ok := c.Target.(*creature.Unit)
+			if !ok {
+				//shouldnt happen
+			}
+			c.Effect = &bonding.Effect {
+				BondingPlayer: owner,
+				BondedCreature: target,
+			}
 		case card.PlayerHarvest:
 			target,ok := c.Target.(*harvesting.Unit)
 			if !ok {
@@ -236,53 +265,106 @@ func (gs *GameState) fillEffectForCard(c *card.PlayableCard, owner *player.Unit)
 }
 
 func (gs *GameState) InitCreatures() {
+	freeLocations := slices.Clone(gs.Locations)
+	rand.Shuffle(len(freeLocations), func(i, j int) {
+		freeLocations[i], freeLocations[j] = freeLocations[j], freeLocations[i]
+	})
 
-	Stag := &creature.Unit{
-		MovingEntity: moving.MovingEntity{CurrentLocation: gs.getRandomLocation()},
+	gs.Creatures = append(gs.Creatures, gs.NewWolf(freeLocations[0]), gs.NewStag(freeLocations[1]))
+	for _, l := range freeLocations[2:5] {
+		gs.Creatures = append(gs.Creatures, gs.NewRacoonOrPlant(l))
+	}
+
+	rand.Shuffle(len(gs.Creatures), func(i, j int) {
+		gs.Creatures[i], gs.Creatures[j] = gs.Creatures[j], gs.Creatures[i]
+	})
+}
+
+func (gs *GameState) NewRacoonOrPlant(at *location.Unit) *creature.Unit {
+	if rand.IntN(2) == 0 {
+		return gs.NewRacoon(at)
+	}
+	return gs.NewPlant(at)
+}
+
+func (gs *GameState) NewStag(at *location.Unit) *creature.Unit {
+	stag := &creature.Unit{
+		MovingEntity: moving.MovingEntity{CurrentLocation: at},
 		HealthPool:   combat.HealthPool{CurrentHealth: 5, MaxHealth: 5},
 		ID:           gs.NextID(),
 		Name:         "Stag",
-		Flavor: "A large stag that wanders the area aimlessly.",
+		Flavor:       "A large stag that wanders the area aimlessly.",
+		CreatureBehaviourConfig: &creature.CreatureBehaviourConfig{
+			CreatureAloofConfig:     creature.GenerateAloofConfig(true),
+			CreatureMovementConfig:  creature.GenerateCuriousShyConfig(),
+			CreatureTurnStateConfig: creature.GenerateDefaultTurnStateConfig(),
+			CreatureBondConfig:      creature.GenerateBondConfig(3),
+			CreatureHuntingConfig:   creature.GenerateHuntingConfig(false, true),
+		},
+	}
+
+	log.Printf("[INIT] Spawned creature %s at %s", stag.NameWithID(), stag.CurrentLocation.Name)
+	return stag
+}
+
+func (gs *GameState) NewRacoon(at *location.Unit) *creature.Unit {
+	racoon := &creature.Unit{
+		MovingEntity: moving.MovingEntity{CurrentLocation: at},
+		HealthPool:   combat.HealthPool{CurrentHealth: 2, MaxHealth: 2},
+		ID:           gs.NextID(),
+		Name:         "Raccoon",
+		Flavor:       "A nifty little raccoon, known to steal berries. Especially yours.",
 		CreatureBehaviourConfig: &creature.CreatureBehaviourConfig{
 			CreatureAloofConfig:     creature.GenerateAloofConfig(true),
 			CreatureMovementConfig:  creature.GenerateCuriousConfig(),
 			CreatureTurnStateConfig: creature.GenerateDefaultTurnStateConfig(),
+			CreatureBondConfig:      creature.GenerateBondConfig(2),
+			CreatureHuntingConfig:   creature.GenerateHuntingConfig(false, true),
 		},
 	}
 
-	log.Printf("[INIT] Spawned creature %s at %s", Stag.Name, Stag.CurrentLocation.Name)
+	log.Printf("[INIT] Spawned creature %s at %s", racoon.NameWithID(), racoon.CurrentLocation.Name)
+	return racoon
+}
 
-	Racoon := &creature.Unit{
-		MovingEntity: moving.MovingEntity{CurrentLocation: gs.getRandomLocation()},
-		HealthPool:   combat.HealthPool{CurrentHealth: 2, MaxHealth: 2},
-		ID:           gs.NextID(),
-		Name:         "Raccoon",
-		Flavor: 		"A nifty little raccoon, known to steal berries. Especially yours.",
-		CreatureBehaviourConfig: &creature.CreatureBehaviourConfig{
-			CreatureAloofConfig:     creature.GenerateAloofConfig(false),
-			CreatureMovementConfig:  creature.GenerateCuriousConfig(),
-			CreatureTurnStateConfig: creature.GenerateDefaultTurnStateConfig(),
-		},
-	}
-
-	log.Printf("[INIT] Spawned creature %s at %s", Racoon.Name, Racoon.CurrentLocation.Name)
-
-	Plant := &creature.Unit{
-		MovingEntity: moving.MovingEntity{CurrentLocation: gs.getRandomLocation()},
+func (gs *GameState) NewPlant(at *location.Unit) *creature.Unit {
+	plant := &creature.Unit{
+		MovingEntity: moving.MovingEntity{CurrentLocation: at},
 		HealthPool:   combat.HealthPool{CurrentHealth: 2, MaxHealth: 2},
 		ID:           gs.NextID(),
 		Name:         "Suspicious Plant",
-		Flavor: 	"Hmmmmm...",
+		Flavor:       "Hmmmmm...",
 		CreatureBehaviourConfig: &creature.CreatureBehaviourConfig{
 			CreatureAloofConfig:     creature.GenerateAloofConfig(true),
 			CreatureMovementConfig:  creature.GenerateShyConfig(),
 			CreatureTurnStateConfig: creature.GenerateDefaultTurnStateConfig(),
+			CreatureBondConfig:      creature.GenerateBondConfig(2),
+			CreatureHuntingConfig:   creature.GenerateHuntingConfig(false, true),
 		},
 	}
 
-	log.Printf("[INIT] Spawned creature %s at %s", Plant.Name, Plant.CurrentLocation.Name)
+	log.Printf("[INIT] Spawned creature %s at %s", plant.NameWithID(), plant.CurrentLocation.Name)
+	return plant
+}
 
-	gs.Creatures = append(gs.Creatures, Stag, Racoon, Plant)
+func (gs *GameState) NewWolf(at *location.Unit) *creature.Unit {
+	wolf := &creature.Unit{
+		MovingEntity: moving.MovingEntity{CurrentLocation: at},
+		HealthPool:   combat.HealthPool{CurrentHealth: 4, MaxHealth: 4},
+		ID:           gs.NextID(),
+		Name:         "Wolf",
+		Flavor:       "Prowling, stalking, these woods belong to the pack...",
+		CreatureBehaviourConfig: &creature.CreatureBehaviourConfig{
+			CreatureAloofConfig:     creature.GenerateAloofConfig(false),
+			CreatureMovementConfig:  creature.GenerateCuriousConfig(),
+			CreatureTurnStateConfig: creature.GenerateDefaultTurnStateConfig(),
+			CreatureBondConfig:      creature.GenerateBondConfig(3),
+			CreatureHuntingConfig:   creature.GenerateHuntingConfig(true, false),
+		},
+	}
+
+	log.Printf("[INIT] Spawned creature %s at %s", wolf.NameWithID(), wolf.CurrentLocation.Name)
+	return wolf
 }
 
 

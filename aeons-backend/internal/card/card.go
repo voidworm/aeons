@@ -18,6 +18,7 @@ const (
 	PlayerDistract
 	PlayerAttack
 	PlayerHarvest
+	PlayerBond
 )
 
 type Targetable interface {

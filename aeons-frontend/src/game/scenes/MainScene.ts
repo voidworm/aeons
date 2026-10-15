@@ -7,6 +7,7 @@ import { CreatureCard } from '../objects/CreatureCard';
 import { HarvestableCard } from '../objects/HarvestableCard';
 import {
   EFFECT_PLAYER_ATTACK,
+  EFFECT_PLAYER_BOND,
   EFFECT_PLAYER_DISTRACT,
   EFFECT_PLAYER_HARVEST,
   EFFECT_PLAYER_MOVE,
@@ -305,6 +306,7 @@ export class MainScene extends Phaser.Scene {
       const card = this.creatureCards.find((c) => c.id === dto.id);
       card?.setHealth(dto.health);
       void card?.setExhausted(dto.exhausted);
+      card?.setBonded(dto.bonded);
     }
     for (const dto of state.harvestNodes) {
       this.harvestableCards.find((h) => h.id === dto.id)?.setYields(dto.nutrition, dto.resources);
@@ -587,6 +589,7 @@ export class MainScene extends Phaser.Scene {
       EFFECT_PLAYER_DISTRACT,
       EFFECT_PLAYER_ATTACK,
       EFFECT_PLAYER_HARVEST,
+      EFFECT_PLAYER_BOND,
     ].includes(card.effectType);
   }
 

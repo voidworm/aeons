@@ -67,9 +67,18 @@ func (gs *GameState) LocationHaEvadableCreatures(le *location.Unit) bool {
 	return false
 }
 
+func (gs *GameState) LocationHasBondableCreatures(le *location.Unit) bool {
+	for _, v := range gs.Creatures {
+		if v.CurrentLocation == le && v.IsBondable() {
+			return true
+		}
+	}
+	return false
+}
+
 func (gs *GameState) LocationHasBlockingCreature(le *location.Unit) bool {
 	for _, v := range gs.Creatures {
-		if le == v.CurrentLocation && !v.Aloof && !v.Distracted {
+		if le == v.CurrentLocation && !v.Aloof && !v.Distracted && !v.Bonded {
 			return true
 		}
 	}
@@ -229,6 +238,8 @@ func (gs *GameState) EvaluatePlayerHandPlayability(p *player.Unit) {
 				}else {
 					v.CanBeCast = false
 				}
+			case card.PlayerBond:
+				v.CanBeCast = gs.LocationHasBondableCreatures(p.CurrentLocation)
 			case card.PlayerHarvest:
 				if gs.LocationHasHarvest(p.CurrentLocation) && !gs.LocationHasBlockingCreature(p.CurrentLocation) {
 					v.CanBeCast = true

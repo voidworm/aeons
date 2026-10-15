@@ -8,6 +8,7 @@ export class CreatureCard extends Card {
   private turnTween: Phaser.Tweens.Tween | null = null;
   private stats!: Phaser.GameObjects.Text;
   private maxHealth: number;
+  private bondedLabel: Phaser.GameObjects.Text | null = null;
 
   constructor(
     scene: MainScene,
@@ -57,6 +58,21 @@ export class CreatureCard extends Card {
     });
   }
 
+  setBonded(on: boolean) {
+    if (!on) {
+      this.bondedLabel?.destroy();
+      this.bondedLabel = null;
+      return;
+    }
+    if (this.bondedLabel) return;
+    const textBoxTop = Card.ART_Y + this.config.artHeight + Card.GAP;
+    this.bondedLabel = this.label(this.cardWidth / 2, textBoxTop + Card.TEXT_PAD, 'Bonded', {
+      fontSize: '11.2px',
+      fontStyle: 'normal',
+    }).setOrigin(0.5, 0);
+    this.addFrameDetails(this.bondedLabel);
+  }
+
   initFrameDetails(currentHealth: integer) {
     this.stats = this.footer(this.statsText(currentHealth), 'center');
     this.addFrameDetails(this.stats);
@@ -83,6 +99,7 @@ export class CreatureCard extends Card {
       dto.maxHealth,
     );
     void card.setExhausted(dto.exhausted, false);
+    card.setBonded(dto.bonded);
     return card;
   }
 }

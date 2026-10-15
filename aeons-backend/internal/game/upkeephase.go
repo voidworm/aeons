@@ -43,7 +43,7 @@ func (gs *GameState) ResolveCreatureRecovery() []UpkeepEvent {
 	for _, v := range gs.Creatures {
 		if v.Distracted {
 			events = append(events, UpkeepEvent{CreatureID: v.ID})
-			gs.Logf("%s recovers from exhaustion", v.Name)
+			gs.Logf("%s recovers from exhaustion", v.NameWithID())
 		}
 		v.Tick()
 	}

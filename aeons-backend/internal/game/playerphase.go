@@ -37,13 +37,16 @@ func (gs *GameState) PlayCard(cardID, targetID int) (*harvesting.Yield, error) {
 			return nil, fmt.Errorf("%s is not connected to %s", owner.CurrentLocation.Name, target.Name)
 		}
 		c.Target = target
-	case card.PlayerDistract, card.PlayerAttack:
+	case card.PlayerDistract, card.PlayerAttack, card.PlayerBond:
 		target, ok := getEntryWithID(gs.Creatures, targetID).(*creature.Unit)
 		if !ok {
 			return nil, fmt.Errorf("%d is not a creature", targetID)
 		}
 		if target.CurrentLocation != owner.CurrentLocation {
 			return nil, fmt.Errorf("%s is not at %s", target.Name, owner.CurrentLocation.Name)
+		}
+		if c.Type == card.PlayerBond && !target.IsBondable() {
+			return nil, fmt.Errorf("%s cannot be bonded with right now", target.Name)
 		}
 		c.Target = target
 	case card.PlayerHarvest:
@@ -187,9 +190,9 @@ func (gs *GameState) ResolveAttackForPlayer(player *player.Unit) {
 		}
 	}
 
-	log.Printf("%s attacks %s down to %d/%d health.\n", player.Name, enemy.Name, enemy.CurrentHealth, enemy.MaxHealth)
+	log.Printf("%s attacks %s down to %d/%d health.\n", player.Name, enemy.NameWithID(), enemy.CurrentHealth, enemy.MaxHealth)
 	if enemy.CurrentHealth == 0 {
-		log.Printf("%s has defeated %s!", player.Name, enemy.Name)
+		log.Printf("%s has defeated %s!", player.Name, enemy.NameWithID())
 	}
 
 	effect := combat.DamageEffect{Target: enemy}
