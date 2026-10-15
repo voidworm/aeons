@@ -24,6 +24,7 @@ import { PlayerSwitcher } from '../objects/PlayerSwitcher';
 import { EventLog } from '../objects/EventLog';
 import { HarvestResultPopup } from '../objects/HarvestResultPopup';
 import { LocationConnector } from '../objects/LocationConnector';
+import { DragGroup } from '../objects/DragGroup';
 import { CURSOR_DEFAULT, CURSOR_GRAB, CURSOR_INTERACTIVE } from '../cursors';
 
 export class MainScene extends Phaser.Scene {
@@ -81,6 +82,10 @@ export class MainScene extends Phaser.Scene {
       () => this.triggerUpkeepPhase(),
     );
     this.eventLog = new EventLog(this);
+    this.placeEventLog();
+    new DragGroup(this, [this.eventLog, ...this.playerSwitcher.phaseButtons]).enableOn(
+      this.eventLog.dragHandle,
+    );
     this.uiCamera = this.cameras.add();
     this.cameras.main.setZoom(MainScene.ZOOM_INITIAL);
     this.initPanning();
@@ -150,6 +155,12 @@ export class MainScene extends Phaser.Scene {
 
     this.handContainer.resize(gameSize.width, gameSize.height);
     this.playerSwitcher.resize(gameSize.width, gameSize.height);
+    this.placeEventLog();
+  }
+
+  private placeEventLog() {
+    const { x, y } = this.playerSwitcher.abovePhaseButtons();
+    this.eventLog.setBottomCentre(x, y);
   }
 
   factor(): integer {
@@ -214,8 +225,7 @@ export class MainScene extends Phaser.Scene {
       this.locationCards.push(c);
     }
     this.connector = new LocationConnector(this, inputGameState.locations, this.locationCards);
-    this.hideFrom(this.uiCamera, this.connector);
-  }
+    this.hideFrom(this.uiCamera, this.connector);  }
 
   initHarvestNodes(inputGameState: GameStateDTO) {
     const factor = this.factor();
@@ -568,6 +578,8 @@ export class MainScene extends Phaser.Scene {
       ...this.harvestableCards,
     ].filter((c) => c !== dragged && !legal.includes(c));
     this.dragSuppressed.forEach((c) => c.setSuppressed(true));
+    const here = this.players.find((p) => p.activePlayer)?.homeLocation;
+    if (dragged.effectType === EFFECT_PLAYER_MOVE && here) this.connector?.focusOn(here);
   }
 
   private legalTargets(card: PlayableCard): Card[] {
@@ -601,6 +613,7 @@ export class MainScene extends Phaser.Scene {
   private releaseSuppressed() {
     this.dragSuppressed.forEach((c) => c.setSuppressed(false));
     this.dragSuppressed = [];
+    this.connector?.clearFocus();
   }
 
   private dropTargets(): Card[] {

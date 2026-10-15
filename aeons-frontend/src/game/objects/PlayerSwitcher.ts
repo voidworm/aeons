@@ -6,6 +6,7 @@ import type { PlayerCard } from './PlayerCard';
 import { MiniPlayerCard } from './MiniPlayerCard';
 import { ControlButton } from './ControlButton';
 import { CURSOR_INTERACTIVE } from '../cursors';
+import { DragGroup } from './DragGroup';
 import { PlayerStatsPanel } from './PlayerStatsPanel';
 import type { PlayerStats } from './PlayerStatsPanel';
 
@@ -18,7 +19,9 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
   private static readonly HAND_GAP = 250; // between the hand's outer cards and the panels / buttons
   private static readonly STATS_GAP = 16; // between the stack and the stats panel
   private static readonly NAME_GAP = 8; // between the stats panel and the name button above it
-  private static readonly BUTTON_GAP = 20; // between the stacked buttons
+  private static readonly LOG_GAP = 40; // between the phase buttons and the event log above them
+  private static readonly BUTTON_GAP = 20; // between the phase buttons
+  static readonly PHASE_BUTTONS_WIDTH = 2 * ControlButton.WIDTH + PlayerSwitcher.BUTTON_GAP;
   private static readonly BOTTOM_INSET = 20;
   private static readonly BUTTONS_LIFT = 40; // raises the phase buttons above the bottom edge
   private static readonly BACK_PREVIEW_OFFSET_Y = 24; // the back preview sits this much higher than the front one
@@ -74,6 +77,8 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
     this.upkeepButton = new ControlButton(scene, 'Upkeep phase', onUpkeepPhase);
 
     this.add([this.stack, this.statsPanel, this.nameButton, this.creaturePhaseButton, this.upkeepButton]);
+    // the previews, name and stats are one unit that follows a drag on the stats panel
+    new DragGroup(scene, [this.stack, this.statsPanel, this.nameButton]).enableOn(this.statsPanel.dragHandle);
     this.setDepth(1000); //if i dont do this the stupid things keeps moving in front of the cards
     this.resize(scene.scale.width, scene.scale.height);
     scene.add.existing(this);
@@ -86,10 +91,25 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
     const originY = height - BOTTOM_INSET;
     this.setPosition(originX, originY);
 
-    // the phase buttons sit right of the hand, stacked upwards from the bottom
-    const buttonX = width / 2 + handHalfWidth + HAND_GAP + ControlButton.WIDTH / 2 - originX;
-    this.upkeepButton.setPosition(buttonX, -BUTTONS_LIFT - ControlButton.HEIGHT / 2);
-    this.creaturePhaseButton.setPosition(buttonX, -BUTTONS_LIFT - ControlButton.HEIGHT * 1.5 - BUTTON_GAP);
+    // the phase buttons sit side by side right of the hand, pulled back in when they would leave the screen
+    const buttonsLeft =
+      Math.min(width / 2 + handHalfWidth + HAND_GAP, width - BOTTOM_INSET - PlayerSwitcher.PHASE_BUTTONS_WIDTH) -
+      originX;
+    const buttonY = -BUTTONS_LIFT - ControlButton.HEIGHT / 2;
+    this.creaturePhaseButton.setPosition(buttonsLeft + ControlButton.WIDTH / 2, buttonY);
+    this.upkeepButton.setPosition(buttonsLeft + ControlButton.WIDTH * 1.5 + BUTTON_GAP, buttonY);
+  }
+
+  get phaseButtons(): ControlButton[] {
+    return [this.creaturePhaseButton, this.upkeepButton];
+  }
+
+  //screen position just above the middle of the phase buttons
+  abovePhaseButtons(): { x: number; y: number } {
+    return {
+      x: this.x + (this.creaturePhaseButton.x + this.upkeepButton.x) / 2,
+      y: this.y + this.creaturePhaseButton.y - ControlButton.HEIGHT / 2 - PlayerSwitcher.LOG_GAP,
+    };
   }
 
   setPlayers(players: PlayerCard[]): void {

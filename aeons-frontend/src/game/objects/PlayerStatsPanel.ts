@@ -16,13 +16,14 @@ export class PlayerStatsPanel extends Phaser.GameObjects.Container {
   private static readonly COLOR = 0x5c3b1f;
   private static readonly OUTLINE_COLOR = 0x2a1809;
 
+  readonly dragHandle: Phaser.GameObjects.Rectangle;
   private readonly text: Phaser.GameObjects.Text;
 
   constructor(scene: MainScene) {
     super(scene, 0, 0);
     const { WIDTH, HEIGHT, COLOR, OUTLINE_COLOR } = PlayerStatsPanel;
 
-    const background = new Phaser.GameObjects.Rectangle(
+    this.dragHandle = new Phaser.GameObjects.Rectangle(
       scene,
       0,
       0,
@@ -37,7 +38,7 @@ export class PlayerStatsPanel extends Phaser.GameObjects.Container {
       align: 'left',
     }).setOrigin(0.5);
 
-    this.add([background, this.text]);
+    this.add([this.dragHandle, this.text]);
   }
 
   setStats(stats: PlayerStats): void {
