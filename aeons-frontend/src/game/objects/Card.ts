@@ -231,7 +231,7 @@ export class Card extends Phaser.GameObjects.Container {
   }
 
   onDragStart(pointer: Phaser.Input.Pointer) {
-    if (this.isInactive()) return;
+    if (!this.canBeDragged()) return;
     this.cancelHoverZoom();
     this.dragTarget = null;
     this.dragLast.set(pointer.x, pointer.y); // screen space: unaffected by which camera the pointer is currently over
@@ -240,7 +240,7 @@ export class Card extends Phaser.GameObjects.Container {
   }
 
   onDrag(pointer: Phaser.Input.Pointer) {
-    if (this.isInactive()) return;
+    if (!this.canBeDragged()) return;
     const zoom = this.dragZoom();
     this.dragTarget ??= new Phaser.Math.Vector2(this.x, this.y);
     this.dragTarget.x += (pointer.x - this.dragLast.x) / zoom;
@@ -257,7 +257,7 @@ export class Card extends Phaser.GameObjects.Container {
   }
 
   onDragend() {
-    if (this.isInactive()) return;
+    if (!this.canBeDragged()) return;
     this.setFloating(false);
     this.emit('cardDragEnd', this);
   }
@@ -426,6 +426,18 @@ export class Card extends Phaser.GameObjects.Container {
 
   protected isInactive(): boolean {
     return this.isDisabled || this.suppressed;
+  }
+
+  protected canBeDragged(): boolean {
+    return !this.isInactive();
+  }
+
+  protected isSuppressed(): boolean {
+    return this.suppressed;
+  }
+
+  isDisabledByRules(): boolean {
+    return this.isDisabled;
   }
 
   private refreshDisabledLayer() {

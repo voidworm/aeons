@@ -32,6 +32,11 @@ export class PlayableCard extends Card {
     );
   }
 
+  //disabled hand cards can still be re-sorted, they just can't be played
+  protected canBeDragged(): boolean {
+    return !this.isSuppressed();
+  }
+
   static fromDto(scene: MainScene, x: integer, y: integer, dto: PlayableCardDTO) {
     const r = new PlayableCard(scene, x, y, dto.id, dto.name, dto.effectText, dto.cost);
     r.effectType = dto.effectType;

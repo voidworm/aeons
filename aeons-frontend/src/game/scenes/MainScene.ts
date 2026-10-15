@@ -555,7 +555,19 @@ export class MainScene extends Phaser.Scene {
     this.inDragging = true;
     if (!(card instanceof PlayableCard)) return;
     this.handContainer.startDrag(card);
-    if (this.hasTargetRestriction(card)) this.suppressAllButLegalTargets(card);
+    if (card.isDisabledByRules()) this.suppressBoard();
+    else if (this.hasTargetRestriction(card)) this.suppressAllButLegalTargets(card);
+  }
+
+  //an unplayable card has no valid target, so the whole board is veiled while it is dragged
+  private suppressBoard() {
+    this.dragSuppressed = [
+      ...this.locationCards,
+      ...this.players,
+      ...this.creatureCards,
+      ...this.harvestableCards,
+    ];
+    this.dragSuppressed.forEach((c) => c.setSuppressed(true));
   }
 
   private hasTargetRestriction(card: PlayableCard): boolean {
@@ -603,7 +615,7 @@ export class MainScene extends Phaser.Scene {
       card.syncContents();
       return;
     }
-    if (!(card instanceof PlayableCard)) return;
+    if (!(card instanceof PlayableCard) || card.isDisabledByRules()) return;
     const { x, y } = this.boardPoint();
     for (const target of this.dropTargets()) {
       target.setDropTarget(target.getHitbox().contains(x, y));
@@ -626,6 +638,10 @@ export class MainScene extends Phaser.Scene {
     this.dropTargets().forEach((t) => t.setDropTarget(false));
     if (!(card instanceof PlayableCard)) return;
     this.handContainer.returnCard(card);
+    if (card.isDisabledByRules()) {
+      this.releaseSuppressed();
+      return;
+    }
 
     // a dragged hand card lives on the ui camera, so board cards never receive pointerover for it
     const { x, y } = this.boardPoint();
