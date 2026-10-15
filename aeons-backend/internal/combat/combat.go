@@ -13,9 +13,7 @@ type Healable interface {
 	HealDamage(int) int
 }
 
-type Attacker interface {
-	OutgoingDamage() int
-}
+const BaseDamage = 1
 
 func (d *HealthPool) TakeDamage(amount int) int {
 	d.CurrentHealth = max(d.CurrentHealth-amount, 0)
@@ -28,10 +26,9 @@ func (d *HealthPool) HealDamage(amount int) int {
 }
 
 type DamageEffect struct {
-	Source Attacker
 	Target Damageable
 }
 
 func (de *DamageEffect) Apply() {
-	de.Target.TakeDamage(de.Source.OutgoingDamage())
+	de.Target.TakeDamage(BaseDamage)
 }

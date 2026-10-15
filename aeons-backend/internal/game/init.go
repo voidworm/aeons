@@ -64,27 +64,23 @@ func (gs *GameState) InitPlayers() {
 	log.Println("[INIT] Setting up player Druid...")
 	Druid := &player.Unit{
 		MovingEntity:       moving.MovingEntity{CurrentLocation: gs.Locations[0]},
-		HealthPool:         combat.HealthPool{CurrentHealth: 10, MaxHealth: 10},
 		ID:                 gs.NextID(),
 		Name:               "Druid",
 		CardsInHand:        []*card.PlayableCard{},
 		ResourcesAvailable: 0,
 		RemainingActions:   3,
 		Energy:             UpkeepEnergy,
-		Damage:             1,
 	}
 
 	log.Println("[INIT] Setting up player Scoundrel...")
 	Scoundrel := &player.Unit{
 		MovingEntity:       moving.MovingEntity{CurrentLocation: gs.Locations[0]},
-		HealthPool:         combat.HealthPool{CurrentHealth: 8, MaxHealth: 8},
 		ID:                 gs.NextID(),
 		Name:               "Scoundrel",
 		CardsInHand:        []*card.PlayableCard{},
 		ResourcesAvailable: 0,
 		RemainingActions:   3,
 		Energy:             UpkeepEnergy,
-		Damage:             1,
 	}
 	gs.Players = append(gs.Players, Druid, Scoundrel)
 }
@@ -216,7 +212,6 @@ func (gs *GameState) fillEffectForCard(c *card.PlayableCard, owner *player.Unit)
 				//shouldnt happen
 			}
 			c.Effect = &combat.DamageEffect {
-				Source: owner,
 				Target: target,
 			}
 		case card.PlayerDistract:
@@ -253,7 +248,6 @@ func (gs *GameState) InitCreatures() {
 			CreatureMovementConfig:  creature.GenerateCuriousConfig(),
 			CreatureTurnStateConfig: creature.GenerateDefaultTurnStateConfig(),
 		},
-		Damage: 2,
 	}
 
 	log.Printf("[INIT] Spawned creature %s at %s", Stag.Name, Stag.CurrentLocation.Name)
@@ -269,7 +263,6 @@ func (gs *GameState) InitCreatures() {
 			CreatureMovementConfig:  creature.GenerateCuriousConfig(),
 			CreatureTurnStateConfig: creature.GenerateDefaultTurnStateConfig(),
 		},
-		Damage: 1,
 	}
 
 	log.Printf("[INIT] Spawned creature %s at %s", Racoon.Name, Racoon.CurrentLocation.Name)
@@ -285,7 +278,6 @@ func (gs *GameState) InitCreatures() {
 			CreatureMovementConfig:  creature.GenerateShyConfig(),
 			CreatureTurnStateConfig: creature.GenerateDefaultTurnStateConfig(),
 		},
-		Damage: 1,
 	}
 
 	log.Printf("[INIT] Spawned creature %s at %s", Plant.Name, Plant.CurrentLocation.Name)

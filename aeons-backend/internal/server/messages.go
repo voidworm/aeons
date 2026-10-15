@@ -87,11 +87,11 @@ type LogPayload struct {
 
 type HarvestResultPayload struct {
 	HarvestableID int `json:"harvestableId"`
-	Healing       int `json:"healing"`
+	Nutrition     int `json:"nutrition"`
 	Resources     int `json:"resources"`
 }
 
 type CreatureAttackDTO struct {
-	TargetPlayerID int `json:"targetPlayerId"`
-	Damage         int `json:"damage"`
+	TargetPlayerID int  `json:"targetPlayerId"`
+	Fainted        bool `json:"fainted"`
 }

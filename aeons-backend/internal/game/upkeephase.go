@@ -28,6 +28,9 @@ func (gs *GameState) ResolveResourceRespawn() {
 
 func (gs *GameState) ResolvePlayerRefresh() {
 	for _, v := range gs.Players {
+		if v.Fainted() {
+			continue
+		}
 		v.RemainingActions = 3
 		v.Energy = UpkeepEnergy
 		gs.Logf("%s refreshes to %d energy", v.Name, UpkeepEnergy)

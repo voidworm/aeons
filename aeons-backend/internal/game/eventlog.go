@@ -2,6 +2,7 @@ package game
 
 import (
 	"aeons/internal/card"
+	"aeons/internal/combat"
 	"aeons/internal/creature"
 	"aeons/internal/harvesting"
 	"aeons/internal/location"
@@ -29,7 +30,7 @@ func (gs *GameState) logPlayedCard(c *card.PlayableCard, owner *player.Unit) {
 	case *harvesting.Unit:
 		if harvest, ok := c.Effect.(*harvesting.Effect); ok && harvest.Yield != nil {
 			gs.Logf("%s harvests %s:", owner.Name, target.Name)
-			gs.Logf("      Yield: %d healing, %d resources", harvest.Yield.Healing, harvest.Yield.Resources)
+			gs.Logf("      Yield: %d nutrition, %d resources", harvest.Yield.Nutrition, harvest.Yield.Resources)
 		}
 	}
 }
@@ -40,8 +41,8 @@ func (gs *GameState) logPlayedOnCreature(c *card.PlayableCard, owner *player.Uni
 		return
 	}
 	if target.CurrentHealth == 0 {
-		gs.Logf("%s attacks %s for %d, %s is defeated", owner.Name, target.Name, owner.Damage, target.Name)
+		gs.Logf("%s attacks %s for %d, %s is defeated", owner.Name, target.Name, combat.BaseDamage, target.Name)
 		return
 	}
-	gs.Logf("%s attacks %s for %d (%d/%d)", owner.Name, target.Name, owner.Damage, target.CurrentHealth, target.MaxHealth)
+	gs.Logf("%s attacks %s for %d (%d/%d)", owner.Name, target.Name, combat.BaseDamage, target.CurrentHealth, target.MaxHealth)
 }

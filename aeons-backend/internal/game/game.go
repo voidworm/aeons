@@ -24,14 +24,6 @@ func (gs *GameState) NextID() int {
 }
 
 func (gs *GameState) ReconcileDefeats() {
-	alivePlayers := gs.Players[:0]
-
-	for _, v := range gs.Players {
-		if v.CurrentHealth > 0 {
-			alivePlayers = append(alivePlayers, v)
-		}
-	}
-
 	aliveCreatures := gs.Creatures[:0]
 	for _, v := range gs.Creatures {
 		if v.CurrentHealth > 0 {
@@ -39,7 +31,6 @@ func (gs *GameState) ReconcileDefeats() {
 		}
 	}
 	gs.Creatures = aliveCreatures
-	gs.Players = alivePlayers
 }
 
 func (gs *GameState) LocationHasEnemies(le *location.Unit) bool {
@@ -51,9 +42,9 @@ func (gs *GameState) LocationHasEnemies(le *location.Unit) bool {
 	return false
 }
 
-func (gs *GameState) LocationHasPlayers(le *location.Unit) bool {
+func (gs *GameState) LocationHasActivePlayers(le *location.Unit) bool {
 	for _, v := range gs.Players {
-		if le == v.CurrentLocation {
+		if le == v.CurrentLocation && !v.Fainted() {
 			return true
 		}
 	}

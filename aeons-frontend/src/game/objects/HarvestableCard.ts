@@ -18,7 +18,7 @@ export class HarvestableCard extends Card {
     id: number,
     name: string,
     flavor: string,
-    healing: HarvestYieldDTO,
+    nutrition: HarvestYieldDTO,
     resources: HarvestYieldDTO,
   ) {
     super(scene, x, y, {
@@ -32,20 +32,20 @@ export class HarvestableCard extends Card {
       footerHeight: 19.2,
     });
 
-    this.initFrameDetails(healing, resources);
+    this.initFrameDetails(nutrition, resources);
   }
 
-  initFrameDetails(healing: HarvestYieldDTO, resources: HarvestYieldDTO) {
-    this.yields = this.footer(this.yieldsText(healing, resources), 'center');
+  initFrameDetails(nutrition: HarvestYieldDTO, resources: HarvestYieldDTO) {
+    this.yields = this.footer(this.yieldsText(nutrition, resources), 'center');
     this.addFrameDetails(this.yields);
   }
 
-  setYields(healing: HarvestYieldDTO, resources: HarvestYieldDTO) {
-    this.yields.setText(this.yieldsText(healing, resources));
+  setYields(nutrition: HarvestYieldDTO, resources: HarvestYieldDTO) {
+    this.yields.setText(this.yieldsText(nutrition, resources));
   }
 
-  private yieldsText(healing: HarvestYieldDTO, resources: HarvestYieldDTO) {
-    return `${yieldText(healing, 'Food')}    ·    ${yieldText(resources, 'Material')}`;
+  private yieldsText(nutrition: HarvestYieldDTO, resources: HarvestYieldDTO) {
+    return `${yieldText(nutrition, 'Nutrition')}    ·    ${yieldText(resources, 'Material')}`;
   }
 
   static fromDto(scene: MainScene, x: number, y: number, dto: HarvestNodeDTO) {
@@ -56,7 +56,7 @@ export class HarvestableCard extends Card {
       dto.id,
       dto.name,
       dto.flavor,
-      dto.healing,
+      dto.nutrition,
       dto.resources,
     );
   }

@@ -4,6 +4,7 @@ import (
 	"aeons/internal/card"
 	"aeons/internal/game"
 	"aeons/internal/harvesting"
+	"aeons/internal/player"
 )
 
 type GameStateDTO struct {
@@ -26,13 +27,14 @@ type PlayerDTO struct {
 	ID         int    `json:"id"`
 	Name       string `json:"name"`
 	LocationID int    `json:"locationId"`
-	Health     int    `json:"health"`
-	MaxHealth  int    `json:"maxHealth"`
+	Wounds     int    `json:"wounds"`
+	MaxWounds  int    `json:"maxWounds"`
+	Fainted    bool   `json:"fainted"`
 	Actions    int    `json:"actions"`
 	Hand       []int  `json:"hand"`
+	Food       int    `json:"food"`
 	Resources  int    `json:"resources"`
 	Energy     int    `json:"energy"`
-	Damage     int    `json:"damage"`
 }
 
 type CreatureDTO struct {
@@ -41,7 +43,6 @@ type CreatureDTO struct {
 	LocationID int    `json:"locationId"`
 	Health     int    `json:"health"`
 	MaxHealth  int    `json:"maxHealth"`
-	Damage     int    `json:"damage"`
 	Flavor     string `json:"flavor"`
 	Exhausted  bool   `json:"exhausted"`
 }
@@ -62,7 +63,7 @@ type HarvestableDTO struct {
 	ID         int      `json:"id"`
 	Name       string   `json:"name"`
 	LocationID int      `json:"locationId"`
-	Healing    YieldDTO `json:"healing"`
+	Nutrition  YieldDTO `json:"nutrition"`
 	Resources  YieldDTO `json:"resources"`
 	Flavor     string   `json:"flavor"`
 }
@@ -120,23 +121,22 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 		}
 		out.Players = append(out.Players, PlayerDTO{
 			ID: p.ID, Name: p.Name, LocationID: p.CurrentLocation.ID,
-			Health: p.CurrentHealth, MaxHealth: p.MaxHealth,
-			Actions: p.RemainingActions, Hand: hand, Resources: p.ResourcesAvailable, Energy: p.Energy,
-			Damage: p.Damage,
+			Wounds: p.Wounds, MaxWounds: player.MaxWounds, Fainted: p.Fainted(),
+			Actions: p.RemainingActions, Hand: hand, Food: p.Food, Resources: p.ResourcesAvailable, Energy: p.Energy,
 		})
 	}
 
 	for _, c := range gs.Creatures {
 		out.Creatures = append(out.Creatures, CreatureDTO{
 			ID: c.ID, Name: c.Name, Flavor: c.Flavor, LocationID: c.CurrentLocation.ID,
-			Health: c.CurrentHealth, MaxHealth: c.MaxHealth, Damage: c.Damage, Exhausted: c.Distracted,
+			Health: c.CurrentHealth, MaxHealth: c.MaxHealth, Exhausted: c.Distracted,
 		})
 	}
 
 	for _, h := range gs.HarvestUnits {
 		out.HarvestNodes = append(out.HarvestNodes, HarvestableDTO{
 			ID: h.ID, Name: h.Name, Flavor: h.Flavor, LocationID: h.StaticLocation.ID,
-			Healing:   yieldDTO(h.HealYieldConfig),
+			Nutrition: yieldDTO(h.NutritionYieldConfig),
 			Resources: yieldDTO(h.ResourceYieldConfig),
 		})
 	}

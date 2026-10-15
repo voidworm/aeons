@@ -15,13 +15,14 @@ export interface PlayerDTO {
   id: number;
   name: string;
   locationId: number;
-  health: number;
-  maxHealth: number;
+  wounds: number;
+  maxWounds: number;
+  fainted: boolean;
   actions: number;
   hand: number[];
+  food: number;
   resources: number;
   energy: number;
-  damage: number;
 }
 
 export interface CreatureDTO {
@@ -30,7 +31,6 @@ export interface CreatureDTO {
   locationId: number;
   health: number;
   maxHealth: number;
-  damage: number;
   flavor: string;
   exhausted: boolean;
 }
@@ -40,7 +40,7 @@ export interface HarvestNodeDTO {
   name: string;
   flavor: string;
   locationId: number;
-  healing: HarvestYieldDTO;
+  nutrition: HarvestYieldDTO;
   resources: HarvestYieldDTO;
 }
 
@@ -75,7 +75,7 @@ export interface GameStateDTO {
 
 export interface CreatureAttackDTO {
   targetPlayerId: number;
-  damage: number;
+  fainted: boolean; // the wound made the player faint
 }
 
 export interface CreatureEventDTO {
@@ -96,7 +96,7 @@ export interface UpkeepEventDTO {
 
 export interface HarvestResultDTO {
   harvestableId: number;
-  healing: number;
+  nutrition: number;
   resources: number;
 }
 

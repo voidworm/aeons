@@ -10,7 +10,7 @@ export class HarvestResultPopup extends Phaser.GameObjects.Container {
   private static readonly OUTLINE_COLOR = 0x2a1809;
   private static readonly DEPTH = 2000;
 
-  constructor(scene: MainScene, harvestableName: string, healing: number, resources: number) {
+  constructor(scene: MainScene, harvestableName: string, nutrition: number, resources: number) {
     const { width, height } = scene.scale;
     super(scene, width / 2, height / 2);
     const { WIDTH, HEIGHT, COLOR, OUTLINE_COLOR } = HarvestResultPopup;
@@ -35,7 +35,7 @@ export class HarvestResultPopup extends Phaser.GameObjects.Container {
     ).setStrokeStyle(4, OUTLINE_COLOR);
     const title = this.text(scene, 'Harvested', -HEIGHT / 2 + 40, '34px', true);
     const source = this.text(scene, harvestableName, -HEIGHT / 2 + 72, '30px', true);
-    const yields = this.text(scene, `Healing: ${healing}\nResources: ${resources}`, 20, '30px');
+    const yields = this.text(scene, `Nutrition: ${nutrition}\nResources: ${resources}`, 20, '30px');
     const close = new ControlButton(scene, 'OK', () => this.destroy());
     close.setY(HEIGHT / 2 - 55);
 

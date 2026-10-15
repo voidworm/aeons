@@ -13,7 +13,6 @@ type Unit struct {
 	moving.MovingEntity
 	combat.HealthPool
 	*CreatureBehaviourConfig
-	Damage int
 }
 
 type CreatureBehaviourConfig struct {
@@ -79,10 +78,6 @@ func (u *Unit) TakeDamage(amount int) int {
 	u.Enraged = true
 	u.CurrentHealth = max(u.CurrentHealth-amount, 0)
 	return u.CurrentHealth
-}
-
-func (ee *Unit) OutgoingDamage() int {
-	return ee.Damage
 }
 
 func (u *Unit) IsEvadable() bool {

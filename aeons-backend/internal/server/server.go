@@ -65,7 +65,7 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 				s.send(ctx, conn, MsgError, err.Error())
 			} else if harvested != nil {
 				s.send(ctx, conn, MsgHarvestResult, HarvestResultPayload{
-					HarvestableID: payload.TargetID, Healing: harvested.Healing, Resources: harvested.Resources,
+					HarvestableID: payload.TargetID, Nutrition: harvested.Nutrition, Resources: harvested.Resources,
 				})
 			}
 			s.sendLog(ctx, conn, gs)
@@ -123,7 +123,7 @@ func creaturePhasePayload(events []game.CreatureEvent) CreaturePhasePayload {
 	for _, e := range events {
 		attacks := make([]CreatureAttackDTO, 0, len(e.Attacks))
 		for _, a := range e.Attacks {
-			attacks = append(attacks, CreatureAttackDTO{TargetPlayerID: a.TargetPlayerID, Damage: a.Damage})
+			attacks = append(attacks, CreatureAttackDTO{TargetPlayerID: a.TargetPlayerID, Fainted: a.Fainted})
 		}
 		out.Events = append(out.Events, CreatureEventDTO{
 			CreatureID: e.CreatureID, FromLocationID: e.FromLocationID,

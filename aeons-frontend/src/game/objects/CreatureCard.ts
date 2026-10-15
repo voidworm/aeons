@@ -8,7 +8,6 @@ export class CreatureCard extends Card {
   private turnTween: Phaser.Tweens.Tween | null = null;
   private stats!: Phaser.GameObjects.Text;
   private maxHealth: number;
-  private damage: number;
 
   constructor(
     scene: MainScene,
@@ -19,7 +18,6 @@ export class CreatureCard extends Card {
     flavor: string,
     health: number,
     maxHealth: number,
-    damage: number,
   ) {
     super(scene, x, y, {
       id: id,
@@ -33,7 +31,6 @@ export class CreatureCard extends Card {
     });
 
     this.maxHealth = maxHealth;
-    this.damage = damage;
     this.initFrameDetails(health);
   }
 
@@ -71,7 +68,7 @@ export class CreatureCard extends Card {
 
   private statsText(health: number): string {
     const hpPct = this.maxHealth > 0 ? Math.round((health / this.maxHealth) * 100) : 0;
-    return `${hpPct}% HP    ·    ${this.damage} DMG`;
+    return `${hpPct}% HP`;
   }
 
   static fromDto(scene: MainScene, x: number, y: number, dto: CreatureDTO) {
@@ -84,7 +81,6 @@ export class CreatureCard extends Card {
       dto.flavor,
       dto.health,
       dto.maxHealth,
-      dto.damage,
     );
     void card.setExhausted(dto.exhausted, false);
     return card;

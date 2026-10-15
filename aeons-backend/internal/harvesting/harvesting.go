@@ -22,7 +22,7 @@ type Unit struct {
 	Name                string
 	Flavor string
 	StaticLocation      *location.Unit
-	HealYieldConfig     *YieldConfig
+	NutritionYieldConfig     *YieldConfig
 	ResourceYieldConfig *YieldConfig
 }
 
@@ -46,7 +46,7 @@ func GenerateBerryBush(id int, location *location.Unit) *Unit {
 		Name:                "Berry Bush",
 		Flavor: "The berries around here are very sweet. Raccoons in particular like that.",
 		StaticLocation:      location,
-		HealYieldConfig:     GenerateSmallYieldConfig(),
+		NutritionYieldConfig:     GenerateSmallYieldConfig(),
 		ResourceYieldConfig: GenerateEmptyYieldConfig(),
 	}
 }
@@ -57,7 +57,7 @@ func GenerateBrush(id int, location *location.Unit) *Unit {
 		Name:                "Brush",
 		Flavor: "Thorns and sticks. You'll find a way to use these.",
 		StaticLocation:      location,
-		HealYieldConfig:     GenerateEmptyYieldConfig(),
+		NutritionYieldConfig:     GenerateEmptyYieldConfig(),
 		ResourceYieldConfig: GenerateSmallYieldConfig(),
 	}
 }
@@ -68,7 +68,7 @@ func GenerateMushroomField(id int, location *location.Unit) *Unit {
 		Name:                "Mushroom Field",
 		Flavor: "A multitude of fungi growing in a large patch.",
 		StaticLocation:      location,
-		HealYieldConfig:     GenerateLargeYieldConfig(),
+		NutritionYieldConfig:     GenerateLargeYieldConfig(),
 		ResourceYieldConfig: GenerateSmallYieldConfig(),
 	}
 }
@@ -79,7 +79,7 @@ func GenerateLushCopse(id int, location *location.Unit) *Unit {
 		Name:                "Lush Copse",
 		Flavor: "This copse is home to life of many sorts, not all of it edible, but vivid.",
 		StaticLocation:      location,
-		HealYieldConfig:     GenerateSmallYieldConfig(),
+		NutritionYieldConfig:     GenerateSmallYieldConfig(),
 		ResourceYieldConfig: GenerateLargeYieldConfig(),
 	}
 }
@@ -90,17 +90,15 @@ func GenerateFruitTree(id int, location *location.Unit) *Unit {
 		Name:                "Fruit Tree",
 		Flavor:			"An almost impossible to exhaust source of both fruit and branches.",
 		StaticLocation:      location,
-		HealYieldConfig:     GenerateLargeYieldConfig(),
+		NutritionYieldConfig:     GenerateLargeYieldConfig(),
 		ResourceYieldConfig: GenerateLargeYieldConfig(),
 	}
 }
 
 func (u *Unit) HarvestBy(player *player.Unit) *Yield {
 	yield := u.GenerateYield()
-	player.ResourcesAvailable += yield.Resources
-	player.CurrentHealth += yield.Healing
-	player.CurrentHealth = min(player.CurrentHealth, player.MaxHealth)
-	log.Printf("[HARVESTING] %s was harvested by %s for %d healing and %d resources\n", u.Name, player.Name, yield.Healing, yield.Resources)
+	player.Gather(yield.Nutrition, yield.Resources)
+	log.Printf("[HARVESTING] %s was harvested by %s for %d nutrition and %d resources\n", u.Name, player.Name, yield.Nutrition, yield.Resources)
 	return yield
 }
 
@@ -108,7 +106,7 @@ func (u *Unit) GenerateYield() *Yield {
 	name := fmt.Sprintf("%s Drop", u.Name)
 	valuesForDrop := make([]int, 0, 2)
 
-	configs := [2]*YieldConfig{u.HealYieldConfig, u.ResourceYieldConfig}
+	configs := [2]*YieldConfig{u.NutritionYieldConfig, u.ResourceYieldConfig}
 
 	for _, v := range configs {
 		valuesForDrop = append(valuesForDrop, v.Drop())
@@ -116,14 +114,14 @@ func (u *Unit) GenerateYield() *Yield {
 
 	yield := &Yield{
 		Name:      name,
-		Healing:   valuesForDrop[0],
+		Nutrition: valuesForDrop[0],
 		Resources: valuesForDrop[1],
 	}
 	return yield
 }
 
 func (u *Unit) Tick() {
-	u.HealYieldConfig.Tick()
+	u.NutritionYieldConfig.Tick()
 	u.ResourceYieldConfig.Tick()
 }
 
@@ -196,7 +194,7 @@ func (yc *YieldConfig) AvailableAmount() int {
 // basic yield
 type Yield struct {
 	Name      string
-	Healing   int
+	Nutrition int
 	Resources int
 }
 

@@ -117,7 +117,7 @@ func (gs *GameState) ResolvePlayerPhaseStep() error {
 			gs.ResolvePlayerPhaseStep()
 		} else {
 			activePlayer.RemainingActions -= 1
-			effect := combat.DamageEffect{Source: activePlayer, Target: target}
+			effect := combat.DamageEffect{Target: target}
 			effect.Apply()
 		}
 	case "Harvest":
@@ -192,6 +192,6 @@ func (gs *GameState) ResolveAttackForPlayer(player *player.Unit) {
 		log.Printf("%s has defeated %s!", player.Name, enemy.Name)
 	}
 
-	effect := combat.DamageEffect{Source: player, Target: enemy}
+	effect := combat.DamageEffect{Target: enemy}
 	effect.Apply()
 }

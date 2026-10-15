@@ -23,6 +23,7 @@ import { HandContainer } from '../objects/HandContainer';
 import { PlayerSwitcher } from '../objects/PlayerSwitcher';
 import { EventLog } from '../objects/EventLog';
 import { HarvestResultPopup } from '../objects/HarvestResultPopup';
+import { FaintedPopup } from '../objects/FaintedPopup';
 import { LocationConnector } from '../objects/LocationConnector';
 import { DragGroup } from '../objects/DragGroup';
 import { CURSOR_DEFAULT, CURSOR_GRAB, CURSOR_INTERACTIVE } from '../cursors';
@@ -306,10 +307,11 @@ export class MainScene extends Phaser.Scene {
       void card?.setExhausted(dto.exhausted);
     }
     for (const dto of state.harvestNodes) {
-      this.harvestableCards.find((h) => h.id === dto.id)?.setYields(dto.healing, dto.resources);
+      this.harvestableCards.find((h) => h.id === dto.id)?.setYields(dto.nutrition, dto.resources);
     }
     for (const dto of state.players) {
       const card = this.players.find((p) => p.id === dto.id);
+      card?.setDisabled(dto.fainted);
       const to = this.locationCards.find((l) => l.id === dto.locationId);
       if (card && to) void this.moveCardToLocation(card, to);
     }
@@ -317,8 +319,13 @@ export class MainScene extends Phaser.Scene {
 
   private showHarvestResult(result: HarvestResultDTO) {
     const harvestable = this.harvestableCards.find((h) => h.id === result.harvestableId);
-    const popup = new HarvestResultPopup(this, harvestable?.name ?? '', result.healing, result.resources);
+    const popup = new HarvestResultPopup(this, harvestable?.name ?? '', result.nutrition, result.resources);
     this.hideFrom(this.cameras.main, popup);
+  }
+
+  private showFainted(playerId: number) {
+    const player = this.players.find((p) => p.id === playerId);
+    this.hideFrom(this.cameras.main, new FaintedPopup(this, player?.name ?? ''));
   }
 
   private triggerCreaturePhase() {
@@ -341,6 +348,9 @@ export class MainScene extends Phaser.Scene {
         await this.creatureCards.find((c) => c.id === event.creatureId)?.setExhausted(true);
     }
     this.finishPhase();
+    for (const attack of events.flatMap((e) => e.attacks).filter((a) => a.fainted)) {
+      this.showFainted(attack.targetPlayerId);
+    }
   }
 
   //exhausted creatures turn upright again, one after another
@@ -530,8 +540,9 @@ export class MainScene extends Phaser.Scene {
     const location = this.locationCards.find((l) => l.id === state.locationId);
     this.playerSwitcher.setStats({
       energy: state.energy,
-      health: state.health,
-      maxHealth: state.maxHealth,
+      wounds: state.wounds,
+      maxWounds: state.maxWounds,
+      food: state.food,
       resources: state.resources,
       location: location?.name ?? '',
     });

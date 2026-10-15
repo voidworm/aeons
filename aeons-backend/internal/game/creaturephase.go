@@ -11,10 +11,10 @@ import (
 	"math/rand/v2"
 )
 
-// CreatureAttack is the damage one creature dealt to one player.
+// CreatureAttack is the wound one creature dealt to one player.
 type CreatureAttack struct {
 	TargetPlayerID int
-	Damage         int
+	Fainted        bool // the wound made the player faint
 }
 
 // CreatureEvent records what one creature did in the creature phase.
@@ -94,7 +94,7 @@ func (gs *GameState) DetermineMovementTargetForCreature(creature *creature.Unit)
 func (gs *GameState) DetermineMovementTargetForShyCreature(creature *creature.Unit) *location.Unit {
 	creatureLocation := creature.CurrentLocation
 
-	if !gs.LocationHasPlayers(creatureLocation) {
+	if !gs.LocationHasActivePlayers(creatureLocation) {
 		return creatureLocation
 	}
 
@@ -122,6 +122,9 @@ func (gs *GameState) DetermineMovementForCuriousCreature(creature *creature.Unit
 	lowestDistance := math.MaxInt
 	lowestPlayers := []*player.Unit{}
 	for _, currentPlayer := range gs.Players {
+		if currentPlayer.Fainted() {
+			continue
+		}
 		distance := creature.CurrentLocation.DistanceTo(currentPlayer.CurrentLocation)
 		if distance == lowestDistance {
 			lowestPlayers = append(lowestPlayers, currentPlayer)
@@ -129,6 +132,10 @@ func (gs *GameState) DetermineMovementForCuriousCreature(creature *creature.Unit
 			lowestPlayers = []*player.Unit{currentPlayer}
 			lowestDistance = distance
 		}
+	}
+
+	if len(lowestPlayers) == 0 {
+		return creature.CurrentLocation
 	}
 
 	//selects a random entry from the array
@@ -150,7 +157,12 @@ func (gs *GameState) ResolveCreatureAttack(creature *creature.Unit) []CreatureAt
 }
 
 func (gs *GameState) ResolveAttackForCreature(creature *creature.Unit) []CreatureAttack {
-	inRange := gs.PlayersAtLocation(creature)
+	inRange := []*player.Unit{}
+	for _, p := range gs.PlayersAtLocation(creature) {
+		if !p.Fainted() {
+			inRange = append(inRange, p)
+		}
+	}
 
 	if len(inRange) == 0 {
 		log.Printf("[CREATURE PHASE] %s has no targets for an attack.\n", creature.Name)
@@ -159,21 +171,20 @@ func (gs *GameState) ResolveAttackForCreature(creature *creature.Unit) []Creatur
 
 	attacks := []CreatureAttack{}
 	for _, target := range inRange {
-		effect := combat.DamageEffect{Source: creature, Target: target}
+		effect := combat.DamageEffect{Target: target}
 		creature.Distracted = true
 		effect.Apply()
-		log.Printf("[CREATURE PHASE] %s attacks %s for %d damage.", creature.Name, target.Name, creature.Damage)
-		attacks = append(attacks, CreatureAttack{TargetPlayerID: target.ID, Damage: creature.Damage})
-		gs.logCreatureAttack(creature.Name, target, creature.Damage)
+		log.Printf("[CREATURE PHASE] %s wounds %s.", creature.Name, target.Name)
+		attacks = append(attacks, CreatureAttack{TargetPlayerID: target.ID, Fainted: target.Fainted()})
+		gs.logCreatureAttack(creature.Name, target)
 	}
 	gs.Logf("%s is exhausted", creature.Name)
 	return attacks
 }
 
-func (gs *GameState) logCreatureAttack(attackerName string, target *player.Unit, damage int) {
-	if target.CurrentHealth == 0 {
-		gs.Logf("%s attacks %s for %d, %s is defeated", attackerName, target.Name, damage, target.Name)
-		return
+func (gs *GameState) logCreatureAttack(attackerName string, target *player.Unit) {
+	gs.Logf("%s wounds %s (%d/%d)", attackerName, target.Name, target.Wounds, player.MaxWounds)
+	if target.Fainted() {
+		gs.Logf("%s faints", target.Name)
 	}
-	gs.Logf("%s attacks %s for %d (%d/%d)", attackerName, target.Name, damage, target.CurrentHealth, target.MaxHealth)
 }

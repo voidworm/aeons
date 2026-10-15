@@ -23,6 +23,7 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
   private static readonly BUTTON_GAP = 20; // between the phase buttons
   static readonly PHASE_BUTTONS_WIDTH = 2 * ControlButton.WIDTH + PlayerSwitcher.BUTTON_GAP;
   private static readonly BOTTOM_INSET = 20;
+  private static readonly PANEL_LIFT = 15; // raises the whole switcher off the bottom edge
   private static readonly BUTTONS_LIFT = 40; // raises the phase buttons above the bottom edge
   private static readonly BACK_PREVIEW_OFFSET_Y = 24; // the back preview sits this much higher than the front one
 
@@ -88,7 +89,7 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
     const { HAND_GAP, BOTTOM_INSET, BUTTON_GAP, BUTTONS_LIFT } = PlayerSwitcher;
     const handHalfWidth = HandContainer.expectedHalfWidth();
     const originX = width / 2 - handHalfWidth - HAND_GAP;
-    const originY = height - BOTTOM_INSET;
+    const originY = height - BOTTOM_INSET - PlayerSwitcher.PANEL_LIFT;
     this.setPosition(originX, originY);
 
     // the phase buttons sit side by side right of the hand, pulled back in when they would leave the screen
