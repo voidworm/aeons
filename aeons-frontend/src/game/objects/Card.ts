@@ -281,6 +281,7 @@ export class Card extends Phaser.GameObjects.Container {
   }
 
   onPointerOver() {
+    if (this.suppressed) return;
     this.emit('cardPointerOver', this);
     this.isHovering = true;
     this.setHoverLift(true);
@@ -442,6 +443,11 @@ export class Card extends Phaser.GameObjects.Container {
 
   private refreshDisabledLayer() {
     this.disabledLayer.setVisible(this.isInactive());
+  }
+
+  //a card that is only displayed (e.g. summoned) must not react to the pointer
+  setPointerEnabled(on: boolean) {
+    if (this.hitbox.input) this.hitbox.input.enabled = on;
   }
 
   getHitbox(): Phaser.Geom.Rectangle {

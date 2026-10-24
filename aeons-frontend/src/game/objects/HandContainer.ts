@@ -89,8 +89,8 @@ export class HandContainer extends Phaser.GameObjects.Container {
     card.setPosition(tx, ty);
   }
 
-  //snap a card back to the hand after being dropped.
-  returnCard(card: PlayableCard): void {
+  //snap a card back to the hand after being dropped; snapBack forces the trip to its slot even over the hand area
+  returnCard(card: PlayableCard, snapBack = false): void {
     const hand = this.handHolding(card);
     if (!hand || card.parentContainer === hand.layer) return;
 
@@ -104,7 +104,7 @@ export class HandContainer extends Phaser.GameObjects.Container {
 
     const origin = this.dragOrigins.get(card);
     this.dragOrigins.delete(card);
-    if (inHandArea || !origin) return; // free placement inside the hand area
+    if ((inHandArea && !snapBack) || !origin) return; // free placement inside the hand area
 
     this.scene.tweens.add({
       targets: card,

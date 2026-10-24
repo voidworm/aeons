@@ -15,6 +15,7 @@ import {
 import type {
   CreatureEventDTO,
   GameStateDTO,
+  LocationDTO,
   HarvestResultDTO,
   PlayerDTO,
   UpkeepEventDTO,
@@ -27,15 +28,14 @@ import { HarvestResultPopup } from '../objects/HarvestResultPopup';
 import { FaintedPopup } from '../objects/FaintedPopup';
 import { LocationConnector } from '../objects/LocationConnector';
 import { DragGroup } from '../objects/DragGroup';
+import { layoutLocations } from '../layout/locationLayout';
+import { TargetingArrow } from '../objects/TargetingArrow';
 import { CURSOR_DEFAULT, CURSOR_GRAB, CURSOR_INTERACTIVE } from '../cursors';
 
 export class MainScene extends Phaser.Scene {
   private static readonly CARD_WIDTH = 252; // rendered card width
   private static readonly MARGIN = 50;
   private static readonly CARD_HEIGHT = 352;
-
-  private static readonly GRID_GAP = 112;
-  private static readonly GRID_COLUMNS = 4;
 
   private handContainer!: HandContainer;
   private playerSwitcher!: PlayerSwitcher;
@@ -52,7 +52,16 @@ export class MainScene extends Phaser.Scene {
   private players: PlayerCard[] = [];
   private playerStates: PlayerDTO[] = []; // latest server state, feeds the stats panel
 
+  private static readonly SUMMON_DURATION = 300;
+  private static readonly SUMMON_HOLD = 600; // an untargeted card rests at the summon position before it resolves
+
   private inDragging: boolean = false;
+  private targeting: {
+    card: PlayableCard;
+    legal: Card[];
+    arrow: TargetingArrow;
+    pressed: boolean; // a click started while targeting, so the release of the card drag doesn't count
+  } | null = null;
   private uiCamera!: Phaser.Cameras.Scene2D.Camera; // fixed camera for the hand and player switcher; the main camera pans over the board
   private boardBounds: Phaser.Geom.Rectangle | null = null;
   private static readonly ZOOM_MIN = 0.4;
@@ -91,6 +100,7 @@ export class MainScene extends Phaser.Scene {
     this.uiCamera = this.cameras.add();
     this.cameras.main.setZoom(MainScene.ZOOM_INITIAL);
     this.initPanning();
+    this.initTargetingInput();
 
     this.socket = connect((msg) => {
       switch (msg.type) {
@@ -171,6 +181,7 @@ export class MainScene extends Phaser.Scene {
 
   update(_timer: number, _delta: number) {
     this.connector?.redraw();
+    this.updateTargeting();
     if (this.inDragging || this.panLast) this.game.canvas.style.cursor = CURSOR_GRAB; // phaser swaps it on every hover change
   }
 
@@ -213,9 +224,9 @@ export class MainScene extends Phaser.Scene {
   }
 
   initLocations(inputGameState: GameStateDTO) {
-    const factor = this.factor();
-    for (const [i, location] of inputGameState.locations.entries()) {
-      const { x, y } = this.gridSlot(i, factor);
+    const slots = this.locationSlots(inputGameState.locations);
+    for (const location of inputGameState.locations) {
+      const { x, y } = slots.get(location.id)!;
 
       const c = LocationCard.fromDto(this, x, y, location);
       c.on('cardDragEnd', this.onCardDrop, this);
@@ -227,7 +238,8 @@ export class MainScene extends Phaser.Scene {
       this.locationCards.push(c);
     }
     this.connector = new LocationConnector(this, inputGameState.locations, this.locationCards);
-    this.hideFrom(this.uiCamera, this.connector);  }
+    this.hideFrom(this.uiCamera, this.connector);
+  }
 
   initHarvestNodes(inputGameState: GameStateDTO) {
     const factor = this.factor();
@@ -321,7 +333,12 @@ export class MainScene extends Phaser.Scene {
 
   private showHarvestResult(result: HarvestResultDTO) {
     const harvestable = this.harvestableCards.find((h) => h.id === result.harvestableId);
-    const popup = new HarvestResultPopup(this, harvestable?.name ?? '', result.nutrition, result.resources);
+    const popup = new HarvestResultPopup(
+      this,
+      harvestable?.name ?? '',
+      result.nutrition,
+      result.resources,
+    );
     this.hideFrom(this.cameras.main, popup);
   }
 
@@ -417,7 +434,12 @@ export class MainScene extends Phaser.Scene {
   //dragging empty space pans the board; the hand area and anything interactive don't start a pan
   private initPanning() {
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer, over: unknown[]) => {
-      if (over.length > 0 || this.handContainer.containsPoint(pointer.x, pointer.y)) return;
+      if (
+        this.targeting ||
+        over.length > 0 ||
+        this.handContainer.containsPoint(pointer.x, pointer.y)
+      )
+        return;
       this.updateBoardBounds();
       this.panLast = new Phaser.Math.Vector2(pointer.x, pointer.y);
     });
@@ -552,7 +574,7 @@ export class MainScene extends Phaser.Scene {
 
   //once we want to highlight cards that are legal targets of a drag this needs to change
   onCardPointerOver(card: Card) {
-    if (this.inDragging) return;
+    if (this.inDragging || this.targeting) return;
     this.children.bringToTop(card);
     this.children.queueDepthSort(); // bringToTop alone would put the card above higher-depth objects like the hand
     if (card instanceof LocationCard) card.raiseContents();
@@ -619,7 +641,6 @@ export class MainScene extends Phaser.Scene {
     return this.creatureCards.filter((c) => c.homeLocation === here);
   }
 
-  //wiggles every enabled card under the pointer while a playable card is dragged
   onCardDragged(card: Card) {
     if (card.homeLocation) {
       card.homeLocation.constrainDrag(card);
@@ -628,11 +649,6 @@ export class MainScene extends Phaser.Scene {
     if (card instanceof LocationCard) {
       card.syncContents();
       return;
-    }
-    if (!(card instanceof PlayableCard) || card.isDisabledByRules()) return;
-    const { x, y } = this.boardPoint();
-    for (const target of this.dropTargets()) {
-      target.setDropTarget(target.getHitbox().contains(x, y));
     }
   }
 
@@ -649,29 +665,95 @@ export class MainScene extends Phaser.Scene {
   onCardDrop(card: Card) {
     this.inDragging = false;
     this.restoreCursor();
-    this.dropTargets().forEach((t) => t.setDropTarget(false));
     if (!(card instanceof PlayableCard)) return;
-    this.handContainer.returnCard(card);
-    if (card.isDisabledByRules()) {
+    const pointer = this.input.activePointer;
+    if (card.isDisabledByRules() || this.handContainer.containsPoint(pointer.x, pointer.y)) {
+      this.handContainer.returnCard(card);
       this.releaseSuppressed();
       return;
     }
+    void this.summon(card);
+  }
 
-    // a dragged hand card lives on the ui camera, so board cards never receive pointerover for it
-    const { x, y } = this.boardPoint();
+  //the card glides above the event log; targeted cards then wait for a click, the others resolve right away
+  private async summon(card: PlayableCard) {
+    card.setPointerEnabled(false);
+    const { x, y } = this.eventLog.summonPoint(card.cardHeight * card.scaleY);
+    await new Promise<void>((resolve) => {
+      this.tweens.add({
+        targets: card,
+        x,
+        y,
+        duration: MainScene.SUMMON_DURATION,
+        ease: 'Sine.easeOut',
+        onComplete: () => resolve(),
+      });
+    });
+
     if (this.hasTargetRestriction(card)) {
-      const target = this.legalTargets(card).find((t) => t.getHitbox().contains(x, y));
-      this.releaseSuppressed();
-      if (target) this.send('play_card', { cardId: card.id, targetId: target.id });
+      this.startTargeting(card);
       return;
     }
-    const locationHighlighted = this.locationCards.find((loc) => loc.getHitbox().contains(x, y));
-    if (locationHighlighted) {
-      this.send('poc_hello', {
-        played_card: card.name,
-        targeted_location: locationHighlighted.name,
-      });
+    await new Promise((resolve) => this.time.delayedCall(MainScene.SUMMON_HOLD, resolve));
+    this.send('poc_hello', { played_card: card.name });
+    this.finishSummon(card);
+  }
+
+  private startTargeting(card: PlayableCard) {
+    const arrow = new TargetingArrow(this);
+    this.hideFrom(this.cameras.main, arrow);
+    this.targeting = { card, legal: this.legalTargets(card), arrow, pressed: false };
+  }
+
+  //escape and clicks on empty board cancel, a click on a legal target confirms, anything else is ignored
+  private initTargetingInput() {
+    this.input.keyboard?.on('keydown-ESC', () => this.cancelTargeting());
+    this.input.on('pointerdown', () => {
+      if (this.targeting) this.targeting.pressed = true;
+    });
+    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (!this.targeting?.pressed) return;
+      this.targeting.pressed = false;
+      const { x, y } = this.boardPoint();
+      const target = this.targeting.legal.find((t) => t.getHitbox().contains(x, y));
+      if (target) this.confirmTarget(target);
+      else if (this.input.hitTestPointer(pointer).length === 0) this.cancelTargeting();
+    });
+  }
+
+  private updateTargeting() {
+    if (!this.targeting) return;
+    const { card, legal, arrow } = this.targeting;
+    const pointer = this.input.activePointer;
+    arrow.pointFromTo(
+      new Phaser.Math.Vector2(card.x, card.y - (card.cardHeight * card.scaleY) / 2),
+      new Phaser.Math.Vector2(pointer.x, pointer.y),
+    );
+    const { x, y } = this.boardPoint();
+    for (const target of this.dropTargets()) {
+      target.setDropTarget(legal.includes(target) && target.getHitbox().contains(x, y));
     }
+  }
+
+  private confirmTarget(target: Card) {
+    const card = this.targeting!.card;
+    this.send('play_card', { cardId: card.id, targetId: target.id });
+    this.finishSummon(card);
+  }
+
+  private cancelTargeting() {
+    if (!this.targeting) return;
+    this.finishSummon(this.targeting.card);
+  }
+
+  //ends the summon and sends the card back to its hand slot
+  private finishSummon(card: PlayableCard) {
+    this.targeting?.arrow.destroy();
+    this.targeting = null;
+    this.dropTargets().forEach((t) => t.setDropTarget(false));
+    this.releaseSuppressed();
+    card.setPointerEnabled(true);
+    this.handContainer.returnCard(card, true);
   }
 
   //temporary helper
@@ -683,26 +765,21 @@ export class MainScene extends Phaser.Scene {
     return { x: margin + halfWidth, y: this.scale.height - margin - halfHeight };
   }
 
-  //grid for initial location placement
-  private gridSlot(index: number, factor: number): { x: number; y: number } {
-    const margin = MainScene.MARGIN * factor;
-    const gap = MainScene.GRID_GAP * factor;
-    const cardWidth = LocationCard.LOC_WIDTH * factor;
-    const cardHeight = LocationCard.LOC_HEIGHT * factor;
-    // contained cards hang below each location
-    const hangHeight = (Card.HEIGHT - LocationCard.OVERLAP) * factor;
-
-    const cols = MainScene.GRID_COLUMNS;
-    const stepX = cardWidth + gap;
-    const stepY = cardHeight + hangHeight + gap;
-    const left = (this.scale.width - (cols * stepX - gap)) / 2;
-    // the camera zooms around the screen centre, so the world y that appears `margin` below the screen top is further up
-    const centreY = this.scale.height / 2;
-    const top = centreY + (margin - centreY) / MainScene.ZOOM_INITIAL;
-
-    return {
-      x: left + cardWidth / 2 + (index % cols) * stepX,
-      y: top + cardHeight / 2 + Math.floor(index / cols) * stepY,
+  //connected locations end up close together, and the whole map is centred on the screen
+  private locationSlots(locations: LocationDTO[]): Map<number, { x: number; y: number }> {
+    const factor = this.factor();
+    const footprint = {
+      width: LocationCard.FOOTPRINT_WIDTH,
+      height: LocationCard.FOOTPRINT_HEIGHT,
+      anchorY: (LocationCard.LOC_HEIGHT - LocationCard.FOOTPRINT_HEIGHT) / 2, // the location sits in the upper part of its footprint
     };
+    const layout = layoutLocations(locations, footprint, this.scale.width / this.scale.height);
+
+    return new Map(
+      [...layout].map(([id, p]) => [
+        id,
+        { x: this.scale.width / 2 + p.x * factor, y: this.scale.height / 2 + p.y * factor },
+      ]),
+    );
   }
 }

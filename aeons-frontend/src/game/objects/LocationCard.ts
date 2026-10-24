@@ -12,6 +12,10 @@ export class LocationCard extends Card {
   private static readonly SLOT_GAP = 12;
   private static readonly ROW_SPILL = 150; // how far the initial row may exceed the location's width before cards start to overlap
 
+  //the box a location claims on the map: its own card plus the row of contained cards hanging below
+  static readonly FOOTPRINT_WIDTH = LocationCard.LOC_WIDTH + LocationCard.ROW_SPILL;
+  static readonly FOOTPRINT_HEIGHT = LocationCard.LOC_HEIGHT + Card.HEIGHT - LocationCard.OVERLAP;
+
   public connections: number[] = []; // ids of the locations reachable from here
   private contents: Card[] = [];
   private offsets = new Map<Card, Phaser.Math.Vector2>(); // card centre relative to the location centre, unscaled
