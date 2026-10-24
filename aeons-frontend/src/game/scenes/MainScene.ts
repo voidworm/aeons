@@ -67,7 +67,6 @@ export class MainScene extends Phaser.Scene {
     arrow: TargetingArrow;
     pressed: boolean; // a click started while targeting, so the release of the card drag doesn't count
     hovered: Card | null; // the legal target under the pointer, raised above its neighbours
-    placed: boolean; // the drop animation has ended; until then clicks and escape are ignored so the card isn't sent back mid-animation
   } | null = null;
   private uiCamera!: Phaser.Cameras.Scene2D.Camera; // fixed camera for the hand and player switcher; the main camera pans over the board
   private boardBounds: Phaser.Geom.Rectangle | null = null;
@@ -781,8 +780,6 @@ export class MainScene extends Phaser.Scene {
 
     if (this.hasTargetRestriction(card)) {
       this.startTargeting(card);
-      await placed;
-      this.targeting!.placed = true;
       return;
     }
     await placed;
@@ -803,7 +800,6 @@ export class MainScene extends Phaser.Scene {
       arrow,
       pressed: false,
       hovered: null,
-      placed: false,
     };
   }
 
@@ -834,7 +830,7 @@ export class MainScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-ESC', () => this.cancelTargeting());
     this.input.on('pointermove', () => this.targeting?.arrow.setVisible(true));
     this.input.on('pointerdown', () => {
-      if (this.targeting?.placed) this.targeting.pressed = true;
+      if (this.targeting) this.targeting.pressed = true;
     });
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       if (!this.targeting?.pressed) return;
@@ -890,7 +886,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   private cancelTargeting() {
-    if (!this.targeting?.placed) return;
+    if (!this.targeting) return;
     this.finishSummon(this.targeting.card);
   }
 
@@ -900,6 +896,7 @@ export class MainScene extends Phaser.Scene {
     this.targeting = null;
     this.dropTargets().forEach((t) => t.setDropTarget(false));
     this.releaseSuppressed();
+    card.cancelPlayAnimation();
     card.setPointerEnabled(true);
     this.handContainer.returnCard(card, true);
   }

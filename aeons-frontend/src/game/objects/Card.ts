@@ -86,6 +86,7 @@ export class Card extends Phaser.GameObjects.Container {
   private hoverTweens: Phaser.Tweens.Tween[] = []; // the lift tweens only, so stopping them leaves e.g. a creature's turn alone
 
   protected shadow: Phaser.GameObjects.Graphics;
+  private face: Phaser.GameObjects.Graphics; // the coloured area inside the black border
   private targetBorder: Phaser.GameObjects.Graphics;
   protected cardFrame: Phaser.GameObjects.Container; // lift/scale target, sits at card centre
   protected surface: Phaser.GameObjects.Container; // top-left coordinate space
@@ -111,6 +112,7 @@ export class Card extends Phaser.GameObjects.Container {
       .setAlpha(rest.alpha);
     this.drawShadow();
 
+    this.face = new Phaser.GameObjects.Graphics(scene);
     this.surface = new Phaser.GameObjects.Container(
       scene,
       -this.cardWidth / 2,
@@ -167,6 +169,24 @@ export class Card extends Phaser.GameObjects.Container {
     );
   }
 
+  private drawFace(color: number): void {
+    const { BORDER, CORNER_RADIUS } = Card;
+    this.face
+      .clear()
+      .fillStyle(color, 1)
+      .fillRoundedRect(
+        BORDER,
+        BORDER,
+        this.cardWidth - 2 * BORDER,
+        this.cardHeight - 2 * BORDER,
+        CORNER_RADIUS - BORDER,
+      );
+  }
+
+  setFaceColor(color: number): void {
+    this.drawFace(color);
+  }
+
   private buildSurface(): void {
     const { BORDER, INSET, TITLE_Y, ART_Y, TEXT_PAD, CORNER_RADIUS } = Card;
     const INNER_WIDTH = this.cardWidth - 2 * INSET;
@@ -181,16 +201,10 @@ export class Card extends Phaser.GameObjects.Container {
       centerText = false,
     } = this.config;
 
+    this.drawFace(faceColor);
     this.surface.add([
       this.roundedRect(0, 0, this.cardWidth, this.cardHeight, CORNER_RADIUS, 0x000000),
-      this.roundedRect(
-        BORDER,
-        BORDER,
-        this.cardWidth - 2 * BORDER,
-        this.cardHeight - 2 * BORDER,
-        CORNER_RADIUS - BORDER,
-        faceColor,
-      ),
+      this.face,
       this.roundedRect(INSET, ART_Y, INNER_WIDTH, artHeight, CORNER_RADIUS - BORDER, 0x2ecc71),
       titleBelowArt
         ? this.label(INSET + INNER_WIDTH / 2, (ART_Y + artHeight + BOTTOM) / 2, this.name, {
@@ -369,6 +383,14 @@ export class Card extends Phaser.GameObjects.Container {
       duration: Card.LIFT_DURATION,
       ease: 'Sine.easeOut',
     });
+  }
+
+  //stops the landing where it is, e.g. when the card is sent back to the hand before it has settled
+  cancelPlayAnimation(): void {
+    this.tweensManager.killTweensOf([this, this.cardFrame, this.shadow]);
+    const pose = SHADOW_REST[this.config.shadow];
+    this.cardFrame.setScale(1).setY(0);
+    this.shadow.setPosition(pose.x, pose.y).setScale(pose.scale).setAlpha(pose.alpha);
   }
 
   //the card is gently placed on the table: it glides forward and up while it slowly settles from raised

@@ -1,10 +1,16 @@
-import type Phaser from 'phaser';
+import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
 import { Card } from './Card';
+import { KindredCard } from './KindredCard';
 import type { CreatureDTO } from './GameState';
 
 export class CreatureCard extends Card {
+  private static readonly FACE_COLOR = 0xad3d2b;
+  private static readonly FACE_FADE_DURATION = 600; // ms, when becoming kindred
   private exhausted = false;
+  private shownFaceColor = CreatureCard.FACE_COLOR; // changes along the colour fade
+  private faceColorGoal = CreatureCard.FACE_COLOR;
+  private faceTween: Phaser.Tweens.Tween | null = null;
   private turnTween: Phaser.Tweens.Tween | null = null;
   private stats!: Phaser.GameObjects.Text;
   private maxHealth: number;
@@ -25,7 +31,7 @@ export class CreatureCard extends Card {
       id: id,
       name: name,
       flavor: flavor,
-      faceColor: 0xad3d2b,
+      faceColor: CreatureCard.FACE_COLOR,
       artHeight: 136,
       shadow: 'flat',
       italicText: true,
@@ -62,6 +68,7 @@ export class CreatureCard extends Card {
 
   setKindredOf(ownerId: number | null, ownerName: string) {
     this.kindredOf = ownerId;
+    this.fadeFaceTo(ownerId === null ? CreatureCard.FACE_COLOR : KindredCard.KINDRED_FACE_COLOR);
     this.kindredLabel?.destroy();
     this.kindredLabel = null;
     if (ownerId === null) return;
@@ -74,6 +81,33 @@ export class CreatureCard extends Card {
       { fontSize: '11.2px', fontStyle: 'normal' },
     ).setOrigin(0.5, 0);
     this.addFrameDetails(this.kindredLabel);
+  }
+
+  private fadeFaceTo(goal: number) {
+    if (goal === this.faceColorGoal) return;
+    this.faceColorGoal = goal;
+    this.faceTween?.stop();
+    const from = Phaser.Display.Color.ValueToColor(this.shownFaceColor);
+    const to = Phaser.Display.Color.ValueToColor(goal);
+    const show = (color: number) => {
+      this.shownFaceColor = color;
+      this.setFaceColor(color);
+    };
+    this.faceTween = this.tweensManager.addCounter({
+      from: 0,
+      to: 100,
+      duration: CreatureCard.FACE_FADE_DURATION,
+      onUpdate: (tween) => {
+        const { r, g, b } = Phaser.Display.Color.Interpolate.ColorWithColor(
+          from,
+          to,
+          100,
+          tween.getValue() ?? 0,
+        );
+        show(Phaser.Display.Color.GetColor(r, g, b));
+      },
+      onComplete: () => show(goal),
+    });
   }
 
   initFrameDetails(currentHealth: integer) {

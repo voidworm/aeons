@@ -22,12 +22,16 @@ export class HandContainer extends Phaser.GameObjects.Container {
   private static readonly EXPECTED_HAND_SIZE = 7; // hands rarely get bigger than this for now
   private static readonly MIN_SCALE = 0.3;
   private static readonly FLY_DURATION = 350;
+  private static readonly RETURN_MIN_SCALE = 0.05; // how small a returning card gets
+  private static readonly SHRINK_DURATION = 500;
+  private static readonly GROW_DURATION = 750;
   private static readonly ENTER_DELAY = 200; // lets the previous hand leave first
   private static readonly DEPTH = 900; // above the board, below the player switcher
   private static readonly DRAG_DEPTH = 950; // a card pulled out of the hand stays above the hand area
 
   private background: Phaser.GameObjects.Arc; // one big circle, only its top cap is on screen
   private hands = new Map<number, Hand>();
+  private returning = new Set<PlayableCard>(); // cards currently shrinking on their way back
   private dragOrigins = new Map<PlayableCard, { x: number; y: number }>();
   private activeId: number | null = null;
   private containerWidth = 0;
@@ -95,31 +99,47 @@ export class HandContainer extends Phaser.GameObjects.Container {
     card.setPosition(tx, ty);
   }
 
-  //snap a card back to the hand after being dropped; snapBack forces the trip to its slot even over the hand area
+  //a card dropped over the hand area stays where it is; otherwise it shrinks away where it is,
+  //reappears tiny in its hand slot and grows back; snapBack forces the second even over the hand area
   returnCard(card: PlayableCard, snapBack = false): void {
     const hand = this.handHolding(card);
-    if (!hand || card.parentContainer === hand.layer) return;
+    if (!hand || card.parentContainer === hand.layer || this.returning.has(card)) return;
 
     const pointer = this.scene.input.activePointer;
     const inHandArea = this.containsPoint(pointer.x, pointer.y);
-    const local = hand.layer.getWorldTransformMatrix().applyInverse(card.x, card.y);
-    hand.layer.add(card);
-    card.setDepth(0);
-    card.setScale(1);
-    card.setPosition(local.x, local.y);
-    hand.cards.forEach((c) => hand.layer.bringToTop(c)); // keeps the original stacking order
-
     const origin = this.dragOrigins.get(card);
     this.dragOrigins.delete(card);
-    if ((inHandArea && !snapBack) || !origin) return; // free placement inside the hand area
 
+    if ((inHandArea && !snapBack) || !origin) {
+      const local = hand.layer.getWorldTransformMatrix().applyInverse(card.x, card.y);
+      this.putInHand(hand, card, local.x, local.y, 1);
+      return;
+    }
+    this.returning.add(card);
     this.scene.tweens.add({
       targets: card,
-      x: origin.x,
-      y: origin.y,
-      duration: 250,
-      ease: 'Sine.easeOut',
+      scale: HandContainer.RETURN_MIN_SCALE,
+      duration: HandContainer.SHRINK_DURATION,
+      ease: 'Sine.easeIn',
+      onComplete: () => {
+        this.returning.delete(card);
+        this.putInHand(hand, card, origin.x, origin.y, HandContainer.RETURN_MIN_SCALE);
+        this.scene.tweens.add({
+          targets: card,
+          scale: 1,
+          duration: HandContainer.GROW_DURATION,
+          ease: 'Back.easeOut',
+        });
+      },
     });
+  }
+
+  private putInHand(hand: Hand, card: PlayableCard, x: number, y: number, scale: number): void {
+    hand.layer.add(card);
+    card.setDepth(0);
+    card.setScale(scale);
+    card.setPosition(x, y);
+    hand.cards.forEach((c) => hand.layer.bringToTop(c)); // keeps the original stacking order
   }
 
   //x and y are local to the circle's bounding box
