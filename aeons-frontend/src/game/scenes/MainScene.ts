@@ -72,6 +72,8 @@ export class MainScene extends Phaser.Scene {
   private static readonly ZOOM_MIN = 0.4;
   private static readonly ZOOM_MAX = 1.5;
   private static readonly ZOOM_DEFAULT = 0.65;
+  private static readonly INTRO_ZOOM_START = 0.4;
+  private static readonly INTRO_ZOOM_DURATION = 1500; // ms
   private static readonly LAYOUT_SIZE = 1500; // the frame the locations settle in; the smaller, the closer they sit
   private static readonly WORLD_SIZE = 2000; // the map is laid out as if the screen were this big, whatever it really is
   private static readonly ZOOM_SPEED = 0.001; // per wheel delta unit
@@ -327,9 +329,15 @@ export class MainScene extends Phaser.Scene {
     const cam = this.cameras.main;
     const centre = MainScene.WORLD_SIZE / 2;
     const target = this.activePlayerCard() ?? { x: centre, y: centre };
-    cam.setZoom(MainScene.ZOOM_DEFAULT);
+    cam.setZoom(MainScene.INTRO_ZOOM_START);
     cam.scrollX = target.x - cam.width / 2;
     cam.scrollY = target.y - cam.height / 2;
+    this.tweens.add({
+      targets: cam,
+      zoom: MainScene.ZOOM_DEFAULT,
+      duration: MainScene.INTRO_ZOOM_DURATION,
+      ease: 'Linear',
+    });
   }
 
   //camera filters are per object, so everything the hand/switcher own has to be flagged once it exists
