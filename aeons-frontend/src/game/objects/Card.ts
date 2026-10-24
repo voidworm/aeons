@@ -51,6 +51,7 @@ export class Card extends Phaser.GameObjects.Container {
   static readonly PLAY_DURATION = 900; // ms a cast card takes to settle
   static readonly HOVER_ZOOM_DELAY = 3000; // ms of uninterrupted hovering before a board card zooms
   static readonly HOVER_ZOOM_FACTOR = 2.5;
+  static readonly LIFT_DURATION = 150; // ms
 
   // layout, all in top-left card coordinates
   protected static readonly BORDER = 8;
@@ -61,6 +62,7 @@ export class Card extends Phaser.GameObjects.Container {
   protected static readonly GAP = 12;
   protected static readonly BOTTOM = Card.HEIGHT - Card.INSET; // 328
   protected static readonly TEXT_PAD = 6.4;
+  protected static readonly CORNER_RADIUS = 10; // 2.5 mm on a 63 x 88 mm card, which is 4 px per mm at 252 x 352
 
   public readonly id: number;
   public readonly cardWidth: number;
@@ -81,11 +83,11 @@ export class Card extends Phaser.GameObjects.Container {
   private suppressed = false;
   private hoverTweens: Phaser.Tweens.Tween[] = []; // the lift tweens only, so stopping them leaves e.g. a creature's turn alone
 
-  protected shadow: Phaser.GameObjects.Rectangle;
+  protected shadow: Phaser.GameObjects.Graphics;
   protected cardFrame: Phaser.GameObjects.Container; // lift/scale target, sits at card centre
   protected surface: Phaser.GameObjects.Container; // top-left coordinate space
   protected hitbox: Phaser.GameObjects.Zone;
-  protected disabledLayer!: Phaser.GameObjects.Rectangle;
+  protected disabledLayer!: Phaser.GameObjects.Graphics;
 
   private dragLast = new Phaser.Math.Vector2();
   private dragTarget: Phaser.Math.Vector2 | null = null; // where the pointer wants the card, even if a constraint holds the card back
@@ -101,14 +103,10 @@ export class Card extends Phaser.GameObjects.Container {
     this.tweensManager = scene.tweens;
 
     const rest = SHADOW_REST[config.shadow];
-    this.shadow = new Phaser.GameObjects.Rectangle(
-      scene,
-      rest.x,
-      rest.y,
-      this.cardWidth,
-      this.cardHeight,
-      0x000000,
-    ).setAlpha(rest.alpha);
+    this.shadow = new Phaser.GameObjects.Graphics(scene)
+      .setPosition(rest.x, rest.y)
+      .setAlpha(rest.alpha);
+    this.drawShadow();
 
     this.surface = new Phaser.GameObjects.Container(
       scene,
@@ -150,7 +148,7 @@ export class Card extends Phaser.GameObjects.Container {
   }
 
   private buildSurface(): void {
-    const { BORDER, INSET, TITLE_Y, ART_Y, TEXT_PAD } = Card;
+    const { BORDER, INSET, TITLE_Y, ART_Y, TEXT_PAD, CORNER_RADIUS } = Card;
     const INNER_WIDTH = this.cardWidth - 2 * INSET;
     const BOTTOM = this.cardHeight - INSET;
     const {
@@ -164,15 +162,16 @@ export class Card extends Phaser.GameObjects.Container {
     } = this.config;
 
     this.surface.add([
-      this.rect(0, 0, this.cardWidth, this.cardHeight, 0x000000),
-      this.rect(
+      this.roundedRect(0, 0, this.cardWidth, this.cardHeight, CORNER_RADIUS, 0x000000),
+      this.roundedRect(
         BORDER,
         BORDER,
         this.cardWidth - 2 * BORDER,
         this.cardHeight - 2 * BORDER,
+        CORNER_RADIUS - BORDER,
         faceColor,
       ),
-      this.rect(INSET, ART_Y, INNER_WIDTH, artHeight, 0x2ecc71),
+      this.roundedRect(INSET, ART_Y, INNER_WIDTH, artHeight, CORNER_RADIUS - BORDER, 0x2ecc71),
       titleBelowArt
         ? this.label(INSET + INNER_WIDTH / 2, (ART_Y + artHeight + BOTTOM) / 2, this.name, {
             fontSize: '17.28px',
@@ -217,14 +216,43 @@ export class Card extends Phaser.GameObjects.Container {
       }
     }
 
-    this.disabledLayer = this.rect(0, 0, this.cardWidth, this.cardHeight, 0x111111, 0.5).setVisible(
-      false,
-    );
+    this.disabledLayer = this.roundedRect(
+      0,
+      0,
+      this.cardWidth,
+      this.cardHeight,
+      CORNER_RADIUS,
+      0x111111,
+      0.5,
+    ).setVisible(false);
     this.surface.add(this.disabledLayer);
   }
 
   protected rect(x: number, y: number, w: number, h: number, color: number, alpha = 1) {
     return new Phaser.GameObjects.Rectangle(this.scene, x, y, w, h, color, alpha).setOrigin(0, 0);
+  }
+
+  protected drawShadow(): void {
+    this.shadow.clear().fillStyle(0x000000, 1);
+    this.fillShadowRect(0, 0, this.cardWidth, this.cardHeight);
+  }
+
+  //centre-based, the shadow scales around the card's centre
+  protected fillShadowRect(centreX: number, centreY: number, w: number, h: number): void {
+    this.shadow.fillRoundedRect(centreX - w / 2, centreY - h / 2, w, h, Card.CORNER_RADIUS);
+  }
+
+  protected roundedRect(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    radius: number,
+    color: number,
+    alpha = 1,
+  ) {
+    const graphics = new Phaser.GameObjects.Graphics(this.scene);
+    return graphics.fillStyle(color, alpha).fillRoundedRect(x, y, w, h, radius);
   }
 
   protected label(
@@ -296,18 +324,29 @@ export class Card extends Phaser.GameObjects.Container {
 
   setFloating(lifted: boolean) {
     this.floating = lifted;
-    const pose = lifted ? SHADOW_LIFTED : SHADOW_REST[this.config.shadow];
+    this.setLifted(lifted);
+  }
+
+  //the raised look only, for cards that are carried along without being dragged themselves
+  //their shadow is then thrown by whoever carries them
+  setLifted(lifted: boolean, castsShadow = true) {
+    const rest = SHADOW_REST[this.config.shadow];
+    const pose = !lifted ? rest : castsShadow ? SHADOW_LIFTED : { ...rest, alpha: 0 };
+    // a running hover tween would otherwise fight the lift and its settle() would drop the card again
+    this.tweensManager.killTweensOf(this.cardFrame);
+    this.tweensManager.killTweensOf(this.shadow);
+    this.hoverTweens = [];
     this.tweensManager.add({
       targets: this.cardFrame,
       scale: lifted ? 1.05 : 1,
       y: lifted ? -8 : 0,
-      duration: 150,
+      duration: Card.LIFT_DURATION,
       ease: 'Sine.easeOut',
     });
     this.tweensManager.add({
       targets: this.shadow,
       ...pose,
-      duration: 150,
+      duration: Card.LIFT_DURATION,
       ease: 'Sine.easeOut',
     });
   }

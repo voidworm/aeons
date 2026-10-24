@@ -7,6 +7,7 @@ export class TargetingArrow extends Phaser.GameObjects.Graphics {
   private static readonly LINE_WIDTH = 6;
   private static readonly HEAD_LENGTH = 26;
   private static readonly HEAD_WIDTH = 22;
+  private static readonly HEAD_ROUNDING = 4; // corner radius of the head
   private static readonly BEND = 0.25; // how far the curve bows upwards, relative to the arrow length
   private static readonly DEPTH = 1100; // above the event log
 
@@ -27,17 +28,40 @@ export class TargetingArrow extends Phaser.GameObjects.Graphics {
     const headBase = to.clone().subtract(direction.clone().scale(HEAD_LENGTH));
     const side = new Phaser.Math.Vector2(-direction.y, direction.x).scale(HEAD_WIDTH / 2);
 
+    const shaft = new Phaser.Curves.QuadraticBezier(from, control, headBase);
+
     this.clear();
     this.lineStyle(LINE_WIDTH, COLOR, 1);
-    this.strokePoints(curve.getPoints(32));
+    this.strokePoints(shaft.getPoints(32));
     this.fillStyle(COLOR, 1);
-    this.fillTriangle(
-      to.x,
-      to.y,
-      headBase.x + side.x,
-      headBase.y + side.y,
-      headBase.x - side.x,
-      headBase.y - side.y,
+    this.fillRoundedTriangle(to, headBase.clone().add(side), headBase.clone().subtract(side));
+  }
+
+  //the triangle is shrunk towards its incentre by the corner radius, then every corner is rounded by that radius
+  private fillRoundedTriangle(
+    a: Phaser.Math.Vector2,
+    b: Phaser.Math.Vector2,
+    c: Phaser.Math.Vector2,
+  ): void {
+    const radius = TargetingArrow.HEAD_ROUNDING;
+    const [lenA, lenB, lenC] = [b.distance(c), a.distance(c), a.distance(b)];
+    const perimeter = lenA + lenB + lenC;
+    const incentre = a
+      .clone()
+      .scale(lenA)
+      .add(b.clone().scale(lenB))
+      .add(c.clone().scale(lenC))
+      .scale(1 / perimeter);
+    const s = perimeter / 2;
+    const inradius = Math.sqrt(((s - lenA) * (s - lenB) * (s - lenC)) / s);
+    const shrink = (inradius - radius) / inradius;
+    const [pa, pb, pc] = [a, b, c].map((p) =>
+      incentre.clone().add(p.clone().subtract(incentre).scale(shrink)),
     );
+
+    this.fillTriangle(pa.x, pa.y, pb.x, pb.y, pc.x, pc.y);
+    this.lineStyle(radius * 2, TargetingArrow.COLOR, 1);
+    this.strokeTriangle(pa.x, pa.y, pb.x, pb.y, pc.x, pc.y);
+    [pa, pb, pc].forEach((p) => this.fillCircle(p.x, p.y, radius));
   }
 }

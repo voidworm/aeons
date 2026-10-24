@@ -29,6 +29,7 @@ export class CreatureCard extends Card {
       artHeight: 136,
       shadow: 'flat',
       italicText: true,
+      centerTitle: true,
       footerHeight: 19.2,
     });
 

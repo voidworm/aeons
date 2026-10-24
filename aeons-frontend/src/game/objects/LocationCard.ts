@@ -43,6 +43,10 @@ export class LocationCard extends Card {
       centerText: true,
       textBoxRect: { x: (WIDTH - 220) / 2, y: HEIGHT - 36 - 64, w: 220, h: 64 },
     });
+    scene.events.on(Phaser.Scenes.Events.UPDATE, this.followWiggle, this);
+    this.once(Phaser.GameObjects.Events.DESTROY, () =>
+      scene.events.off(Phaser.Scenes.Events.UPDATE, this.followWiggle, this),
+    );
   }
 
   static fromDto(scene: MainScene, x: number, y: number, dto: LocationDTO) {
@@ -78,17 +82,57 @@ export class LocationCard extends Card {
     this.setContents([...this.contents, card]);
   }
 
+  // the contents ride along with the location, so they are raised with it and its shadow covers them
+  override setFloating(lifted: boolean): void {
+    super.setFloating(lifted);
+    for (const card of this.contents) card.setLifted(lifted, false);
+    if (lifted) {
+      this.drawShadow();
+      return;
+    }
+    this.settleContents();
+    this.scene.time.delayedCall(Card.LIFT_DURATION, () => this.floating || this.drawShadow());
+  }
+
+  private settleContents(): void {
+    this.syncContents();
+    this.scene.tweens.add({
+      targets: this.contents,
+      angle: 0,
+      duration: Card.LIFT_DURATION,
+      ease: 'Sine.easeOut',
+    });
+  }
+
+  // while floating, the shadow takes the shape of the location and its contents together
+  protected override drawShadow(): void {
+    super.drawShadow();
+    if (!this.floating) return;
+    for (const [card, offset] of this.offsets) {
+      this.fillShadowRect(offset.x, offset.y, card.cardWidth, card.cardHeight);
+    }
+  }
+
   // keeps the contents on top of the location in the display list
   raiseContents(): void {
     for (const card of this.contents) this.scene.children.bringToTop(card);
     this.scene.children.queueDepthSort();
   }
 
-  // moves the contents along with the location
+  // moves the contents along with the location; while it is carried they turn around its centre with it
   syncContents(): void {
+    const turn = this.floating ? this.rotation : 0;
     for (const [card, offset] of this.offsets) {
-      card.setPosition(this.x + offset.x * this.scaleX, this.y + offset.y * this.scaleX);
+      const turned = offset.clone().scale(this.scaleX).rotate(turn);
+      card.setPosition(this.x + turned.x, this.y + turned.y);
     }
+  }
+
+  // the location wiggles while it is carried; its contents wiggle with it instead of standing still
+  private followWiggle(): void {
+    if (!this.floating) return;
+    this.syncContents();
+    for (const card of this.contents) card.setAngle(this.angle);
   }
 
   // while a contained card is dragged: it may go anywhere as long as it still touches the location

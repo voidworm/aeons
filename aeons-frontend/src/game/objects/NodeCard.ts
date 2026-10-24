@@ -20,6 +20,7 @@ export class NodeCard extends Card {
       artHeight: 136,
       shadow: 'flat',
       italicText: true,
+      centerTitle: true,
       footerHeight: 19.2,
     });
     this.dto = dto;
