@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
 import { Card } from './Card';
-import { HandContainer } from './HandContainer';
 import type { PlayerCard } from './PlayerCard';
 import { MiniPlayerCard } from './MiniPlayerCard';
 import { ControlButton } from './ControlButton';
@@ -17,13 +16,14 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
   private static readonly PREVIEW_HEIGHT = Card.HEIGHT * PlayerSwitcher.PREVIEW_SCALE;
   private static readonly PREVIEW_OFFSET_X = 16;
   static readonly STACK_WIDTH = PlayerSwitcher.PREVIEW_WIDTH + 2 * PlayerSwitcher.PREVIEW_OFFSET_X;
-  private static readonly HAND_GAP = 250; // between the hand's outer cards and the panels / buttons
   private static readonly STATS_GAP = 16; // between the stack and the stats panel
+  private static readonly CLUSTER_WIDTH = PlayerStatsPanel.WIDTH + PlayerSwitcher.STATS_GAP + PlayerSwitcher.STACK_WIDTH; // previews and stats panel together
   private static readonly NAME_GAP = 8; // between the stats panel and the name button above it
   private static readonly LOG_GAP = 40; // between the phase buttons and the event log above them
   private static readonly BUTTON_GAP = 20; // between the phase buttons
   static readonly PHASE_BUTTONS_WIDTH = 2 * ControlButton.WIDTH + PlayerSwitcher.BUTTON_GAP;
-  private static readonly BOTTOM_INSET = 20;
+  private static readonly BOTTOM_INSET = 20; // also the gap to the side edges
+
   private static readonly PANEL_LIFT = 15; // raises the whole switcher off the bottom edge
   private static readonly BUTTONS_LIFT = 40; // raises the phase buttons above the bottom edge
   private static readonly BACK_PREVIEW_OFFSET_Y = 24; // the back preview sits this much higher than the front one
@@ -87,22 +87,16 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
   }
 
   resize(width: number, height: number): void {
-    const { HAND_GAP, BOTTOM_INSET, BUTTON_GAP, BUTTONS_LIFT } = PlayerSwitcher;
+    const { BOTTOM_INSET, BUTTON_GAP, BUTTONS_LIFT, CLUSTER_WIDTH } = PlayerSwitcher;
     const scale = uiScale(width, height);
-    const handHalfWidth = HandContainer.expectedHalfWidth() * scale;
-    const originX = width / 2 - handHalfWidth - HAND_GAP * scale;
+    const inset = BOTTOM_INSET * scale;
+    const originX = inset + CLUSTER_WIDTH * scale; // previews, name and stats sit in the bottom left corner
     const originY = height - (BOTTOM_INSET + PlayerSwitcher.PANEL_LIFT) * scale;
     this.setScale(scale);
     this.setPosition(originX, originY);
 
-    // the phase buttons sit side by side right of the hand, pulled back in when they would leave the screen
-    const buttonsLeft =
-      (Math.min(
-        width / 2 + handHalfWidth + HAND_GAP * scale,
-        width - (BOTTOM_INSET + PlayerSwitcher.PHASE_BUTTONS_WIDTH) * scale,
-      ) -
-        originX) /
-      scale;
+    // the phase buttons sit side by side in the bottom right corner
+    const buttonsLeft = (width - inset - PlayerSwitcher.PHASE_BUTTONS_WIDTH * scale - originX) / scale;
     const buttonY = -BUTTONS_LIFT - ControlButton.HEIGHT / 2;
     this.creaturePhaseButton.setPosition(buttonsLeft + ControlButton.WIDTH / 2, buttonY);
     this.upkeepButton.setPosition(buttonsLeft + ControlButton.WIDTH * 1.5 + BUTTON_GAP, buttonY);

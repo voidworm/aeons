@@ -58,6 +58,8 @@ export class MainScene extends Phaser.Scene {
   private players: PlayerCard[] = [];
   private playerStates: PlayerDTO[] = []; // latest server state, feeds the stats panel
 
+  private static readonly SPLIT_START_SCALE = 0.3; // relative to the node, the halves start this small
+  private static readonly SPLIT_DURATION = 400; // ms the halves take to grow out of the node
   private static readonly SUMMON_HOLD = 600; // an untargeted card rests at the summon position before it resolves
 
   private inDragging: boolean = false;
@@ -803,23 +805,25 @@ export class MainScene extends Phaser.Scene {
     };
   }
 
-  //a node that offers harvesting and foraging splits into one card each, side by side where the node stands
+  //a node that offers harvesting and foraging splits into one card each, side by side where the node stands;
+  //the halves grow out of the node
   private splitNodes(legal: Card[]): GatherOptionCard[] {
     const nodes = legal.filter((t): t is NodeCard => t instanceof NodeCard && t.modes.length > 1);
     return nodes.flatMap((node) => {
       const gap = (Card.WIDTH * node.scaleX) / 2 + 8;
       return node.modes.map((mode, i) => {
-        const half = new GatherOptionCard(
-          this,
-          node.x + (i === 0 ? -gap : gap),
-          node.y,
-          node.dto,
-          mode,
-        );
-        half.setScale(node.scaleX);
+        const half = new GatherOptionCard(this, node.x, node.y, node.dto, mode);
+        half.setScale(MainScene.SPLIT_START_SCALE * node.scaleX);
         half.setDepth(1500);
         this.hideFromUiCamera(half);
         node.setVisible(false);
+        this.tweens.add({
+          targets: half,
+          x: node.x + (i === 0 ? -gap : gap),
+          scale: node.scaleX,
+          duration: MainScene.SPLIT_DURATION,
+          ease: 'Back.easeOut',
+        });
         return half;
       });
     });
