@@ -12,6 +12,6 @@ type Effect struct {
 }
 
 func (ee *Effect) Apply() {
-	ee.BondedCreature.Bond()
+	ee.BondedCreature.Bond(ee.BondingPlayer)
 	log.Printf("[Player Phase] %s has bonded with %s (%d/%d).", ee.BondingPlayer.Name, ee.BondedCreature.NameWithID(), ee.BondedCreature.BondCounter, ee.BondedCreature.BondThreshold)
 }

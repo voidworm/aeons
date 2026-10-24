@@ -6,7 +6,7 @@ import (
 	"aeons/internal/combat"
 	"aeons/internal/creature"
 	"aeons/internal/distracting"
-	"aeons/internal/harvesting"
+	"aeons/internal/collecting"
 	"aeons/internal/location"
 	"aeons/internal/moving"
 	"aeons/internal/player"
@@ -19,10 +19,10 @@ func (gs *GameState) Init() {
 
 	gs.InitLocations()
 	gs.InitPlayers()
-	gs.InitHarvestingUnits()
+	gs.InitNodes()
 	gs.InitCreatures()
 
-	//init hands also sets playability of cards, so needs to be evoked after all creatures and harvesting have been added to the board
+	//init hands also sets playability of cards, so needs to be evoked after all creatures and nodes have been added to the board
 	gs.initHandsForAllPlayers()
 }
 
@@ -48,16 +48,16 @@ func (gs *GameState) InitLocations() {
 	gs.Locations = append(gs.Locations, SecludedDen, WindsweptPlains, RedhornLake, ConiferousGrove, AridPlateau, SlumberingCrag, HermitsRecluse)
 }
 
-func (gs *GameState) InitHarvestingUnits() {
+func (gs *GameState) InitNodes() {
 	grabBag := append([]*location.Unit(nil), gs.Locations...)
 	for range 5 {
 		r := rand.IntN(len(grabBag))
 		randomLocation := grabBag[r]
 		grabBag = slices.Delete(grabBag, r, r+1)
 
-		h := harvesting.GenerateRandomPredefinedHarvestingUnit(gs.NextID(), randomLocation)
-		gs.HarvestUnits = append(gs.HarvestUnits, h)
-		log.Printf("[INIT] Spawning harvestable %s at %s\n", h.Name, randomLocation.Name)
+		n := collecting.GenerateRandomNode(gs.NextID(), randomLocation)
+		gs.Nodes = append(gs.Nodes, n)
+		log.Printf("[INIT] Spawning node %s at %s\n", n.Name, randomLocation.Name)
 	}
 }
 
@@ -95,7 +95,7 @@ func (gs *GameState)initHandsForAllPlayers() {
 
 func (gs *GameState) GenerateBasicHand() []*card.PlayableCard {
 	basicHand := []*card.PlayableCard{}
-	basicHand = append(basicHand, gs.GenerateBasicMoveCard(), gs.GenerateBasicAttackCard(), gs.GenerateBasicDistractCard(), gs.GenerateBasicHarvestCard(), gs.GenerateBasicBondCard())
+	basicHand = append(basicHand, gs.GenerateBasicMoveCard(), gs.GenerateBasicAttackCard(), gs.GenerateBasicDistractCard(), gs.GenerateBasicGatherCard(), gs.GenerateBasicBondCard())
 	gs.PlayableCards = append(gs.PlayableCards, basicHand...)
 	return basicHand
 }
@@ -169,12 +169,12 @@ func (gs *GameState) GenerateBasicDistractCard() *card.PlayableCard {
 	return BasicDistractCard
 }
 
-func (gs *GameState) GenerateBasicHarvestCard() *card.PlayableCard {
-	BasicHarvestCard := &card.PlayableCard {
+func (gs *GameState) GenerateBasicGatherCard() *card.PlayableCard {
+	BasicGatherCard := &card.PlayableCard {
 		ID: gs.NextID(),
-		Type: card.PlayerHarvest,
-		Name: "Harvest",
-		EffectText: "Harvests a target Harvestable at your location.",
+		Type: card.PlayerGather,
+		Name: "Gather",
+		EffectText: "**Harvest** or **Forage** at your location",
 		TargetSpec: nil,
 		Candidates: []card.Targetable{},
 		Effect: nil,
@@ -182,14 +182,14 @@ func (gs *GameState) GenerateBasicHarvestCard() *card.PlayableCard {
 		Cost: 1,
 	}
 
-	BasicHarvestTargetHarvestable := &card.TargetSpec {
-		Type: card.TargetTypeHarvest,
+	BasicGatherTargetNode := &card.TargetSpec {
+		Type: card.TargetTypeNode,
 		Target: nil,
 		Filter: nil,
 	}
 
-	BasicHarvestCard.TargetSpec = BasicHarvestTargetHarvestable
-	return BasicHarvestCard
+	BasicGatherCard.TargetSpec = BasicGatherTargetNode
+	return BasicGatherCard
 }
 
 func (gs *GameState) GenerateBasicBondCard() *card.PlayableCard {
@@ -215,7 +215,20 @@ func (gs *GameState) GenerateBasicBondCard() *card.PlayableCard {
 	return BasicBondCard
 }
 
-func (gs *GameState) fillEffectForCard(c *card.PlayableCard, owner *player.Unit) {
+func (gs *GameState) GenerateKindredMoveCard() *card.PlayableCard {
+	return &card.PlayableCard{
+		ID:         gs.NextID(),
+		Type:       card.PlayerMoveKindred,
+		Name:       "Move Kindred",
+		EffectText: "Moves your kindred to an adjacent location. Ready again next upkeep.",
+		TargetSpec: &card.TargetSpec{Type: card.TargetTypeLocation},
+		Candidates: []card.Targetable{},
+		Range:      1,
+		Cost:       0,
+	}
+}
+
+func (gs *GameState) fillEffectForCard(c *card.PlayableCard, owner *player.Unit, mode collecting.Mode) {
 		switch c.Type {
 		case card.PlayerMove:
 			location,ok := c.Target.(*location.Unit)
@@ -226,12 +239,17 @@ func (gs *GameState) fillEffectForCard(c *card.PlayableCard, owner *player.Unit)
 				Entity: owner,
 				Target: location,
 			}
+		case card.PlayerMoveKindred:
+			c.Effect = &moving.MoveEffect {
+				Entity: gs.KindredOf(owner),
+				Target: c.Target.(*location.Unit),
+			}
 		case card.PlayerAttack:
 			target,ok := c.Target.(*creature.Unit)
 			if !ok {
 				//shouldnt happen
 			}
-			c.Effect = &combat.DamageEffect {
+			c.Effect = &creature.PlayerAttackEffect {
 				Target: target,
 			}
 		case card.PlayerDistract:
@@ -252,14 +270,15 @@ func (gs *GameState) fillEffectForCard(c *card.PlayableCard, owner *player.Unit)
 				BondingPlayer: owner,
 				BondedCreature: target,
 			}
-		case card.PlayerHarvest:
-			target,ok := c.Target.(*harvesting.Unit)
+		case card.PlayerGather:
+			target,ok := c.Target.(*collecting.Node)
 			if !ok {
 				//shouldnt happen
 			}
-			c.Effect = &harvesting.Effect {
+			c.Effect = &collecting.Effect {
 				Player: owner,
-				TargetHarvestable: target,
+				Node: target,
+				Mode: mode,
 			}
 	} 
 }

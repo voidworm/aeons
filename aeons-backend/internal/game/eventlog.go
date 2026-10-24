@@ -4,7 +4,7 @@ import (
 	"aeons/internal/card"
 	"aeons/internal/combat"
 	"aeons/internal/creature"
-	"aeons/internal/harvesting"
+	"aeons/internal/collecting"
 	"aeons/internal/location"
 	"aeons/internal/player"
 	"fmt"
@@ -24,13 +24,16 @@ func (gs *GameState) DrainEventLog() []string {
 func (gs *GameState) logPlayedCard(c *card.PlayableCard, owner *player.Unit) {
 	switch target := c.Target.(type) {
 	case *location.Unit:
+		if c.Type == card.PlayerMoveKindred {
+			gs.Logf("Kindred %s moves to %s", gs.KindredOf(owner).NameWithID(), target.Name)
+			return
+		}
 		gs.Logf("%s moves to %s", owner.Name, target.Name)
 	case *creature.Unit:
 		gs.logPlayedOnCreature(c, owner, target)
-	case *harvesting.Unit:
-		if harvest, ok := c.Effect.(*harvesting.Effect); ok && harvest.Yield != nil {
-			gs.Logf("%s harvests %s:", owner.Name, target.Name)
-			gs.Logf("      Yield: %d nutrition, %d resources", harvest.Yield.Nutrition, harvest.Yield.Resources)
+	case *collecting.Node:
+		if gathered, ok := c.Effect.(*collecting.Effect); ok {
+			gs.Logf("%s %s %s", owner.Name, gathered.Mode.Verb(), target.Name)
 		}
 	}
 }
@@ -43,7 +46,7 @@ func (gs *GameState) logPlayedOnCreature(c *card.PlayableCard, owner *player.Uni
 	if c.Type == card.PlayerBond {
 		gs.Logf("%s bonds with %s (%d/%d)", owner.Name, target.NameWithID(), target.BondCounter, target.BondThreshold)
 		if target.Bonded {
-			gs.Logf("%s is now bonded", target.NameWithID())
+			gs.Logf("%s is now kindred to %s", target.NameWithID(), owner.Name)
 		}
 		return
 	}

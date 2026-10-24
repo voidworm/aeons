@@ -4,6 +4,8 @@ import Phaser from 'phaser';
 import type { PlayableCardDTO } from './GameState';
 
 export class PlayableCard extends Card {
+  protected static readonly FACE_COLOR = 0x8b5e34;
+
   public effectType = -1;
 
   constructor(
@@ -14,12 +16,13 @@ export class PlayableCard extends Card {
     cardname: string,
     flavor: string,
     cost: number,
+    faceColor: number = PlayableCard.FACE_COLOR,
   ) {
     super(scene, x, y, {
       id: id,
       name: cardname,
       flavor: flavor,
-      faceColor: 0x8b5e34,
+      faceColor,
       artHeight: 136,
       shadow: 'hovers',
     });
@@ -37,10 +40,13 @@ export class PlayableCard extends Card {
     return !this.isSuppressed();
   }
 
+  protected applyDto(dto: PlayableCardDTO): this {
+    this.effectType = dto.effectType;
+    this.setDisabled(!dto.canBeCast);
+    return this;
+  }
+
   static fromDto(scene: MainScene, x: integer, y: integer, dto: PlayableCardDTO) {
-    const r = new PlayableCard(scene, x, y, dto.id, dto.name, dto.effectText, dto.cost);
-    r.effectType = dto.effectType;
-    r.setDisabled(!dto.canBeCast);
-    return r;
+    return new PlayableCard(scene, x, y, dto.id, dto.name, dto.effectText, dto.cost).applyDto(dto);
   }
 }

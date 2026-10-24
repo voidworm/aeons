@@ -1,19 +1,25 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
 import { ControlButton } from './ControlButton';
+import type { CollectMode } from './GameState';
 
-//modal summary of one harvest, closes on its button
-export class HarvestResultPopup extends Phaser.GameObjects.Container {
+const RESULT: Record<CollectMode, { title: string; gained: string }> = {
+  harvest: { title: 'Harvested', gained: '+1 Food' },
+  forage: { title: 'Foraged', gained: '+1 Material' },
+};
+
+//modal summary of one harvest or forage, closes on its button
+export class GatherResultPopup extends Phaser.GameObjects.Container {
   private static readonly WIDTH = 480;
   private static readonly HEIGHT = 320;
   private static readonly COLOR = 0xd8c9a3; // same as the card text boxes
   private static readonly OUTLINE_COLOR = 0x2a1809;
   private static readonly DEPTH = 2000;
 
-  constructor(scene: MainScene, harvestableName: string, nutrition: number, resources: number) {
+  constructor(scene: MainScene, nodeName: string, mode: CollectMode) {
     const { width, height } = scene.scale;
     super(scene, width / 2, height / 2);
-    const { WIDTH, HEIGHT, COLOR, OUTLINE_COLOR } = HarvestResultPopup;
+    const { WIDTH, HEIGHT, COLOR, OUTLINE_COLOR } = GatherResultPopup;
 
     // swallows clicks, so nothing behind the popup reacts
     const dim = new Phaser.GameObjects.Rectangle(
@@ -33,14 +39,15 @@ export class HarvestResultPopup extends Phaser.GameObjects.Container {
       HEIGHT,
       COLOR,
     ).setStrokeStyle(4, OUTLINE_COLOR);
-    const title = this.text(scene, 'Harvested', -HEIGHT / 2 + 40, '34px', true);
-    const source = this.text(scene, harvestableName, -HEIGHT / 2 + 72, '30px', true);
-    const yields = this.text(scene, `Nutrition: ${nutrition}\nResources: ${resources}`, 20, '30px');
+    const { title: titleText, gained } = RESULT[mode];
+    const title = this.text(scene, titleText, -HEIGHT / 2 + 40, '34px', true);
+    const source = this.text(scene, nodeName, -HEIGHT / 2 + 72, '30px', true);
+    const yields = this.text(scene, gained, 20, '30px');
     const close = new ControlButton(scene, 'OK', () => this.destroy());
     close.setY(HEIGHT / 2 - 55);
 
     this.add([dim, panel, title, source, yields, close]);
-    this.setDepth(HarvestResultPopup.DEPTH);
+    this.setDepth(GatherResultPopup.DEPTH);
     scene.add.existing(this);
   }
 

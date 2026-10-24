@@ -10,18 +10,17 @@ type UpkeepEvent struct {
 // ResolveUpkeepPhase runs the upkeep phase and returns what happened, in order.
 func (gs *GameState) ResolveUpkeepPhase() []UpkeepEvent {
 	gs.Logf("-- Upkeep phase --")
-	gs.ResolveResourceRespawn()
+	gs.ResolveRegrowth()
 	gs.ResolvePlayerRefresh()
 	events := gs.ResolveCreatureRecovery()
 
-	for _, p := range gs.Players {
-		gs.EvaluatePlayerHandPlayability(p)
-	}
+	gs.ResolveCooldownReset()
+	gs.RefreshHands()
 	return events
 }
 
-func (gs *GameState) ResolveResourceRespawn() {
-	for _, v := range gs.HarvestUnits {
+func (gs *GameState) ResolveRegrowth() {
+	for _, v := range gs.Nodes {
 		v.Tick()
 	}
 }

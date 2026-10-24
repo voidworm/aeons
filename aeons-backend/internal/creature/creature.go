@@ -4,6 +4,7 @@ import (
 	"aeons/internal/card"
 	"aeons/internal/combat"
 	"aeons/internal/moving"
+	"aeons/internal/player"
 	"fmt"
 )
 
@@ -91,15 +92,17 @@ type CreatureTurnStateConfig struct {
 }
 
 type CreatureBondConfig struct {
-	Bonded        bool // bonded creatures do not attack and do not prevent player movement
+	Bonded        bool // bonded creatures do not attack, do not prevent player movement and cannot be attacked or distracted
+	BondedTo      *player.Unit // the player that pushed the bond counter to the threshold, the creature is their kindred
 	BondCounter   int
 	BondThreshold int // the bond counter at which the creature becomes bonded
 }
 
-func (u *Unit) Bond() {
+func (u *Unit) Bond(by *player.Unit) {
 	u.BondCounter++
 	if u.BondCounter >= u.BondThreshold {
 		u.Bonded = true
+		u.BondedTo = by
 	}
 }
 
@@ -112,15 +115,30 @@ func (u *Unit) Tick() {
 	u.Distracted = false
 }
 
+// only damage dealt by players wears down the bond progress, hunters do not
+type PlayerAttackEffect struct {
+	Target *Unit
+}
+
+func (e *PlayerAttackEffect) Apply() {
+	if !e.Target.Bonded {
+		e.Target.BondCounter = 0
+	}
+	damage := combat.DamageEffect{Target: e.Target}
+	damage.Apply()
+}
+
 func (u *Unit) TakeDamage(amount int) int {
 	u.Enraged = true
-	u.Bonded = false
-	u.BondCounter = 0
 	u.CurrentHealth = max(u.CurrentHealth-amount, 0)
 	return u.CurrentHealth
 }
 
 func (u *Unit) IsEvadable() bool {
+
+	if u.Bonded {
+		return false
+	}
 
 	if u.Distracted {
 		return false

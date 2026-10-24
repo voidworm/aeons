@@ -9,7 +9,7 @@ const (
 	TargetTypePlayer TargetType = iota
 	TargetTypeCreature
 	TargetTypeLocation
-	TargetTypeHarvest
+	TargetTypeNode // a place to harvest or forage at
 )
 
 type EffectType int
@@ -17,8 +17,9 @@ const (
 	PlayerMove EffectType = iota
 	PlayerDistract
 	PlayerAttack
-	PlayerHarvest
+	PlayerGather
 	PlayerBond
+	PlayerMoveKindred
 )
 
 type Targetable interface {
@@ -51,6 +52,7 @@ type PlayableCard struct {
 	Effect effect.Effect
 	Cost int
 	Range int
+	OnCooldown bool // cannot be cast again until the next upkeep phase
 }
 
 func (c *PlayableCard) Play() {

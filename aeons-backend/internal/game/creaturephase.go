@@ -57,9 +57,7 @@ func (gs *GameState) ResolveCreaturePhase() []CreatureEvent {
 		events = append(events, preyReactions...)
 	}
 
-	for _, p := range gs.Players {
-		gs.EvaluatePlayerHandPlayability(p)
-	}
+	gs.RefreshHands()
 	return events
 }
 

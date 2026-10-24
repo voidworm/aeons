@@ -3,7 +3,7 @@ package game
 import (
 	"aeons/internal/card"
 	"aeons/internal/creature"
-	"aeons/internal/harvesting"
+	"aeons/internal/collecting"
 	"aeons/internal/location"
 	"aeons/internal/player"
 )
@@ -14,7 +14,7 @@ type GameState struct {
 	Locations    []*location.Unit
 	Players      []*player.Unit
 	Creatures    []*creature.Unit
-	HarvestUnits []*harvesting.Unit
+	Nodes []*collecting.Node
 	PlayableCards 			[]*card.PlayableCard
 }
 
@@ -35,7 +35,7 @@ func (gs *GameState) ReconcileDefeats() {
 
 func (gs *GameState) LocationHasEnemies(le *location.Unit) bool {
 	for _, v := range gs.Creatures {
-		if le == v.CurrentLocation {
+		if le == v.CurrentLocation && !v.Bonded {
 			return true
 		}
 	}
@@ -89,9 +89,9 @@ func (gs *GameState) LocationCanBeLeft(le *location.Unit) bool {
 	return !gs.LocationHasBlockingCreature(le)
 }
 
-func (gs *GameState) LocationHasHarvest(le *location.Unit) bool {
-	for _, v := range gs.HarvestUnits {
-		if le == v.StaticLocation {
+func (gs *GameState) LocationHasGatherable(le *location.Unit) bool {
+	for _, v := range gs.Nodes {
+		if le == v.StaticLocation && len(v.Modes()) > 0 {
 			return true
 		}
 	}
@@ -120,10 +120,10 @@ func (gs *GameState) EvadableEnemiesAtLocation(le *location.Unit) []*creature.Un
 	return found
 }
 
-func (gs *GameState) HarvestUnitsAtLocation(le *location.Unit) []*harvesting.Unit {
+func (gs *GameState) NodesAtLocation(le *location.Unit) []*collecting.Node {
 
-	found := []*harvesting.Unit{}
-	for _, v := range gs.HarvestUnits {
+	found := []*collecting.Node{}
+	for _, v := range gs.Nodes {
 		if le == v.StaticLocation {
 			found = append(found, v)
 		}
@@ -157,8 +157,8 @@ func (gs *GameState) Candidates(kind card.TargetType) []card.Targetable{
 	switch kind {
 	case card.TargetTypeCreature:
 		return toTargetables(gs.Creatures)
-	case card.TargetTypeHarvest:
-		return toTargetables(gs.HarvestUnits)
+	case card.TargetTypeNode:
+		return toTargetables(gs.Nodes)
 	case card.TargetTypePlayer:
 		return toTargetables(gs.Players)
 	case card.TargetTypeLocation:
@@ -192,8 +192,8 @@ func (gs *GameState) FillCardWithCandidates(input card.PlayableCard) {
 			input.Candidates = gs.Candidates(card.TargetTypeCreature)
 		case card.TargetTypePlayer:
 			input.Candidates = gs.Candidates(card.TargetTypePlayer)
-		case card.TargetTypeHarvest:
-			input.Candidates = gs.Candidates(card.TargetTypeHarvest)
+		case card.TargetTypeNode:
+			input.Candidates = gs.Candidates(card.TargetTypeNode)
 		case card.TargetTypeLocation:
 			input.Candidates = gs.Candidates(card.TargetTypeLocation)
 		default:
@@ -207,8 +207,8 @@ func (gs *GameState) GetTargetWithIdAndType(id int, ttype card.TargetType) card.
 			return getEntryWithID(gs.Creatures,id)
 		case card.TargetTypePlayer:
 			return getEntryWithID(gs.Players,id)
-		case card.TargetTypeHarvest:
-			return getEntryWithID(gs.HarvestUnits,id)
+		case card.TargetTypeNode:
+			return getEntryWithID(gs.Nodes,id)
 		case card.TargetTypeLocation:
 			return getEntryWithID(gs.Locations,id)
 		default:
@@ -239,13 +239,12 @@ func (gs *GameState) EvaluatePlayerHandPlayability(p *player.Unit) {
 					v.CanBeCast = false
 				}
 			case card.PlayerBond:
-				v.CanBeCast = gs.LocationHasBondableCreatures(p.CurrentLocation)
-			case card.PlayerHarvest:
-				if gs.LocationHasHarvest(p.CurrentLocation) && !gs.LocationHasBlockingCreature(p.CurrentLocation) {
-					v.CanBeCast = true
-				}else {
-					v.CanBeCast = false
-				}
+				v.CanBeCast = gs.KindredOf(p) == nil && gs.LocationHasBondableCreatures(p.CurrentLocation)
+			case card.PlayerMoveKindred:
+				kindred := gs.KindredOf(p)
+				v.CanBeCast = kindred != nil && !v.OnCooldown && len(kindred.CurrentLocation.OutgoingConnections) > 0
+			case card.PlayerGather:
+				v.CanBeCast = gs.LocationHasGatherable(p.CurrentLocation) && !gs.LocationHasBlockingCreature(p.CurrentLocation)
 			default:
 				v.CanBeCast = true
 		}

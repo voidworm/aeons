@@ -1,22 +1,26 @@
 import Phaser from 'phaser';
 import { PlayableCard } from '../objects/PlayableCard';
+import { KindredCard } from '../objects/KindredCard';
 import { LocationCard } from '../objects/LocationCard';
 import { Card } from '../objects/Card';
 import { connect } from '../../net/socket';
 import { CreatureCard } from '../objects/CreatureCard';
-import { HarvestableCard } from '../objects/HarvestableCard';
+import { NodeCard } from '../objects/NodeCard';
+import { GatherOptionCard } from '../objects/GatherOptionCard';
 import {
   EFFECT_PLAYER_ATTACK,
   EFFECT_PLAYER_BOND,
+  EFFECT_KINDRED_MOVE,
   EFFECT_PLAYER_DISTRACT,
-  EFFECT_PLAYER_HARVEST,
+  EFFECT_PLAYER_GATHER,
   EFFECT_PLAYER_MOVE,
 } from '../objects/GameState';
 import type {
   CreatureEventDTO,
   GameStateDTO,
   LocationDTO,
-  HarvestResultDTO,
+  GatherResultDTO,
+  PlayableCardDTO,
   PlayerDTO,
   UpkeepEventDTO,
 } from '../objects/GameState';
@@ -24,7 +28,7 @@ import { PlayerCard } from '../objects/PlayerCard';
 import { HandContainer } from '../objects/HandContainer';
 import { PlayerSwitcher } from '../objects/PlayerSwitcher';
 import { EventLog } from '../objects/EventLog';
-import { HarvestResultPopup } from '../objects/HarvestResultPopup';
+import { GatherResultPopup } from '../objects/GatherResultPopup';
 import { FaintedPopup } from '../objects/FaintedPopup';
 import { LocationConnector } from '../objects/LocationConnector';
 import { DragGroup } from '../objects/DragGroup';
@@ -42,12 +46,13 @@ export class MainScene extends Phaser.Scene {
   private eventLog!: EventLog;
   private gameStarted = false;
   private phaseRunning = false; // a creature or upkeep phase is being animated
+  private splits: GatherOptionCard[] = []; // stand in for nodes that offer both harvesting and foraging, from drag start until the cast ends
   private dragSuppressed: Card[] = []; // cards disabled for the duration of a drag
   private pendingState: GameStateDTO | null = null; // an update that arrived mid creature phase
 
   private playableCards: PlayableCard[] = [];
   private locationCards: LocationCard[] = [];
-  private harvestableCards: HarvestableCard[] = [];
+  private nodeCards: NodeCard[] = [];
   private creatureCards: CreatureCard[] = [];
   private players: PlayerCard[] = [];
   private playerStates: PlayerDTO[] = []; // latest server state, feeds the stats panel
@@ -119,8 +124,8 @@ export class MainScene extends Phaser.Scene {
         case 'log':
           this.eventLog.append(msg.payload.entries);
           break;
-        case 'harvest_result':
-          this.showHarvestResult(msg.payload);
+        case 'gather_result':
+          this.showGatherResult(msg.payload);
           break;
         case 'poc_reply':
           this.send('poc_ack');
@@ -154,7 +159,7 @@ export class MainScene extends Phaser.Scene {
       ...this.playableCards,
       ...this.locationCards,
       ...this.players,
-      ...this.harvestableCards,
+      ...this.nodeCards,
       ...this.creatureCards,
     ]) {
       card.setScale(factor);
@@ -188,14 +193,19 @@ export class MainScene extends Phaser.Scene {
   handleCardDragStart(_card: Card) {}
 
   initHands(inputGameState: GameStateDTO) {
-    for (const card of inputGameState.cardsInHand) {
-      const c = PlayableCard.fromDto(this, 0, 0, card);
-      c.on('cardDragEnd', this.onCardDrop, this);
-      c.on('cardPointerOver', this.onCardPointerOver, this);
-      c.on('cardDragStart', this.onCardDrag, this);
-      c.on('cardDragged', this.onCardDragged, this);
-      this.playableCards.push(c);
-    }
+    for (const card of inputGameState.cardsInHand) this.createPlayableCard(card);
+  }
+
+  private createPlayableCard(dto: PlayableCardDTO): PlayableCard {
+    const create =
+      dto.effectType === EFFECT_KINDRED_MOVE ? KindredCard.fromDto : PlayableCard.fromDto;
+    const c = create(this, 0, 0, dto);
+    c.on('cardDragEnd', this.onCardDrop, this);
+    c.on('cardPointerOver', this.onCardPointerOver, this);
+    c.on('cardDragStart', this.onCardDrag, this);
+    c.on('cardDragged', this.onCardDragged, this);
+    this.playableCards.push(c);
+    return c;
   }
 
   initPlayers(inputGameState: GameStateDTO) {
@@ -241,15 +251,15 @@ export class MainScene extends Phaser.Scene {
     this.hideFrom(this.uiCamera, this.connector);
   }
 
-  initHarvestNodes(inputGameState: GameStateDTO) {
+  initNodes(inputGameState: GameStateDTO) {
     const factor = this.factor();
-    for (const harvestable of inputGameState.harvestNodes) {
+    for (const node of inputGameState.nodes) {
       const { x, y } = this.stackAnchor(factor);
 
-      const c = HarvestableCard.fromDto(this, x, y, harvestable);
+      const c = NodeCard.fromDto(this, x, y, node);
       c.setScale(this.factor());
       this.hideFromUiCamera(c);
-      this.harvestableCards.push(c);
+      this.nodeCards.push(c);
       c.on('cardDragEnd', this.onCardDrop, this);
       c.on('cardPointerOver', this.onCardPointerOver, this);
       c.on('cardDragStart', this.onCardDrag, this);
@@ -285,7 +295,7 @@ export class MainScene extends Phaser.Scene {
     this.initPlayers(inputGameState);
     this.initLocations(inputGameState);
     this.initCreatures(inputGameState);
-    this.initHarvestNodes(inputGameState);
+    this.initNodes(inputGameState);
     this.assignToLocations(inputGameState);
     this.initFirstActivePlayer();
     this.hideUiFromMainCamera();
@@ -311,6 +321,7 @@ export class MainScene extends Phaser.Scene {
   private syncState(state: GameStateDTO) {
     this.playerStates = state.players;
     this.refreshStatsPanel();
+    this.syncHands(state);
     for (const dto of state.cardsInHand) {
       this.playableCards.find((c) => c.id === dto.id)?.setDisabled(!dto.canBeCast);
     }
@@ -318,10 +329,13 @@ export class MainScene extends Phaser.Scene {
       const card = this.creatureCards.find((c) => c.id === dto.id);
       card?.setHealth(dto.health);
       void card?.setExhausted(dto.exhausted);
-      card?.setBonded(dto.bonded);
+      const owner = state.players.find((p) => p.id === dto.kindredOf);
+      card?.setKindredOf(dto.kindredOf, owner?.name ?? '');
+      const to = this.locationCards.find((l) => l.id === dto.locationId);
+      if (card && to) void this.moveCardToLocation(card, to);
     }
-    for (const dto of state.harvestNodes) {
-      this.harvestableCards.find((h) => h.id === dto.id)?.setYields(dto.nutrition, dto.resources);
+    for (const dto of state.nodes) {
+      this.nodeCards.find((n) => n.id === dto.id)?.sync(dto);
     }
     for (const dto of state.players) {
       const card = this.players.find((p) => p.id === dto.id);
@@ -331,14 +345,32 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
-  private showHarvestResult(result: HarvestResultDTO) {
-    const harvestable = this.harvestableCards.find((h) => h.id === result.harvestableId);
-    const popup = new HarvestResultPopup(
-      this,
-      harvestable?.name ?? '',
-      result.nutrition,
-      result.resources,
-    );
+  //cards come and go with the server's hands, e.g. Bond is swapped for Move Kindred
+  private syncHands(state: GameStateDTO) {
+    const handCardIds = new Set(state.players.flatMap((p) => p.hand));
+    for (const card of this.playableCards.filter((c) => !handCardIds.has(c.id))) {
+      const owner = this.players.find((p) => p.cardsInHand.includes(card.id));
+      this.tweens.killTweensOf(card);
+      if (owner) this.handContainer.removeCard(owner.id, card, true);
+      this.playableCards = this.playableCards.filter((c) => c !== card);
+    }
+    for (const dto of state.cardsInHand) {
+      if (this.playableCards.some((c) => c.id === dto.id)) continue;
+      const owner = state.players.find((p) => p.hand.includes(dto.id));
+      if (!owner) continue;
+      const card = this.createPlayableCard(dto);
+      this.handContainer.addCard(owner.id, card);
+      this.hideFrom(this.cameras.main, card);
+    }
+    for (const dto of state.players) {
+      const player = this.players.find((p) => p.id === dto.id);
+      if (player) player.cardsInHand = dto.hand;
+    }
+  }
+
+  private showGatherResult(result: GatherResultDTO) {
+    const node = this.nodeCards.find((n) => n.id === result.nodeId);
+    const popup = new GatherResultPopup(this, node?.name ?? '', result.mode);
     this.hideFrom(this.cameras.main, popup);
   }
 
@@ -495,7 +527,7 @@ export class MainScene extends Phaser.Scene {
       ...this.locationCards,
       ...this.players,
       ...this.creatureCards,
-      ...this.harvestableCards,
+      ...this.nodeCards,
     ];
     if (cards.length === 0) return;
     this.boardBounds = cards
@@ -526,7 +558,7 @@ export class MainScene extends Phaser.Scene {
     return this.cameras.main.getWorldPoint(pointer.x, pointer.y);
   }
 
-  //links every player/creature/harvestable to the location it holds the id of
+  //links every player/creature/node to the location it holds the id of
   private assignToLocations(inputGameState: GameStateDTO) {
     for (const location of this.locationCards) {
       const here = (dto: { locationId: number }) => dto.locationId === location.id;
@@ -536,7 +568,7 @@ export class MainScene extends Phaser.Scene {
       location.setContents([
         ...cardsOf(this.players, inputGameState.players),
         ...cardsOf(this.creatureCards, inputGameState.creatures),
-        ...cardsOf(this.harvestableCards, inputGameState.harvestNodes),
+        ...cardsOf(this.nodeCards, inputGameState.nodes),
       ]);
       location.raiseContents();
     }
@@ -591,7 +623,11 @@ export class MainScene extends Phaser.Scene {
     if (!(card instanceof PlayableCard)) return;
     this.handContainer.startDrag(card);
     if (card.isDisabledByRules()) this.suppressBoard();
-    else if (this.hasTargetRestriction(card)) this.suppressAllButLegalTargets(card);
+    else if (this.hasTargetRestriction(card)) {
+      this.suppressAllButLegalTargets(card);
+      if (card.effectType === EFFECT_PLAYER_GATHER)
+        this.splits = this.splitNodes(this.legalTargets(card));
+    }
   }
 
   //an unplayable card has no valid target, so the whole board is veiled while it is dragged
@@ -600,7 +636,7 @@ export class MainScene extends Phaser.Scene {
       ...this.locationCards,
       ...this.players,
       ...this.creatureCards,
-      ...this.harvestableCards,
+      ...this.nodeCards,
     ];
     this.dragSuppressed.forEach((c) => c.setSuppressed(true));
   }
@@ -610,12 +646,13 @@ export class MainScene extends Phaser.Scene {
       EFFECT_PLAYER_MOVE,
       EFFECT_PLAYER_DISTRACT,
       EFFECT_PLAYER_ATTACK,
-      EFFECT_PLAYER_HARVEST,
+      EFFECT_PLAYER_GATHER,
       EFFECT_PLAYER_BOND,
+      EFFECT_KINDRED_MOVE,
     ].includes(card.effectType);
   }
 
-  //while a move, distract, attack or harvest card is dragged only its legal targets stay enabled
+  //while a move, distract, attack, bond or gather card is dragged only its legal targets stay enabled
   private suppressAllButLegalTargets(dragged: PlayableCard) {
     const legal = this.legalTargets(dragged);
     this.dragSuppressed = [
@@ -623,11 +660,24 @@ export class MainScene extends Phaser.Scene {
       ...this.locationCards,
       ...this.players,
       ...this.creatureCards,
-      ...this.harvestableCards,
+      ...this.nodeCards,
     ].filter((c) => c !== dragged && !legal.includes(c));
     this.dragSuppressed.forEach((c) => c.setSuppressed(true));
-    const here = this.players.find((p) => p.activePlayer)?.homeLocation;
-    if (dragged.effectType === EFFECT_PLAYER_MOVE && here) this.connector?.focusOn(here);
+    const mover =
+      dragged.effectType === EFFECT_KINDRED_MOVE ? this.activeKindred() : this.activePlayerCard();
+    if (dragged.effectType === EFFECT_PLAYER_MOVE || dragged.effectType === EFFECT_KINDRED_MOVE) {
+      if (mover?.homeLocation) this.connector?.focusOn(mover.homeLocation);
+    }
+  }
+
+  private activePlayerCard(): PlayerCard | undefined {
+    return this.players.find((p) => p.activePlayer);
+  }
+
+  //the creature that is kindred to the active player
+  private activeKindred(): CreatureCard | undefined {
+    const id = this.activePlayerCard()?.id;
+    return this.creatureCards.find((c) => c.kindredOf === id);
   }
 
   private legalTargets(card: PlayableCard): Card[] {
@@ -635,10 +685,14 @@ export class MainScene extends Phaser.Scene {
     if (card.effectType === EFFECT_PLAYER_MOVE) {
       return this.locationCards.filter((l) => here?.connections.includes(l.id));
     }
-    if (card.effectType === EFFECT_PLAYER_HARVEST) {
-      return this.harvestableCards.filter((h) => h.homeLocation === here);
+    if (card.effectType === EFFECT_KINDRED_MOVE) {
+      const kindredAt = this.activeKindred()?.homeLocation;
+      return this.locationCards.filter((l) => kindredAt?.connections.includes(l.id));
     }
-    return this.creatureCards.filter((c) => c.homeLocation === here);
+    if (card.effectType === EFFECT_PLAYER_GATHER) {
+      return this.nodeCards.filter((n) => n.homeLocation === here && n.modes.length > 0);
+    }
+    return this.creatureCards.filter((c) => c.homeLocation === here && c.kindredOf === null);
   }
 
   onCardDragged(card: Card) {
@@ -653,13 +707,16 @@ export class MainScene extends Phaser.Scene {
   }
 
   private releaseSuppressed() {
+    this.splits.forEach((s) => s.destroy());
+    this.splits = [];
+    this.nodeCards.forEach((n) => n.setVisible(true));
     this.dragSuppressed.forEach((c) => c.setSuppressed(false));
     this.dragSuppressed = [];
     this.connector?.clearFocus();
   }
 
   private dropTargets(): Card[] {
-    return [...this.locationCards, ...this.creatureCards, ...this.harvestableCards];
+    return [...this.locationCards, ...this.creatureCards, ...this.nodeCards, ...this.splits];
   }
 
   onCardDrop(card: Card) {
@@ -702,7 +759,36 @@ export class MainScene extends Phaser.Scene {
   private startTargeting(card: PlayableCard) {
     const arrow = new TargetingArrow(this);
     this.hideFrom(this.cameras.main, arrow);
-    this.targeting = { card, legal: this.legalTargets(card), arrow, pressed: false };
+    const legal = this.legalTargets(card);
+    const splitNodes = new Set(this.splits.map((s) => s.id));
+    this.targeting = {
+      card,
+      legal: [...legal.filter((t) => !splitNodes.has(t.id)), ...this.splits],
+      arrow,
+      pressed: false,
+    };
+  }
+
+  //a node that offers harvesting and foraging splits into one card each, side by side where the node stands
+  private splitNodes(legal: Card[]): GatherOptionCard[] {
+    const nodes = legal.filter((t): t is NodeCard => t instanceof NodeCard && t.modes.length > 1);
+    return nodes.flatMap((node) => {
+      const gap = (Card.WIDTH * node.scaleX) / 2 + 8;
+      return node.modes.map((mode, i) => {
+        const half = new GatherOptionCard(
+          this,
+          node.x + (i === 0 ? -gap : gap),
+          node.y,
+          node.dto,
+          mode,
+        );
+        half.setScale(node.scaleX);
+        half.setDepth(1500);
+        this.hideFromUiCamera(half);
+        node.setVisible(false);
+        return half;
+      });
+    });
   }
 
   //escape and clicks on empty board cancel, a click on a legal target confirms, anything else is ignored
@@ -737,7 +823,13 @@ export class MainScene extends Phaser.Scene {
 
   private confirmTarget(target: Card) {
     const card = this.targeting!.card;
-    this.send('play_card', { cardId: card.id, targetId: target.id });
+    const mode =
+      target instanceof GatherOptionCard
+        ? target.mode
+        : target instanceof NodeCard
+          ? target.modes[0]
+          : undefined;
+    this.send('play_card', { cardId: card.id, targetId: target.id, mode });
     this.finishSummon(card);
   }
 

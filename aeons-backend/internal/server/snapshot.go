@@ -3,7 +3,7 @@ package server
 import (
 	"aeons/internal/card"
 	"aeons/internal/game"
-	"aeons/internal/harvesting"
+	"aeons/internal/collecting"
 	"aeons/internal/player"
 )
 
@@ -12,7 +12,7 @@ type GameStateDTO struct {
 	Locations    []LocationDTO     `json:"locations"`
 	Players      []PlayerDTO       `json:"players"`
 	Creatures    []CreatureDTO     `json:"creatures"`
-	HarvestNodes []HarvestableDTO  `json:"harvestNodes"`
+	Nodes        []NodeDTO         `json:"nodes"`
 	CardsInHand  []PlayableCardDTO `json:"cardsInHand"`
 }
 
@@ -46,6 +46,7 @@ type CreatureDTO struct {
 	Flavor     string `json:"flavor"`
 	Exhausted  bool   `json:"exhausted"`
 	Bonded     bool   `json:"bonded"`
+	KindredOf  *int   `json:"kindredOf"` // id of the player this creature is kindred to
 }
 
 type PlayableCardDTO struct {
@@ -60,31 +61,38 @@ type PlayableCardDTO struct {
 	CandidateIDs []int  `json:"candidateIds"`
 }
 
-type HarvestableDTO struct {
+type NodeDTO struct {
 	ID         int      `json:"id"`
 	Name       string   `json:"name"`
 	LocationID int      `json:"locationId"`
-	Nutrition  YieldDTO `json:"nutrition"`
-	Resources  YieldDTO `json:"resources"`
+	Food       PoolDTO  `json:"food"`
+	Material   PoolDTO  `json:"material"`
+	Modes      []string `json:"modes"` // what can be collected here right now
 	Flavor     string   `json:"flavor"`
 }
 
-type YieldDTO struct {
-	Capacity     int `json:"capacity"`
-	MaxCapacity  int `json:"maxCapacity"`
-	YieldAmount  int `json:"yieldAmount"`
-	RespawnTicks int `json:"respawnTicks"`
-	CurrentTicks int `json:"currentTicks"`
+type PoolDTO struct {
+	Remaining     int `json:"remaining"`
+	Max           int `json:"max"`
+	RegrowthTimer int `json:"regrowthTimer"`
+	TurnsToRegrow int `json:"turnsToRegrow"`
 }
 
-func yieldDTO(yc *harvesting.YieldConfig) YieldDTO {
-	return YieldDTO{
-		Capacity:     yc.CurrentCapacity,
-		MaxCapacity:  yc.MaxCapacity,
-		YieldAmount:  yc.YieldAmount,
-		RespawnTicks: yc.RespawnTicks,
-		CurrentTicks: yc.CurrentTicks,
+func poolDTO(p *collecting.Pool) PoolDTO {
+	return PoolDTO{
+		Remaining:     p.Remaining,
+		Max:           p.Max,
+		RegrowthTimer: p.RegrowthTimer,
+		TurnsToRegrow: p.TicksUntilRegrowth(),
 	}
+}
+
+func modeStrings(modes []collecting.Mode) []string {
+	out := make([]string, 0, len(modes))
+	for _, m := range modes {
+		out = append(out, string(m))
+	}
+	return out
 }
 
 func playableCardDTO(c *card.PlayableCard) PlayableCardDTO {
@@ -128,17 +136,20 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 	}
 
 	for _, c := range gs.Creatures {
-		out.Creatures = append(out.Creatures, CreatureDTO{
+		var kindredOf *int
+		if c.BondedTo != nil {
+			kindredOf = &c.BondedTo.ID
+		}
+		out.Creatures = append(out.Creatures, CreatureDTO{KindredOf: kindredOf,
 			ID: c.ID, Name: c.Name, Flavor: c.Flavor, LocationID: c.CurrentLocation.ID,
 			Health: c.CurrentHealth, MaxHealth: c.MaxHealth, Exhausted: c.Distracted, Bonded: c.Bonded,
 		})
 	}
 
-	for _, h := range gs.HarvestUnits {
-		out.HarvestNodes = append(out.HarvestNodes, HarvestableDTO{
-			ID: h.ID, Name: h.Name, Flavor: h.Flavor, LocationID: h.StaticLocation.ID,
-			Nutrition: yieldDTO(h.NutritionYieldConfig),
-			Resources: yieldDTO(h.ResourceYieldConfig),
+	for _, n := range gs.Nodes {
+		out.Nodes = append(out.Nodes, NodeDTO{
+			ID: n.ID, Name: n.Name, Flavor: n.Flavor, LocationID: n.StaticLocation.ID,
+			Food: poolDTO(n.Food), Material: poolDTO(n.Material), Modes: modeStrings(n.Modes()),
 		})
 	}
 

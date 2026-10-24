@@ -35,11 +35,11 @@ func (p *Unit) Fainted() bool {
 }
 
 // Gather fills the shared inventory, food first. What doesn't fit is lost.
-func (p *Unit) Gather(nutrition, resources int) {
+func (p *Unit) Gather(food, material int) {
 	space := MaxCarrying - p.Food - p.ResourcesAvailable
-	food := min(nutrition, space)
-	p.Food += food
-	p.ResourcesAvailable += min(resources, space-food)
+	foodTaken := min(food, space)
+	p.Food += foodTaken
+	p.ResourcesAvailable += min(material, space-foodTaken)
 }
 
 func (u *Unit) GetTargetType() card.TargetType {

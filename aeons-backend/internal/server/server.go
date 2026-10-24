@@ -1,6 +1,7 @@
 package server
 
 import (
+	"aeons/internal/collecting"
 	"aeons/internal/game"
 	"context"
 	"encoding/json"
@@ -60,12 +61,12 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 				s.send(ctx, conn, MsgError, "bad play_card payload: "+err.Error())
 				continue
 			}
-			harvested, err := gs.PlayCard(payload.CardID, payload.TargetID)
+			gathered, err := gs.PlayCard(payload.CardID, payload.TargetID, collecting.Mode(payload.Mode))
 			if err != nil {
 				s.send(ctx, conn, MsgError, err.Error())
-			} else if harvested != nil {
-				s.send(ctx, conn, MsgHarvestResult, HarvestResultPayload{
-					HarvestableID: payload.TargetID, Nutrition: harvested.Nutrition, Resources: harvested.Resources,
+			} else if gathered != nil {
+				s.send(ctx, conn, MsgGatherResult, GatherResultPayload{
+					NodeID: gathered.Node.ID, Mode: string(gathered.Mode),
 				})
 			}
 			s.sendLog(ctx, conn, gs)

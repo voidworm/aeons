@@ -8,7 +8,8 @@ export class CreatureCard extends Card {
   private turnTween: Phaser.Tweens.Tween | null = null;
   private stats!: Phaser.GameObjects.Text;
   private maxHealth: number;
-  private bondedLabel: Phaser.GameObjects.Text | null = null;
+  public kindredOf: number | null = null; // id of the player this creature is kindred to
+  private kindredLabel: Phaser.GameObjects.Text | null = null;
 
   constructor(
     scene: MainScene,
@@ -58,19 +59,20 @@ export class CreatureCard extends Card {
     });
   }
 
-  setBonded(on: boolean) {
-    if (!on) {
-      this.bondedLabel?.destroy();
-      this.bondedLabel = null;
-      return;
-    }
-    if (this.bondedLabel) return;
+  setKindredOf(ownerId: number | null, ownerName: string) {
+    this.kindredOf = ownerId;
+    this.kindredLabel?.destroy();
+    this.kindredLabel = null;
+    if (ownerId === null) return;
+
     const textBoxTop = Card.ART_Y + this.config.artHeight + Card.GAP;
-    this.bondedLabel = this.label(this.cardWidth / 2, textBoxTop + Card.TEXT_PAD, 'Bonded', {
-      fontSize: '11.2px',
-      fontStyle: 'normal',
-    }).setOrigin(0.5, 0);
-    this.addFrameDetails(this.bondedLabel);
+    this.kindredLabel = this.label(
+      this.cardWidth / 2,
+      textBoxTop + Card.TEXT_PAD,
+      `Kindred to: ${ownerName}`,
+      { fontSize: '11.2px', fontStyle: 'normal' },
+    ).setOrigin(0.5, 0);
+    this.addFrameDetails(this.kindredLabel);
   }
 
   initFrameDetails(currentHealth: integer) {
@@ -99,7 +101,6 @@ export class CreatureCard extends Card {
       dto.maxHealth,
     );
     void card.setExhausted(dto.exhausted, false);
-    card.setBonded(dto.bonded);
     return card;
   }
 }

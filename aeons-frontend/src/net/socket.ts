@@ -1,7 +1,7 @@
 import type {
   CreaturePhaseDTO,
   GameStateDTO,
-  HarvestResultDTO,
+  GatherResultDTO,
   UpkeepPhaseDTO,
 } from '../game/objects/GameState';
 
@@ -10,7 +10,7 @@ export type ServerMessage =
   | { type: 'updated_game_state'; payload: GameStateDTO }
   | { type: 'creature_phase'; payload: CreaturePhaseDTO }
   | { type: 'upkeep_phase'; payload: UpkeepPhaseDTO }
-  | { type: 'harvest_result'; payload: HarvestResultDTO }
+  | { type: 'gather_result'; payload: GatherResultDTO }
   | { type: 'log'; payload: { entries: string[] } }
   | { type: 'poc_reply'; payload: string }
   | { type: 'poc_done'; payload: string }

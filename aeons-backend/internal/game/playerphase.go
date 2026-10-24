@@ -4,7 +4,7 @@ import (
 	"aeons/internal/card"
 	"aeons/internal/combat"
 	"aeons/internal/creature"
-	"aeons/internal/harvesting"
+	"aeons/internal/collecting"
 	"aeons/internal/location"
 	"aeons/internal/player"
 	"fmt"
@@ -13,9 +13,9 @@ import (
 )
 
 // PlayCard casts a card from a player's hand on the target with the given id.
-// Move, distract, attack and harvest cards are implemented so far.
-// Harvest cards return what the harvestable dropped, all others return nil.
-func (gs *GameState) PlayCard(cardID, targetID int) (*harvesting.Yield, error) {
+// Move, distract, attack, bond and gather cards are implemented so far.
+// Gather cards return the collecting effect, all others return nil. The mode only matters to gather cards.
+func (gs *GameState) PlayCard(cardID, targetID int, mode collecting.Mode) (*collecting.Effect, error) {
 	c, owner := gs.findCardInHands(cardID)
 	if c == nil {
 		return nil, fmt.Errorf("card %d is not in any hand", cardID)
@@ -45,17 +45,36 @@ func (gs *GameState) PlayCard(cardID, targetID int) (*harvesting.Yield, error) {
 		if target.CurrentLocation != owner.CurrentLocation {
 			return nil, fmt.Errorf("%s is not at %s", target.Name, owner.CurrentLocation.Name)
 		}
+		if target.Bonded && (c.Type == card.PlayerAttack || c.Type == card.PlayerDistract) {
+			return nil, fmt.Errorf("%s is kindred and cannot be targeted", target.NameWithID())
+		}
 		if c.Type == card.PlayerBond && !target.IsBondable() {
 			return nil, fmt.Errorf("%s cannot be bonded with right now", target.Name)
 		}
 		c.Target = target
-	case card.PlayerHarvest:
-		target, ok := getEntryWithID(gs.HarvestUnits, targetID).(*harvesting.Unit)
+	case card.PlayerMoveKindred:
+		kindred := gs.KindredOf(owner)
+		if kindred == nil {
+			return nil, fmt.Errorf("%s has no kindred", owner.Name)
+		}
+		target, ok := getEntryWithID(gs.Locations, targetID).(*location.Unit)
 		if !ok {
-			return nil, fmt.Errorf("%d is not a harvestable", targetID)
+			return nil, fmt.Errorf("%d is not a location", targetID)
+		}
+		if !slices.Contains(kindred.CurrentLocation.OutgoingConnections, target) {
+			return nil, fmt.Errorf("%s is not connected to %s", kindred.CurrentLocation.Name, target.Name)
+		}
+		c.Target = target
+	case card.PlayerGather:
+		target, ok := getEntryWithID(gs.Nodes, targetID).(*collecting.Node)
+		if !ok {
+			return nil, fmt.Errorf("%d is not a node", targetID)
 		}
 		if target.StaticLocation != owner.CurrentLocation {
 			return nil, fmt.Errorf("%s is not at %s", target.Name, owner.CurrentLocation.Name)
+		}
+		if !target.CanCollect(mode) {
+			return nil, fmt.Errorf("%s has nothing to %s", target.Name, mode)
 		}
 		c.Target = target
 	default:
@@ -63,23 +82,17 @@ func (gs *GameState) PlayCard(cardID, targetID int) (*harvesting.Yield, error) {
 	}
 
 	owner.Energy -= c.Cost
-	gs.fillEffectForCard(c, owner)
+	gs.fillEffectForCard(c, owner, mode)
 	c.Play()
+	if c.Type == card.PlayerMoveKindred {
+		c.OnCooldown = true
+	}
 	gs.logPlayedCard(c, owner)
 	gs.ReconcileDefeats()
 
-	for _, p := range gs.Players {
-		gs.EvaluatePlayerHandPlayability(p)
-	}
-	return harvestYield(c), nil
-}
-
-func harvestYield(c *card.PlayableCard) *harvesting.Yield {
-	harvest, ok := c.Effect.(*harvesting.Effect)
-	if !ok {
-		return nil
-	}
-	return harvest.Yield
+	gs.RefreshHands()
+	collected, _ := c.Effect.(*collecting.Effect)
+	return collected, nil
 }
 
 func (gs *GameState) findCardInHands(cardID int) (*card.PlayableCard, *player.Unit) {
@@ -170,11 +183,6 @@ func (gs *GameState) ChooseEvadeTargetForPlayer(player *player.Unit) (bool, *cre
 }
 
 func (gs *GameState) ChooseTargetForPlayerAttack(player *player.Unit) (bool, *creature.Unit, error) {
-	//old ui trash has been removed
-	return false, nil, nil
-}
-
-func (gs *GameState) ChooseHarvestableForHarvestAction(player *player.Unit) (bool, *harvesting.Unit, error) {
 	//old ui trash has been removed
 	return false, nil, nil
 }

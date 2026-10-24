@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
 import type { LocationCard } from './LocationCard';
 import { CURSOR_INTERACTIVE } from '../cursors';
+import { RichText } from './RichText';
 
 export type ShadowMode = 'hovers' | 'flat';
 
@@ -169,19 +170,28 @@ export class Card extends Phaser.GameObjects.Container {
         w: INNER_WIDTH,
         h: BOTTOM - footerHeight - top,
       };
+      const textX = box.x + box.w / 2;
+      const textY = box.y + (centerText ? box.h / 2 : box.h - TEXT_PAD);
+      const textStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+        ...TEXT_STYLE,
+        fontSize: '11.2px',
+        fontStyle: italicText ? 'italic' : 'normal',
+        align: 'center',
+        wordWrap: { width: box.w - 2 * TEXT_PAD },
+      };
       this.surface.add([
         this.rect(box.x, box.y, box.w, box.h, 0xd8c9a3),
-        this.label(
-          box.x + box.w / 2,
-          box.y + (centerText ? box.h / 2 : box.h - TEXT_PAD),
-          this.flavor,
-          {
-            fontSize: '11.2px',
-            fontStyle: italicText ? 'italic' : 'normal',
-            align: 'center',
-            wordWrap: { width: box.w - 2 * TEXT_PAD },
-          },
-        ).setOrigin(0.5, centerText ? 0.5 : 1),
+        this.flavor.includes('**')
+          ? new RichText(
+              this.scene,
+              textX,
+              textY,
+              this.flavor,
+              textStyle,
+              box.w - 2 * TEXT_PAD,
+              centerText ? 0.5 : 1,
+            )
+          : this.label(textX, textY, this.flavor, textStyle).setOrigin(0.5, centerText ? 0.5 : 1),
       ]);
     }
 

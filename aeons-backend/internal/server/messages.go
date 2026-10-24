@@ -18,7 +18,7 @@ const (
 	MsgTargets = "targets"
 	MsgCreaturePhase = "creature_phase"
 	MsgUpkeepPhase = "upkeep_phase"
-	MsgHarvestResult = "harvest_result"
+	MsgGatherResult = "gather_result"
 	MsgLog = "log"
 	MsgError = "error"
 
@@ -44,11 +44,13 @@ type SelectPlayerPayload struct {
 type PlayCardPayload struct {
 	CardID   int `json:"cardId"`
 	TargetID int `json:"targetId"`
+	Mode     string `json:"mode"` // harvest or forage, only read for gather cards
 }
 
 type ChooseTargetPayload struct {
 	CardID   int `json:"cardId"`
 	TargetID int `json:"targetId"`
+	Mode     string `json:"mode"` // harvest or forage, only read for gather cards
 }
 
 type HandPayload struct {
@@ -85,10 +87,9 @@ type LogPayload struct {
 	Entries []string `json:"entries"`
 }
 
-type HarvestResultPayload struct {
-	HarvestableID int `json:"harvestableId"`
-	Nutrition     int `json:"nutrition"`
-	Resources     int `json:"resources"`
+type GatherResultPayload struct {
+	NodeID int    `json:"nodeId"`
+	Mode   string `json:"mode"`
 }
 
 type CreatureAttackDTO struct {

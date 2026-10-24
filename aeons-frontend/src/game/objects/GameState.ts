@@ -2,8 +2,9 @@
 export const EFFECT_PLAYER_MOVE = 0;
 export const EFFECT_PLAYER_DISTRACT = 1;
 export const EFFECT_PLAYER_ATTACK = 2;
-export const EFFECT_PLAYER_HARVEST = 3;
+export const EFFECT_PLAYER_GATHER = 3;
 export const EFFECT_PLAYER_BOND = 4;
+export const EFFECT_KINDRED_MOVE = 5;
 
 export interface LocationDTO {
   id: number;
@@ -35,23 +36,26 @@ export interface CreatureDTO {
   flavor: string;
   exhausted: boolean;
   bonded: boolean;
+  kindredOf: number | null; // id of the player the creature is kindred to
 }
 
-export interface HarvestNodeDTO {
+export interface NodeDTO {
   id: number;
   name: string;
   flavor: string;
   locationId: number;
-  nutrition: HarvestYieldDTO;
-  resources: HarvestYieldDTO;
+  food: PoolDTO;
+  material: PoolDTO;
+  modes: CollectMode[]; // what can be collected here right now
 }
 
-export interface HarvestYieldDTO {
-  capacity: number;
-  maxCapacity: number;
-  yieldAmount: number;
-  respawnTicks: number;
-  currentTicks: number;
+export type CollectMode = 'harvest' | 'forage';
+
+export interface PoolDTO {
+  remaining: number;
+  max: number;
+  regrowthTimer: number; // 0 means it never grows back
+  turnsToRegrow: number;
 }
 
 export interface PlayableCardDTO {
@@ -71,7 +75,7 @@ export interface GameStateDTO {
   locations: LocationDTO[];
   players: PlayerDTO[];
   creatures: CreatureDTO[];
-  harvestNodes: HarvestNodeDTO[];
+  nodes: NodeDTO[];
   cardsInHand: PlayableCardDTO[];
 }
 
@@ -96,10 +100,9 @@ export interface UpkeepEventDTO {
   creatureId: number; // the creature recovers from exhaustion
 }
 
-export interface HarvestResultDTO {
-  harvestableId: number;
-  nutrition: number;
-  resources: number;
+export interface GatherResultDTO {
+  nodeId: number;
+  mode: CollectMode;
 }
 
 export interface UpkeepPhaseDTO {
