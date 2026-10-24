@@ -43,20 +43,19 @@ export class CreatureCard extends Card {
     this.initFrameDetails(health);
   }
 
-  // an exhausted creature lies on its side; the hitbox turns with it
+  // an exhausted creature lies on its side; the hitbox and shadow turn with it
   setExhausted(on: boolean, animate = true): Promise<void> {
     if (on === this.exhausted) return Promise.resolve();
     this.exhausted = on;
     const angle = on ? 90 : 0;
     this.turnTween?.stop();
     if (!animate) {
-      this.cardFrame.setAngle(angle);
-      this.hitbox.setAngle(angle);
+      [this.cardFrame, this.hitbox, this.shadow].forEach((part) => part.setAngle(angle));
       return Promise.resolve();
     }
     return new Promise((resolve) => {
       this.turnTween = this.tweensManager.add({
-        targets: [this.cardFrame, this.hitbox],
+        targets: [this.cardFrame, this.hitbox, this.shadow],
         angle,
         duration: 400,
         ease: 'Sine.easeInOut',

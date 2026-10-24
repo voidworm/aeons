@@ -82,7 +82,10 @@ export class HandContainer extends Phaser.GameObjects.Container {
   removeCard(playerId: number, card: PlayableCard, destroy = false): void {
     const hand = this.handOf(playerId);
     hand.cards = hand.cards.filter((c) => c !== card);
-    hand.layer.remove(card, destroy);
+    hand.layer.remove(card);
+    this.dragOrigins.delete(card);
+    this.returning.delete(card);
+    if (destroy) card.destroy(); // the card may be outside the layer, e.g. still shrinking on its way back
     this.layout(hand);
   }
 

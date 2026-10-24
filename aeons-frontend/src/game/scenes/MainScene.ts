@@ -859,7 +859,7 @@ export class MainScene extends Phaser.Scene {
     arrow.pointFromTo(
       card.textBoxCentre(),
       new Phaser.Math.Vector2(pointer.x, pointer.y),
-      card.getHitbox(),
+      card.getShadowedBounds(),
     );
   }
 

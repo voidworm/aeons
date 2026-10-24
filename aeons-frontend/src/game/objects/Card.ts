@@ -48,6 +48,7 @@ const TEXT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
 export class Card extends Phaser.GameObjects.Container {
   static readonly WIDTH = 252;
   static readonly HEIGHT = 352;
+  private static readonly SHADOW_REACH = 40; // px, covers the lifted shadow's offset and growth
   static readonly PLAY_TRAVEL = 96; // px a cast card travels up the screen while it lands
   static readonly PLAY_DURATION = 900; // ms a cast card takes to settle
   static readonly HOVER_ZOOM_DELAY = 3000; // ms of uninterrupted hovering before a board card zooms
@@ -594,6 +595,12 @@ export class Card extends Phaser.GameObjects.Container {
   //a card that is only displayed (e.g. summoned) must not react to the pointer
   setPointerEnabled(on: boolean) {
     if (this.hitbox.input) this.hitbox.input.enabled = on;
+  }
+
+  //the hitbox grown by how far a lifted card's shadow reaches beyond it
+  getShadowedBounds(): Phaser.Geom.Rectangle {
+    const reach = Card.SHADOW_REACH * this.scaleX;
+    return Phaser.Geom.Rectangle.Inflate(this.getHitbox(), reach, reach);
   }
 
   getHitbox(): Phaser.Geom.Rectangle {
