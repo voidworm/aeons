@@ -57,7 +57,6 @@ export class MainScene extends Phaser.Scene {
   private players: PlayerCard[] = [];
   private playerStates: PlayerDTO[] = []; // latest server state, feeds the stats panel
 
-  private static readonly SUMMON_DURATION = 300;
   private static readonly SUMMON_HOLD = 600; // an untargeted card rests at the summon position before it resolves
 
   private inDragging: boolean = false;
@@ -66,6 +65,7 @@ export class MainScene extends Phaser.Scene {
     legal: Card[];
     arrow: TargetingArrow;
     pressed: boolean; // a click started while targeting, so the release of the card drag doesn't count
+    placed: boolean; // the drop animation has ended; until then clicks and escape are ignored so the card isn't sent back mid-animation
   } | null = null;
   private uiCamera!: Phaser.Cameras.Scene2D.Camera; // fixed camera for the hand and player switcher; the main camera pans over the board
   private boardBounds: Phaser.Geom.Rectangle | null = null;
@@ -732,25 +732,18 @@ export class MainScene extends Phaser.Scene {
     void this.summon(card);
   }
 
-  //the card glides above the event log; targeted cards then wait for a click, the others resolve right away
+  //the card is put down where it was dropped; targeted cards then wait for a click, the others resolve right away
   private async summon(card: PlayableCard) {
     card.setPointerEnabled(false);
-    const { x, y } = this.eventLog.summonPoint(card.cardHeight * card.scaleY);
-    await new Promise<void>((resolve) => {
-      this.tweens.add({
-        targets: card,
-        x,
-        y,
-        duration: MainScene.SUMMON_DURATION,
-        ease: 'Sine.easeOut',
-        onComplete: () => resolve(),
-      });
-    });
+    const placed = card.playAnimation();
 
     if (this.hasTargetRestriction(card)) {
       this.startTargeting(card);
+      await placed;
+      this.targeting!.placed = true;
       return;
     }
+    await placed;
     await new Promise((resolve) => this.time.delayedCall(MainScene.SUMMON_HOLD, resolve));
     this.send('poc_hello', { played_card: card.name });
     this.finishSummon(card);
@@ -759,6 +752,7 @@ export class MainScene extends Phaser.Scene {
   private startTargeting(card: PlayableCard) {
     const arrow = new TargetingArrow(this);
     this.hideFrom(this.cameras.main, arrow);
+    arrow.setVisible(false); // shown once the pointer moves
     const legal = this.legalTargets(card);
     const splitNodes = new Set(this.splits.map((s) => s.id));
     this.targeting = {
@@ -766,6 +760,7 @@ export class MainScene extends Phaser.Scene {
       legal: [...legal.filter((t) => !splitNodes.has(t.id)), ...this.splits],
       arrow,
       pressed: false,
+      placed: false,
     };
   }
 
@@ -794,8 +789,9 @@ export class MainScene extends Phaser.Scene {
   //escape and clicks on empty board cancel, a click on a legal target confirms, anything else is ignored
   private initTargetingInput() {
     this.input.keyboard?.on('keydown-ESC', () => this.cancelTargeting());
+    this.input.on('pointermove', () => this.targeting?.arrow.setVisible(true));
     this.input.on('pointerdown', () => {
-      if (this.targeting) this.targeting.pressed = true;
+      if (this.targeting?.placed) this.targeting.pressed = true;
     });
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       if (!this.targeting?.pressed) return;
@@ -812,7 +808,7 @@ export class MainScene extends Phaser.Scene {
     const { card, legal, arrow } = this.targeting;
     const pointer = this.input.activePointer;
     arrow.pointFromTo(
-      new Phaser.Math.Vector2(card.x, card.y - (card.cardHeight * card.scaleY) / 2),
+      card.textBoxCentre(),
       new Phaser.Math.Vector2(pointer.x, pointer.y),
     );
     const { x, y } = this.boardPoint();
@@ -834,7 +830,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   private cancelTargeting() {
-    if (!this.targeting) return;
+    if (!this.targeting?.placed) return;
     this.finishSummon(this.targeting.card);
   }
 

@@ -10,6 +10,7 @@ export interface CardConfig {
   id: number;
   name: string;
   flavor: string;
+  effectText?: string; // sits at the top of the text box, with the flavor in italics at the bottom
   faceColor: number;
   artHeight: number;
   shadow: ShadowMode;
@@ -46,6 +47,8 @@ const TEXT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
 export class Card extends Phaser.GameObjects.Container {
   static readonly WIDTH = 252;
   static readonly HEIGHT = 352;
+  static readonly PLAY_TRAVEL = 96; // px a cast card travels up the screen while it lands
+  static readonly PLAY_DURATION = 900; // ms a cast card takes to settle
   static readonly HOVER_ZOOM_DELAY = 3000; // ms of uninterrupted hovering before a board card zooms
   static readonly HOVER_ZOOM_FACTOR = 2.5;
 
@@ -123,8 +126,31 @@ export class Card extends Phaser.GameObjects.Container {
     scene.add.existing(this);
   }
 
+  //top-left card coordinates
+  private textBox(): { x: number; y: number; w: number; h: number } {
+    const { INSET, ART_Y, GAP } = Card;
+    const top = ART_Y + this.config.artHeight + GAP;
+    return (
+      this.config.textBoxRect ?? {
+        x: INSET,
+        y: top,
+        w: this.cardWidth - 2 * INSET,
+        h: this.cardHeight - INSET - (this.config.footerHeight ?? 0) - top,
+      }
+    );
+  }
+
+  //the middle of the text box on screen, following the card's position and scale
+  textBoxCentre(): Phaser.Math.Vector2 {
+    const box = this.textBox();
+    return new Phaser.Math.Vector2(
+      this.x + (box.x + box.w / 2 - this.cardWidth / 2) * this.scaleX,
+      this.y + (box.y + box.h / 2 - this.cardHeight / 2) * this.scaleY,
+    );
+  }
+
   private buildSurface(): void {
-    const { BORDER, INSET, TITLE_Y, ART_Y, GAP, TEXT_PAD } = Card;
+    const { BORDER, INSET, TITLE_Y, ART_Y, TEXT_PAD } = Card;
     const INNER_WIDTH = this.cardWidth - 2 * INSET;
     const BOTTOM = this.cardHeight - INSET;
     const {
@@ -132,11 +158,9 @@ export class Card extends Phaser.GameObjects.Container {
       artHeight,
       showTextBox = true,
       italicText = false,
-      footerHeight = 0,
       titleBelowArt = false,
       centerTitle = false,
       centerText = false,
-      textBoxRect,
     } = this.config;
 
     this.surface.add([
@@ -163,36 +187,34 @@ export class Card extends Phaser.GameObjects.Container {
     ]);
 
     if (showTextBox) {
-      const top = ART_Y + artHeight + GAP;
-      const box = textBoxRect ?? {
-        x: INSET,
-        y: top,
-        w: INNER_WIDTH,
-        h: BOTTOM - footerHeight - top,
-      };
+      const box = this.textBox();
+      const { effectText } = this.config;
       const textX = box.x + box.w / 2;
-      const textY = box.y + (centerText ? box.h / 2 : box.h - TEXT_PAD);
       const textStyle: Phaser.Types.GameObjects.Text.TextStyle = {
         ...TEXT_STYLE,
         fontSize: '11.2px',
-        fontStyle: italicText ? 'italic' : 'normal',
+        fontStyle: italicText || effectText !== undefined ? 'italic' : 'normal',
         align: 'center',
         wordWrap: { width: box.w - 2 * TEXT_PAD },
       };
+      const text = (content: string, y: number, anchorY: number, style = textStyle) =>
+        content.includes('*')
+          ? new RichText(this.scene, textX, y, content, style, box.w - 2 * TEXT_PAD, anchorY)
+          : this.label(textX, y, content, style).setOrigin(0.5, anchorY);
+
       this.surface.add([
         this.rect(box.x, box.y, box.w, box.h, 0xd8c9a3),
-        this.flavor.includes('**')
-          ? new RichText(
-              this.scene,
-              textX,
-              textY,
-              this.flavor,
-              textStyle,
-              box.w - 2 * TEXT_PAD,
-              centerText ? 0.5 : 1,
-            )
-          : this.label(textX, textY, this.flavor, textStyle).setOrigin(0.5, centerText ? 0.5 : 1),
+        text(
+          this.flavor,
+          box.y + (centerText ? box.h / 2 : box.h - TEXT_PAD),
+          centerText ? 0.5 : 1,
+        ),
       ]);
+      if (effectText !== undefined) {
+        this.surface.add(
+          text(effectText, box.y + TEXT_PAD, 0, { ...textStyle, fontStyle: 'normal' }),
+        );
+      }
     }
 
     this.disabledLayer = this.rect(0, 0, this.cardWidth, this.cardHeight, 0x111111, 0.5).setVisible(
@@ -287,6 +309,38 @@ export class Card extends Phaser.GameObjects.Container {
       ...pose,
       duration: 150,
       ease: 'Sine.easeOut',
+    });
+  }
+
+  //the card is gently placed on the table: it glides forward and up while it slowly settles from raised
+  playAnimation(): Promise<void> {
+    this.tweensManager.add({
+      targets: this,
+      y: this.y - Card.PLAY_TRAVEL,
+      duration: Card.PLAY_DURATION,
+      ease: 'Sine.easeInOut',
+    });
+    this.tweensManager.killTweensOf(this.cardFrame);
+    this.tweensManager.killTweensOf(this.shadow);
+    this.cardFrame.setScale(1.15);
+    this.cardFrame.setY(-14);
+    this.shadow.setPosition(SHADOW_LIFTED.x, SHADOW_LIFTED.y);
+    const pose = SHADOW_REST[this.config.shadow];
+    this.tweensManager.add({
+      targets: this.shadow,
+      ...pose,
+      duration: Card.PLAY_DURATION,
+      ease: 'Sine.easeInOut',
+    });
+    return new Promise((resolve) => {
+      this.tweensManager.add({
+        targets: this.cardFrame,
+        scale: 1,
+        y: 0,
+        duration: Card.PLAY_DURATION,
+        ease: 'Sine.easeInOut',
+        onComplete: () => resolve(),
+      });
     });
   }
 

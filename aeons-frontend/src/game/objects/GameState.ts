@@ -62,6 +62,7 @@ export interface PlayableCardDTO {
   id: number;
   name: string;
   effectText: string;
+  flavor: string;
   effectType: number;
   cost: integer;
   canBeCast: boolean;

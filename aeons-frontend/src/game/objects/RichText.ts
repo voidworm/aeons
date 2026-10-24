@@ -3,9 +3,10 @@ import Phaser from 'phaser';
 interface Word {
   text: Phaser.GameObjects.Text;
   width: number;
+  startsLine: boolean; // follows a line break in the markup
 }
 
-//centred, word-wrapped text where **double asterisks** mark bold passages
+//centred, word-wrapped text where *asterisks* mark bold passages and a newline starts a new line
 export class RichText extends Phaser.GameObjects.Container {
   constructor(
     scene: Phaser.Scene,
@@ -34,18 +35,24 @@ export class RichText extends Phaser.GameObjects.Container {
   }
 
   private words(markup: string, style: Phaser.Types.GameObjects.Text.TextStyle): Word[] {
-    return markup.split('**').flatMap((part, i) =>
-      part
-        .split(/\s+/)
-        .filter(Boolean)
-        .map((content) => {
-          const text = new Phaser.GameObjects.Text(this.scene, 0, 0, content, {
-            ...style,
-            fontStyle: i % 2 === 1 ? 'bold' : style.fontStyle,
+    let breakPending = false;
+    return markup.split('*').flatMap((part, i) =>
+      part.split('\n').flatMap((line, row) => {
+        if (row > 0) breakPending = true;
+        return line
+          .split(/\s+/)
+          .filter(Boolean)
+          .map((content) => {
+            const text = new Phaser.GameObjects.Text(this.scene, 0, 0, content, {
+              ...style,
+              fontStyle: i % 2 === 1 ? 'bold' : style.fontStyle,
+            });
+            this.add(text);
+            const word = { text, width: text.width, startsLine: breakPending };
+            breakPending = false;
+            return word;
           });
-          this.add(text);
-          return { text, width: text.width };
-        }),
+      }),
     );
   }
 
@@ -55,7 +62,7 @@ export class RichText extends Phaser.GameObjects.Container {
     for (const word of words) {
       const current = lines[lines.length - 1];
       const widthWithWord = lineWidth + (current.length > 0 ? spaceWidth : 0) + word.width;
-      if (current.length > 0 && widthWithWord > wrapWidth) {
+      if (current.length > 0 && (word.startsLine || widthWithWord > wrapWidth)) {
         lines.push([word]);
         lineWidth = word.width;
       } else {

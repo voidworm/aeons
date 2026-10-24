@@ -8,7 +8,6 @@ export class EventLog extends Phaser.GameObjects.Container {
   private static readonly WIDTH = PlayerSwitcher.PHASE_BUTTONS_WIDTH;
   private static readonly ROW_HEIGHT = 30;
   private static readonly PADDING = 12;
-  private static readonly SUMMON_GAP = 24;
   private static readonly HEIGHT = EventLog.VISIBLE * EventLog.ROW_HEIGHT + 2 * EventLog.PADDING;
   private static readonly OUTLINE_COLOR = 0x2a1809;
 
@@ -41,11 +40,6 @@ export class EventLog extends Phaser.GameObjects.Container {
 
     this.setDepth(1000);
     scene.add.existing(this);
-  }
-
-  //where a summoned card of the given height hovers: centred right above the log
-  summonPoint(cardHeight: number): { x: number; y: number } {
-    return { x: this.x + EventLog.WIDTH / 2, y: this.y - EventLog.SUMMON_GAP - cardHeight / 2 };
   }
 
   setBottomCentre(x: number, y: number): void {

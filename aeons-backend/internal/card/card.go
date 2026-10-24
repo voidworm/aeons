@@ -46,6 +46,7 @@ type PlayableCard struct {
 	CanBeCast bool
 	Name string
 	EffectText string
+	Flavor string
 	Target Targetable
 	TargetSpec *TargetSpec
 	Candidates []Targetable

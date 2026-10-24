@@ -12,13 +12,23 @@ export class KindredCard extends PlayableCard {
     y: number,
     id: number,
     cardname: string,
+    effectText: string,
     flavor: string,
     cost: number,
   ) {
-    super(scene, x, y, id, cardname, flavor, cost, KindredCard.KINDRED_FACE_COLOR);
+    super(scene, x, y, id, cardname, effectText, flavor, cost, KindredCard.KINDRED_FACE_COLOR);
   }
 
   static fromDto(scene: MainScene, x: integer, y: integer, dto: PlayableCardDTO) {
-    return new KindredCard(scene, x, y, dto.id, dto.name, dto.effectText, dto.cost).applyDto(dto);
+    return new KindredCard(
+      scene,
+      x,
+      y,
+      dto.id,
+      dto.name,
+      dto.effectText,
+      dto.flavor,
+      dto.cost,
+    ).applyDto(dto);
   }
 }

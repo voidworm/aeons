@@ -14,6 +14,7 @@ export class PlayableCard extends Card {
     y: number,
     id: number,
     cardname: string,
+    effectText: string,
     flavor: string,
     cost: number,
     faceColor: number = PlayableCard.FACE_COLOR,
@@ -21,7 +22,8 @@ export class PlayableCard extends Card {
     super(scene, x, y, {
       id: id,
       name: cardname,
-      flavor: flavor,
+      effectText,
+      flavor,
       faceColor,
       artHeight: 136,
       shadow: 'hovers',
@@ -47,6 +49,15 @@ export class PlayableCard extends Card {
   }
 
   static fromDto(scene: MainScene, x: integer, y: integer, dto: PlayableCardDTO) {
-    return new PlayableCard(scene, x, y, dto.id, dto.name, dto.effectText, dto.cost).applyDto(dto);
+    return new PlayableCard(
+      scene,
+      x,
+      y,
+      dto.id,
+      dto.name,
+      dto.effectText,
+      dto.flavor,
+      dto.cost,
+    ).applyDto(dto);
   }
 }

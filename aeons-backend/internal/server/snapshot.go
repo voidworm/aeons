@@ -54,7 +54,8 @@ type PlayableCardDTO struct {
 	Name         string `json:"name"`
 	Cost         int    `json:"cost"`
 	EffectText   string `json:"effectText"`
-	EffectType   int    `json:"effectType"`
+	Flavor       string `json:"flavor"`
+	EffectType  int    `json:"effectType"`
 	CanBeCast    bool   `json:"canBeCast"`
 	Range        int    `json:"range"`
 	TargetType   *int   `json:"targetType"`
@@ -97,7 +98,7 @@ func modeStrings(modes []collecting.Mode) []string {
 
 func playableCardDTO(c *card.PlayableCard) PlayableCardDTO {
 	out := PlayableCardDTO{
-		ID: c.ID, Name: c.Name, EffectText: c.EffectText,
+		ID: c.ID, Name: c.Name, EffectText: c.EffectText, Flavor: c.Flavor,
 		Cost:       c.Cost,
 		EffectType: int(c.Type), CanBeCast: c.CanBeCast, Range: c.Range,
 		CandidateIDs: make([]int, 0, len(c.Candidates)),
