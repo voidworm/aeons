@@ -9,7 +9,7 @@ export class LocationCard extends Card {
   // how far the contained cards reach up into the location from its lower border
   static readonly OVERLAP = 30;
 
-  private static readonly SLOT_GAP = 12;
+  private static readonly STEP_DIVISOR = 1.5; // same card spacing as the hand
   private static readonly ROW_SPILL = 150; // how far the initial row may exceed the location's width before cards start to overlap
 
   //the box a location claims on the map: its own card plus the row of contained cards hanging below
@@ -149,8 +149,6 @@ export class LocationCard extends Card {
   private slotStep(): number {
     const n = this.contents.length;
     if (n < 2) return 0;
-    const cardWidth = this.contents[0].cardWidth;
-    const maxSpan = LocationCard.LOC_WIDTH + LocationCard.ROW_SPILL;
-    return Math.min(cardWidth + LocationCard.SLOT_GAP, (maxSpan - cardWidth) / (n - 1));
+    return this.contents[0].cardWidth / LocationCard.STEP_DIVISOR;
   }
 }

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
 import { Card } from './Card';
 import type { PlayableCard } from './PlayableCard';
+import { uiScale } from '../layout/uiScale';
 
 //one hand instance per player
 //many hands per hand container
@@ -52,15 +53,19 @@ export class HandContainer extends Phaser.GameObjects.Container {
     return span / 2 + Card.WIDTH / 2;
   }
 
+  //the container is scaled as a whole, so its content is laid out in units of the scaled-up screen width
   resize(width: number, height: number): void {
-    this.containerWidth = width;
-    this.setPosition(0, height - HandContainer.HEIGHT);
+    const scale = uiScale(width, height);
+    const localWidth = width / scale;
+    this.containerWidth = localWidth;
+    this.setScale(scale);
+    this.setPosition(0, height - HandContainer.HEIGHT * scale);
 
-    const halfChord = (width - 2 * HandContainer.PADDING) / 2;
+    const halfChord = (localWidth - 2 * HandContainer.PADDING) / 2;
     const radius = (halfChord ** 2 + HandContainer.HEIGHT ** 2) / (2 * HandContainer.HEIGHT);
     this.background.setRadius(radius).setIterations(2 / radius);
-    this.background.setPosition(width / 2, radius - HandContainer.ARC_LIFT);
-    this.hands.forEach((hand) => hand.layer.setX(width / 2));
+    this.background.setPosition(localWidth / 2, radius - HandContainer.ARC_LIFT);
+    this.hands.forEach((hand) => hand.layer.setX(localWidth / 2));
   }
 
   addCard(playerId: number, card: PlayableCard): void {
@@ -86,6 +91,7 @@ export class HandContainer extends Phaser.GameObjects.Container {
     hand.layer.remove(card);
     this.scene.add.existing(card);
     card.setDepth(HandContainer.DRAG_DEPTH);
+    card.setScale(this.scaleX * hand.layer.scaleX);
     card.setPosition(tx, ty);
   }
 
@@ -99,6 +105,7 @@ export class HandContainer extends Phaser.GameObjects.Container {
     const local = hand.layer.getWorldTransformMatrix().applyInverse(card.x, card.y);
     hand.layer.add(card);
     card.setDepth(0);
+    card.setScale(1);
     card.setPosition(local.x, local.y);
     hand.cards.forEach((c) => hand.layer.bringToTop(c)); // keeps the original stacking order
 
@@ -124,7 +131,7 @@ export class HandContainer extends Phaser.GameObjects.Container {
   //hand area = the visible cap of the background circle
   containsPoint(x: number, y: number): boolean {
     const { tx: cx, ty: cy } = this.background.getWorldTransformMatrix();
-    return Phaser.Math.Distance.Between(x, y, cx, cy) <= this.background.radius;
+    return Phaser.Math.Distance.Between(x, y, cx, cy) <= this.background.radius * this.scaleX;
   }
 
   private handHolding(card: PlayableCard): Hand | undefined {

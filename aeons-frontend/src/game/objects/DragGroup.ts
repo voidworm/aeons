@@ -22,7 +22,10 @@ export class DragGroup {
     });
     handle.on('drag', (pointer: Phaser.Input.Pointer) => {
       const { dx, dy } = this.clampedDelta(pointer.x - last.x, pointer.y - last.y);
-      for (const member of this.members) member.setPosition(member.x + dx, member.y + dy);
+      for (const member of this.members) {
+        const parentScale = member.parentContainer?.scaleX ?? 1; // positions are local to a scaled parent
+        member.setPosition(member.x + dx / parentScale, member.y + dy / parentScale);
+      }
       last.set(pointer.x, pointer.y);
     });
     handle.on('dragend', () => {

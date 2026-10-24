@@ -43,10 +43,11 @@ export class EventLog extends Phaser.GameObjects.Container {
   }
 
   setBottomCentre(x: number, y: number): void {
-    const maxX = this.scene.scale.width - EventLog.WIDTH;
+    const width = EventLog.WIDTH * this.scaleX;
+    const height = EventLog.HEIGHT * this.scaleY;
     this.setPosition(
-      Phaser.Math.Clamp(x - EventLog.WIDTH / 2, 0, maxX),
-      Math.max(0, y - EventLog.HEIGHT),
+      Phaser.Math.Clamp(x - width / 2, 0, this.scene.scale.width - width),
+      Math.max(0, y - height),
     );
   }
 
@@ -58,7 +59,12 @@ export class EventLog extends Phaser.GameObjects.Container {
 
   containsPoint(x: number, y: number): boolean {
     const { WIDTH, HEIGHT } = EventLog;
-    return new Phaser.Geom.Rectangle(this.x, this.y, WIDTH, HEIGHT).contains(x, y);
+    return new Phaser.Geom.Rectangle(
+      this.x,
+      this.y,
+      WIDTH * this.scaleX,
+      HEIGHT * this.scaleY,
+    ).contains(x, y);
   }
 
   private scroll(direction: number): void {

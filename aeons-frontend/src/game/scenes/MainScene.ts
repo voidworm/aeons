@@ -33,6 +33,7 @@ import { FaintedPopup } from '../objects/FaintedPopup';
 import { LocationConnector } from '../objects/LocationConnector';
 import { DragGroup } from '../objects/DragGroup';
 import { layoutLocations } from '../layout/locationLayout';
+import { uiScale } from '../layout/uiScale';
 import { TargetingArrow } from '../objects/TargetingArrow';
 import { CURSOR_DEFAULT, CURSOR_GRAB, CURSOR_INTERACTIVE } from '../cursors';
 
@@ -65,6 +66,7 @@ export class MainScene extends Phaser.Scene {
     legal: Card[];
     arrow: TargetingArrow;
     pressed: boolean; // a click started while targeting, so the release of the card drag doesn't count
+    hovered: Card | null; // the legal target under the pointer, raised above its neighbours
     placed: boolean; // the drop animation has ended; until then clicks and escape are ignored so the card isn't sent back mid-animation
   } | null = null;
   private uiCamera!: Phaser.Cameras.Scene2D.Camera; // fixed camera for the hand and player switcher; the main camera pans over the board
@@ -161,7 +163,7 @@ export class MainScene extends Phaser.Scene {
     const factor = this.factor();
 
     for (const card of [
-      ...this.playableCards,
+      ...this.playableCards.filter((c) => !c.parentContainer), // cards in a hand are scaled with the hand
       ...this.locationCards,
       ...this.players,
       ...this.nodeCards,
@@ -194,12 +196,13 @@ export class MainScene extends Phaser.Scene {
   }
 
   private placeEventLog() {
+    this.eventLog.setScale(this.factor());
     const { x, y } = this.playerSwitcher.abovePhaseButtons();
     this.eventLog.setBottomCentre(x, y);
   }
 
   factor(): integer {
-    return Math.min(1, this.scale.width / 1920, this.scale.height / 1080);
+    return uiScale(this.scale.width, this.scale.height);
   }
 
   update(_timer: number, _delta: number) {
@@ -799,6 +802,7 @@ export class MainScene extends Phaser.Scene {
       legal: [...legal.filter((t) => !splitNodes.has(t.id)), ...this.splits],
       arrow,
       pressed: false,
+      hovered: null,
       placed: false,
     };
   }
@@ -846,11 +850,31 @@ export class MainScene extends Phaser.Scene {
     if (!this.targeting) return;
     const { card, legal, arrow } = this.targeting;
     const pointer = this.input.activePointer;
-    arrow.pointFromTo(card.textBoxCentre(), new Phaser.Math.Vector2(pointer.x, pointer.y));
     const { x, y } = this.boardPoint();
-    for (const target of this.dropTargets()) {
-      target.setDropTarget(legal.includes(target) && target.getHitbox().contains(x, y));
-    }
+    const under = legal.filter((t) => t.getHitbox().contains(x, y));
+    const hovered = under.reduce<Card | null>(
+      (top, t) => (top && this.children.getIndex(top) > this.children.getIndex(t) ? top : t),
+      null,
+    ); // of overlapping cards the one on top is the one the pointer is on
+    for (const target of this.dropTargets()) target.setDropTarget(target === hovered);
+    this.raiseHovered(hovered);
+    if (hovered) arrow.runBehind(hovered, this.cameras.main, this.uiCamera);
+    else arrow.runAbove(this.cameras.main);
+    arrow.pointFromTo(
+      card.textBoxCentre(),
+      new Phaser.Math.Vector2(pointer.x, pointer.y),
+      card.getHitbox(),
+    );
+  }
+
+  //the target under the pointer comes to the front, so neighbours overlapping it don't cover its outline
+  private raiseHovered(hovered: Card | null) {
+    if (!this.targeting || hovered === this.targeting.hovered) return;
+    this.targeting.hovered = hovered;
+    if (!hovered) return;
+    this.children.bringToTop(hovered);
+    this.children.queueDepthSort();
+    if (hovered instanceof LocationCard) hovered.raiseContents();
   }
 
   private confirmTarget(target: Card) {

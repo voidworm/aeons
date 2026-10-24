@@ -3,6 +3,7 @@ import type { MainScene } from '../scenes/MainScene';
 import type { LocationCard } from './LocationCard';
 import { CURSOR_INTERACTIVE } from '../cursors';
 import { RichText } from './RichText';
+import { TargetingArrow } from './TargetingArrow';
 
 export type ShadowMode = 'hovers' | 'flat';
 
@@ -62,6 +63,7 @@ export class Card extends Phaser.GameObjects.Container {
   protected static readonly GAP = 12;
   protected static readonly BOTTOM = Card.HEIGHT - Card.INSET; // 328
   protected static readonly TEXT_PAD = 6.4;
+  static readonly TARGET_BORDER_WIDTH = 6; // the outline of a card the targeting arrow points at
   protected static readonly CORNER_RADIUS = 10; // 2.5 mm on a 63 x 88 mm card, which is 4 px per mm at 252 x 352
 
   public readonly id: number;
@@ -84,6 +86,7 @@ export class Card extends Phaser.GameObjects.Container {
   private hoverTweens: Phaser.Tweens.Tween[] = []; // the lift tweens only, so stopping them leaves e.g. a creature's turn alone
 
   protected shadow: Phaser.GameObjects.Graphics;
+  private targetBorder: Phaser.GameObjects.Graphics;
   protected cardFrame: Phaser.GameObjects.Container; // lift/scale target, sits at card centre
   protected surface: Phaser.GameObjects.Container; // top-left coordinate space
   protected hitbox: Phaser.GameObjects.Zone;
@@ -115,6 +118,8 @@ export class Card extends Phaser.GameObjects.Container {
     );
     this.cardFrame = new Phaser.GameObjects.Container(scene, 0, 0, [this.surface]);
     this.buildSurface();
+    this.targetBorder = this.buildTargetBorder(scene);
+    this.cardFrame.add(this.targetBorder);
 
     this.hitbox = new Phaser.GameObjects.Zone(scene, 0, 0, this.cardWidth, this.cardHeight);
     this.hitbox.setInteractive({ draggable: true, cursor: CURSOR_INTERACTIVE });
@@ -122,6 +127,21 @@ export class Card extends Phaser.GameObjects.Container {
 
     this.add([this.shadow, this.cardFrame, this.hitbox]);
     scene.add.existing(this);
+  }
+
+  //an outline in the arrow's colour just outside the card, shown while the targeting arrow points at it
+  private buildTargetBorder(scene: MainScene): Phaser.GameObjects.Graphics {
+    const width = Card.TARGET_BORDER_WIDTH;
+    return new Phaser.GameObjects.Graphics(scene)
+      .lineStyle(width, TargetingArrow.COLOR, 1)
+      .strokeRoundedRect(
+        -this.cardWidth / 2 - width / 2,
+        -this.cardHeight / 2 - width / 2,
+        this.cardWidth + width,
+        this.cardHeight + width,
+        Card.CORNER_RADIUS + width / 2,
+      )
+      .setVisible(false);
   }
 
   //top-left card coordinates
@@ -454,6 +474,7 @@ export class Card extends Phaser.GameObjects.Container {
     on = on && !this.isInactive();
     if (on === this.isDropTarget) return;
     this.isDropTarget = on;
+    this.targetBorder.setVisible(on);
     if (on) this.startWiggle();
     else if (!this.isHovering) this.finishHover();
   }

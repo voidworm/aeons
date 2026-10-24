@@ -7,6 +7,7 @@ import { MiniPlayerCard } from './MiniPlayerCard';
 import { ControlButton } from './ControlButton';
 import { CURSOR_INTERACTIVE } from '../cursors';
 import { DragGroup } from './DragGroup';
+import { uiScale } from '../layout/uiScale';
 import { PlayerStatsPanel } from './PlayerStatsPanel';
 import type { PlayerStats } from './PlayerStatsPanel';
 
@@ -87,15 +88,21 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
 
   resize(width: number, height: number): void {
     const { HAND_GAP, BOTTOM_INSET, BUTTON_GAP, BUTTONS_LIFT } = PlayerSwitcher;
-    const handHalfWidth = HandContainer.expectedHalfWidth();
-    const originX = width / 2 - handHalfWidth - HAND_GAP;
-    const originY = height - BOTTOM_INSET - PlayerSwitcher.PANEL_LIFT;
+    const scale = uiScale(width, height);
+    const handHalfWidth = HandContainer.expectedHalfWidth() * scale;
+    const originX = width / 2 - handHalfWidth - HAND_GAP * scale;
+    const originY = height - (BOTTOM_INSET + PlayerSwitcher.PANEL_LIFT) * scale;
+    this.setScale(scale);
     this.setPosition(originX, originY);
 
     // the phase buttons sit side by side right of the hand, pulled back in when they would leave the screen
     const buttonsLeft =
-      Math.min(width / 2 + handHalfWidth + HAND_GAP, width - BOTTOM_INSET - PlayerSwitcher.PHASE_BUTTONS_WIDTH) -
-      originX;
+      (Math.min(
+        width / 2 + handHalfWidth + HAND_GAP * scale,
+        width - (BOTTOM_INSET + PlayerSwitcher.PHASE_BUTTONS_WIDTH) * scale,
+      ) -
+        originX) /
+      scale;
     const buttonY = -BUTTONS_LIFT - ControlButton.HEIGHT / 2;
     this.creaturePhaseButton.setPosition(buttonsLeft + ControlButton.WIDTH / 2, buttonY);
     this.upkeepButton.setPosition(buttonsLeft + ControlButton.WIDTH * 1.5 + BUTTON_GAP, buttonY);
@@ -108,8 +115,10 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
   //screen position just above the middle of the phase buttons
   abovePhaseButtons(): { x: number; y: number } {
     return {
-      x: this.x + (this.creaturePhaseButton.x + this.upkeepButton.x) / 2,
-      y: this.y + this.creaturePhaseButton.y - ControlButton.HEIGHT / 2 - PlayerSwitcher.LOG_GAP,
+      x: this.x + ((this.creaturePhaseButton.x + this.upkeepButton.x) / 2) * this.scaleX,
+      y:
+        this.y +
+        (this.creaturePhaseButton.y - ControlButton.HEIGHT / 2 - PlayerSwitcher.LOG_GAP) * this.scaleY,
     };
   }
 
