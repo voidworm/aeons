@@ -18,12 +18,14 @@ interface Point {
   y: number;
 }
 
-const SPREAD = 1.6; // frame area per node, relative to the node's own box
+const SPREAD = 1.6; // area per node, relative to the node's own box
 const ITERATIONS = 300;
 const BOX_PADDING = 40;
 const MAX_SEPARATION_PASSES = 200;
 const OBSTRUCTION_PUSH = 2; // relative to the ideal edge length; weaker than this, dense maps keep hidden connections
 const JITTER = 0.2; // seed noise relative to the ideal edge length, keeps symmetric maps from stalling
+const ATTEMPTS = 40; // force layouts know nothing of crossings, so the best of several seeds is kept
+const RESEED_JITTER = 1; // seed noise of the later attempts, big enough to land in another arrangement
 
 //Fruchterman-Reingold: every node repels every other, connections pull their ends together,
 //and a connection running through a third node's box pushes that node off its path.
@@ -31,36 +33,76 @@ const JITTER = 0.2; // seed noise relative to the ideal edge length, keeps symme
 export function layoutLocations(
   nodes: LayoutNode[],
   box: LayoutBox,
-  aspect: number,
+  frame: Size,
 ): Map<number, Point> {
-  const area = nodes.length * box.width * box.height * SPREAD;
-  const frame = { width: Math.sqrt(area * aspect), height: area / Math.sqrt(area * aspect) };
-  const idealLength = Math.sqrt(area / nodes.length);
+  const idealLength = Math.sqrt(box.width * box.height * SPREAD);
+  const edges = edgesOf(nodes);
 
-  const positions = seedOnGrid(nodes.length, frame, idealLength, aspect);
-  settle(positions, edgesOf(nodes), frame, box, idealLength);
-  separateOverlaps(positions, box);
-  centre(positions, box);
+  let best: Point[] = [];
+  let bestFlaws = Infinity;
+  for (let attempt = 0; attempt < ATTEMPTS && bestFlaws > 0; attempt++) {
+    const positions = seedOnGrid(nodes.length, frame, idealLength, attempt);
+    settle(positions, edges, frame, box, idealLength);
+    separateOverlaps(positions, box);
+    const flaws = countFlaws(positions, edges, box);
+    if (flaws < bestFlaws) {
+      best = positions;
+      bestFlaws = flaws;
+    }
+  }
+  centre(best, box);
 
-  return new Map(nodes.map((node, i) => [node.id, positions[i]]));
+  return new Map(nodes.map((node, i) => [node.id, best[i]]));
 }
 
-function seedOnGrid(count: number, frame: Size, idealLength: number, aspect: number): Point[] {
-  const columns = Math.ceil(Math.sqrt(count * aspect));
+//connections crossing each other, plus connections running behind a third node's box
+function countFlaws(positions: Point[], edges: [number, number][], box: LayoutBox): number {
+  let flaws = 0;
+  edges.forEach(([a, b], i) => {
+    for (const [c, d] of edges.slice(i + 1)) {
+      const apart = new Set([a, b, c, d]).size === 4;
+      if (apart && segmentsCross(positions[a], positions[b], positions[c], positions[d])) flaws++;
+    }
+    positions.forEach((position, node) => {
+      if (
+        node !== a &&
+        node !== b &&
+        sideOfBlockedPath(positions[a], positions[b], position, box)
+      ) {
+        flaws++;
+      }
+    });
+  });
+  return flaws;
+}
+
+function segmentsCross(a: Point, b: Point, c: Point, d: Point): boolean {
+  const turn = (from: Point, to: Point, point: Point) =>
+    (to.x - from.x) * (point.y - from.y) - (to.y - from.y) * (point.x - from.x);
+  return turn(a, b, c) * turn(a, b, d) < 0 && turn(c, d, a) * turn(c, d, b) < 0;
+}
+
+function seedOnGrid(count: number, frame: Size, idealLength: number, attempt: number): Point[] {
+  const amount = attempt === 0 ? JITTER : RESEED_JITTER;
+  const salt = attempt * count * 2;
+  const columns = Math.ceil(Math.sqrt((count * frame.width) / frame.height));
   const rows = Math.ceil(count / columns);
   return Array.from({ length: count }, (_, i) => ({
-    x: ((i % columns) + 0.5) * (frame.width / columns) - frame.width / 2 + jitter(i, idealLength),
+    x:
+      ((i % columns) + 0.5) * (frame.width / columns) -
+      frame.width / 2 +
+      jitter(salt + i, idealLength * amount),
     y:
       (Math.floor(i / columns) + 0.5) * (frame.height / rows) -
       frame.height / 2 +
-      jitter(i + count, idealLength),
+      jitter(salt + i + count, idealLength * amount),
   }));
 }
 
 //deterministic, so a given map always lays out the same way
-function jitter(seed: number, idealLength: number): number {
+function jitter(seed: number, magnitude: number): number {
   const noise = Math.sin(seed + 1) * 10000;
-  return (noise - Math.floor(noise) - 0.5) * idealLength * JITTER;
+  return (noise - Math.floor(noise) - 0.5) * magnitude;
 }
 
 //every connection once, whichever side lists it

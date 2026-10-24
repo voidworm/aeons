@@ -54,6 +54,7 @@ export class LocationConnector extends Phaser.GameObjects.Graphics {
 
   private links: Link[] = [];
   private focus: LocationCard | null = null; // while set, only the trails leading away from it stay lit
+  private drawnState = ''; // what the trails were last drawn from; redrawing them is expensive
 
   constructor(scene: MainScene, dtos: LocationDTO[], cards: LocationCard[]) {
     super(scene);
@@ -77,7 +78,12 @@ export class LocationConnector extends Phaser.GameObjects.Graphics {
     this.redraw();
   }
 
+  //draws only when a location moved or the focus changed
   redraw(): void {
+    const state = this.stateKey();
+    if (state === this.drawnState) return;
+    this.drawnState = state;
+
     const { NORMAL, VEIL } = LocationConnector;
     this.clear();
     // the veiled links go first, so a trail that can be walked is never veiled where they cross
@@ -90,6 +96,11 @@ export class LocationConnector extends Phaser.GameObjects.Graphics {
     this.drawAllTips(veiled, NORMAL);
     this.drawAllTips(veiled, VEIL);
     this.drawAllTips(walkable, NORMAL);
+  }
+
+  private stateKey(): string {
+    const places = this.links.map(({ from, to }) => [from.x, from.y, from.scaleX, to.x, to.y]);
+    return `${this.focus?.id}|${places.join(';')}`;
   }
 
   //veils every trail that cannot be walked away from the location

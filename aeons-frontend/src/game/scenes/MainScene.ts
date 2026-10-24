@@ -71,9 +71,12 @@ export class MainScene extends Phaser.Scene {
   private boardBounds: Phaser.Geom.Rectangle | null = null;
   private static readonly ZOOM_MIN = 0.4;
   private static readonly ZOOM_MAX = 1.5;
-  private static readonly ZOOM_INITIAL = 0.75;
+  private static readonly ZOOM_DEFAULT = 0.65;
+  private static readonly LAYOUT_SIZE = 1500; // the frame the locations settle in; the smaller, the closer they sit
+  private static readonly WORLD_SIZE = 2000; // the map is laid out as if the screen were this big, whatever it really is
   private static readonly ZOOM_SPEED = 0.001; // per wheel delta unit
 
+  private zoomDebug!: Phaser.GameObjects.Text;
   private connector: LocationConnector | null = null;
   private panLast: Phaser.Math.Vector2 | null = null;
 
@@ -103,8 +106,8 @@ export class MainScene extends Phaser.Scene {
       this.eventLog.dragHandle,
     );
     this.uiCamera = this.cameras.add();
-    this.cameras.main.setZoom(MainScene.ZOOM_INITIAL);
     this.initPanning();
+    this.initZoomDebug();
     this.initTargetingInput();
 
     this.socket = connect((msg) => {
@@ -163,7 +166,7 @@ export class MainScene extends Phaser.Scene {
       ...this.creatureCards,
     ]) {
       card.setScale(factor);
-      if (card.floating) continue;
+      if (card.floating || this.locationCards.includes(card as LocationCard)) continue; // locations sit at fixed world positions
       card.setPosition(card.x * ratioX, card.y * ratioY);
     }
     for (const location of this.locationCards) location.syncContents();
@@ -173,6 +176,19 @@ export class MainScene extends Phaser.Scene {
     this.handContainer.resize(gameSize.width, gameSize.height);
     this.playerSwitcher.resize(gameSize.width, gameSize.height);
     this.placeEventLog();
+    this.zoomDebug.setX(gameSize.width - 12);
+  }
+
+  private initZoomDebug() {
+    this.zoomDebug = this.add
+      .text(this.scale.width - 12, 12, '', {
+        fontFamily: 'monospace',
+        fontSize: '18px',
+        color: '#ffffff',
+      })
+      .setOrigin(1, 0)
+      .setDepth(1000);
+    this.hideFrom(this.cameras.main, this.zoomDebug);
   }
 
   private placeEventLog() {
@@ -185,6 +201,9 @@ export class MainScene extends Phaser.Scene {
   }
 
   update(_timer: number, _delta: number) {
+    this.zoomDebug.setText(
+      `zoom ${Math.round(this.cameras.main.zoom * 100)}% · ${Math.round(this.game.loop.actualFps)} fps`,
+    );
     this.connector?.redraw();
     this.updateTargeting();
     if (this.inDragging || this.panLast) this.game.canvas.style.cursor = CURSOR_GRAB; // phaser swaps it on every hover change
@@ -299,6 +318,18 @@ export class MainScene extends Phaser.Scene {
     this.assignToLocations(inputGameState);
     this.initFirstActivePlayer();
     this.hideUiFromMainCamera();
+    this.updateBoardBounds();
+    this.centreCameraOnActivePlayer();
+  }
+
+  //the camera starts on the active player
+  private centreCameraOnActivePlayer() {
+    const cam = this.cameras.main;
+    const centre = MainScene.WORLD_SIZE / 2;
+    const target = this.activePlayerCard() ?? { x: centre, y: centre };
+    cam.setZoom(MainScene.ZOOM_DEFAULT);
+    cam.scrollX = target.x - cam.width / 2;
+    cam.scrollY = target.y - cam.height / 2;
   }
 
   //camera filters are per object, so everything the hand/switcher own has to be flagged once it exists
@@ -807,10 +838,7 @@ export class MainScene extends Phaser.Scene {
     if (!this.targeting) return;
     const { card, legal, arrow } = this.targeting;
     const pointer = this.input.activePointer;
-    arrow.pointFromTo(
-      card.textBoxCentre(),
-      new Phaser.Math.Vector2(pointer.x, pointer.y),
-    );
+    arrow.pointFromTo(card.textBoxCentre(), new Phaser.Math.Vector2(pointer.x, pointer.y));
     const { x, y } = this.boardPoint();
     for (const target of this.dropTargets()) {
       target.setDropTarget(legal.includes(target) && target.getHitbox().contains(x, y));
@@ -853,21 +881,19 @@ export class MainScene extends Phaser.Scene {
     return { x: margin + halfWidth, y: this.scale.height - margin - halfHeight };
   }
 
-  //connected locations end up close together, and the whole map is centred on the screen
+  //connected locations end up close together, and the whole map is centred in the world
   private locationSlots(locations: LocationDTO[]): Map<number, { x: number; y: number }> {
-    const factor = this.factor();
     const footprint = {
       width: LocationCard.FOOTPRINT_WIDTH,
       height: LocationCard.FOOTPRINT_HEIGHT,
       anchorY: (LocationCard.LOC_HEIGHT - LocationCard.FOOTPRINT_HEIGHT) / 2, // the location sits in the upper part of its footprint
     };
-    const layout = layoutLocations(locations, footprint, this.scale.width / this.scale.height);
+    const layout = layoutLocations(locations, footprint, {
+      width: MainScene.LAYOUT_SIZE,
+      height: MainScene.LAYOUT_SIZE,
+    });
+    const centre = MainScene.WORLD_SIZE / 2;
 
-    return new Map(
-      [...layout].map(([id, p]) => [
-        id,
-        { x: this.scale.width / 2 + p.x * factor, y: this.scale.height / 2 + p.y * factor },
-      ]),
-    );
+    return new Map([...layout].map(([id, p]) => [id, { x: centre + p.x, y: centre + p.y }]));
   }
 }
