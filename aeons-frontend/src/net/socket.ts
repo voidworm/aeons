@@ -1,15 +1,17 @@
 import type {
-  CreaturePhaseDTO,
+  AwakeningPhaseDTO,
   GameStateDTO,
   GatherResultDTO,
-  UpkeepPhaseDTO,
+  Phase,
+  WorldPhaseDTO,
 } from '../game/objects/GameState';
 
 export type ServerMessage =
   | { type: 'initial_game_state'; payload: GameStateDTO }
   | { type: 'updated_game_state'; payload: GameStateDTO }
-  | { type: 'creature_phase'; payload: CreaturePhaseDTO }
-  | { type: 'upkeep_phase'; payload: UpkeepPhaseDTO }
+  | { type: 'phase_changed'; payload: { phase: Phase; cycle: number } }
+  | { type: 'world_phase'; payload: WorldPhaseDTO }
+  | { type: 'awakening_phase'; payload: AwakeningPhaseDTO }
   | { type: 'gather_result'; payload: GatherResultDTO }
   | { type: 'log'; payload: { entries: string[] } }
   | { type: 'poc_reply'; payload: string }

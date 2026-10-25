@@ -6,6 +6,8 @@ export const EFFECT_PLAYER_GATHER = 3;
 export const EFFECT_PLAYER_BOND = 4;
 export const EFFECT_KINDRED_MOVE = 5;
 
+export type Phase = 'spirit' | 'world' | 'awakening';
+
 export interface LocationDTO {
   id: number;
   name: string;
@@ -72,7 +74,8 @@ export interface PlayableCardDTO {
 }
 
 export interface GameStateDTO {
-  turnCounter: number;
+  cycle: number;
+  phase: Phase;
   locations: LocationDTO[];
   players: PlayerDTO[];
   creatures: CreatureDTO[];
@@ -93,11 +96,11 @@ export interface CreatureEventDTO {
   exhausted: boolean; // the creature became exhausted during this event
 }
 
-export interface CreaturePhaseDTO {
+export interface WorldPhaseDTO {
   events: CreatureEventDTO[];
 }
 
-export interface UpkeepEventDTO {
+export interface AwakeningEventDTO {
   creatureId: number; // the creature recovers from exhaustion
 }
 
@@ -106,6 +109,6 @@ export interface GatherResultDTO {
   mode: CollectMode;
 }
 
-export interface UpkeepPhaseDTO {
-  events: UpkeepEventDTO[];
+export interface AwakeningPhaseDTO {
+  events: AwakeningEventDTO[];
 }

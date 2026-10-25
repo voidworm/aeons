@@ -8,7 +8,8 @@ import (
 )
 
 type GameStateDTO struct {
-	TurnCounter  int               `json:"turnCounter"`
+	Cycle        int               `json:"cycle"`
+	Phase        string            `json:"phase"`
 	Locations    []LocationDTO     `json:"locations"`
 	Players      []PlayerDTO       `json:"players"`
 	Creatures    []CreatureDTO     `json:"creatures"`
@@ -114,7 +115,7 @@ func playableCardDTO(c *card.PlayableCard) PlayableCardDTO {
 }
 
 func Snapshot(gs *game.GameState) GameStateDTO {
-	var out GameStateDTO
+	out := GameStateDTO{Phase: string(gs.Phase), Cycle: gs.Cycle}
 
 	for _, l := range gs.Locations {
 		conns := make([]int, 0, len(l.OutgoingConnections))

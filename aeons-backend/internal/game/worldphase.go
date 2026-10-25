@@ -18,7 +18,7 @@ type CreatureAttack struct {
 	Fainted        bool // the wound made the player faint
 }
 
-// CreatureEvent records what one creature did in the creature phase.
+// CreatureEvent records what one creature did in the world phase.
 // Creatures that neither moved nor attacked produce no event.
 type CreatureEvent struct {
 	CreatureID     int
@@ -28,10 +28,10 @@ type CreatureEvent struct {
 	Exhausted      bool // the creature became exhausted during this event
 }
 
-// ResolveCreaturePhase runs the creature phase and returns what happened, in order.
-func (gs *GameState) ResolveCreaturePhase() []CreatureEvent {
+// ResolveWorldPhase runs the world phase and returns what happened, in order.
+func (gs *GameState) ResolveWorldPhase() []CreatureEvent {
 	events := []CreatureEvent{}
-	gs.Logf("-- Creature phase --")
+	gs.Logf("-- World phase --")
 
 	for _, v := range slices.Clone(gs.Creatures) {
 		if v.CurrentHealth == 0 {
@@ -63,23 +63,23 @@ func (gs *GameState) ResolveCreaturePhase() []CreatureEvent {
 
 func (gs *GameState) ResolveCreatureMovement(input *creature.Unit) {
 	if !input.Curious && !input.Shy {
-		log.Printf("[CREATURE PHASE] %s is neither curious nor shy. It does not move.", input.NameWithID())
+		log.Printf("[WORLD PHASE] %s is neither curious nor shy. It does not move.", input.NameWithID())
 		return
 	}
 
 	target := gs.DetermineMovementTargetForCreature(input)
 	if target == input.CurrentLocation {
 		if input.Distracted {
-			log.Printf("[CREATURE PHASE] %s is exhausted and can not move.", input.NameWithID())
+			log.Printf("[WORLD PHASE] %s is exhausted and can not move.", input.NameWithID())
 		} else {
-			log.Printf("[CREATURE PHASE] %s would move but is already at its target.", input.NameWithID())
+			log.Printf("[WORLD PHASE] %s would move but is already at its target.", input.NameWithID())
 		}
 		return
 	}
 
 	moveEffect := moving.MoveEffect{Entity: input, Target: target}
 	moveEffect.Apply()
-	log.Printf("[CREATURE PHASE] %s is moving to %s.", input.NameWithID(), input.CurrentLocation.Name)
+	log.Printf("[WORLD PHASE] %s is moving to %s.", input.NameWithID(), input.CurrentLocation.Name)
 	gs.Logf("%s moves to %s", input.NameWithID(), input.CurrentLocation.Name)
 
 }
@@ -124,12 +124,12 @@ func (gs *GameState) DetermineMovementTargetForShyCreature(creature *creature.Un
 
 	if len(possibleLocations) == 0 {
 		creature.Enraged = true
-		log.Printf("[CREATURE PHASE] %s is shy and wants to escape but can't. It becomes enraged.", creature.NameWithID())
+		log.Printf("[WORLD PHASE] %s is shy and wants to escape but can't. It becomes enraged.", creature.NameWithID())
 		return creatureLocation
 	}
 
 	target := possibleLocations[rand.IntN(len(possibleLocations))]
-	log.Printf("[CREATURE PHASE] %s is shy and runs away to %s.", creature.NameWithID(), target.Name)
+	log.Printf("[WORLD PHASE] %s is shy and runs away to %s.", creature.NameWithID(), target.Name)
 	return target
 
 }
@@ -181,15 +181,15 @@ func (gs *GameState) CuriosityTargetLocations(curious *creature.Unit) []*locatio
 // returns the wounds dealt to players and the moves of prey that fled from the attack
 func (gs *GameState) ResolveCreatureAttack(creature *creature.Unit) ([]CreatureAttack, []CreatureEvent) {
 	if creature.Bonded {
-		log.Printf("[CREATURE PHASE] %s is bonded and doesn't attack.", creature.NameWithID())
+		log.Printf("[WORLD PHASE] %s is bonded and doesn't attack.", creature.NameWithID())
 		return nil, nil
 	}
 	if !creature.Aggressive {
-		log.Printf("[CREATURE PHASE] %s is not aggressive and doesn't attack.", creature.NameWithID())
+		log.Printf("[WORLD PHASE] %s is not aggressive and doesn't attack.", creature.NameWithID())
 		return nil, nil
 	}
 	if creature.Distracted {
-		log.Printf("[CREATURE PHASE] %s is exhausted and doesn't attack.", creature.NameWithID())
+		log.Printf("[WORLD PHASE] %s is exhausted and doesn't attack.", creature.NameWithID())
 		return nil, nil
 	}
 	return gs.ResolveAttackForCreature(creature)
@@ -205,7 +205,7 @@ func (gs *GameState) ResolveAttackForCreature(attacker *creature.Unit) ([]Creatu
 	preyInRange := gs.PreyAtLocation(attacker)
 
 	if len(playersInRange) == 0 && len(preyInRange) == 0 {
-		log.Printf("[CREATURE PHASE] %s has no targets for an attack.\n", attacker.NameWithID())
+		log.Printf("[WORLD PHASE] %s has no targets for an attack.\n", attacker.NameWithID())
 		return nil, nil
 	}
 
@@ -223,7 +223,7 @@ func (gs *GameState) AttackPlayers(attacker *creature.Unit, targets []*player.Un
 	for _, target := range targets {
 		effect := combat.DamageEffect{Target: target}
 		effect.Apply()
-		log.Printf("[CREATURE PHASE] %s wounds %s.", attacker.NameWithID(), target.Name)
+		log.Printf("[WORLD PHASE] %s wounds %s.", attacker.NameWithID(), target.Name)
 		attacks = append(attacks, CreatureAttack{TargetPlayerID: target.ID, Fainted: target.Fainted()})
 		gs.logCreatureAttack(attacker.NameWithID(), target)
 	}
@@ -239,7 +239,7 @@ func (gs *GameState) AttackPrey(attacker *creature.Unit, targets []*creature.Uni
 		}
 		effect := combat.DamageEffect{Target: prey}
 		effect.Apply()
-		log.Printf("[CREATURE PHASE] %s attacks %s.", attacker.NameWithID(), prey.NameWithID())
+		log.Printf("[WORLD PHASE] %s attacks %s.", attacker.NameWithID(), prey.NameWithID())
 		gs.logCreatureHit("attacks", attacker, prey)
 
 		if prey.CurrentHealth == 0 {
@@ -248,7 +248,7 @@ func (gs *GameState) AttackPrey(attacker *creature.Unit, targets []*creature.Uni
 		if prey.Aggressive {
 			retaliation := combat.DamageEffect{Target: attacker}
 			retaliation.Apply()
-			log.Printf("[CREATURE PHASE] %s retaliates against %s.", prey.NameWithID(), attacker.NameWithID())
+			log.Printf("[WORLD PHASE] %s retaliates against %s.", prey.NameWithID(), attacker.NameWithID())
 			gs.logCreatureHit("retaliates against", prey, attacker)
 			continue
 		}
@@ -290,7 +290,7 @@ func (gs *GameState) FleeToSaferLocation(prey *creature.Unit) (CreatureEvent, bo
 
 	target := options[rand.IntN(len(options))]
 	prey.MoveTo(target)
-	log.Printf("[CREATURE PHASE] %s flees to %s.", prey.NameWithID(), target.Name)
+	log.Printf("[WORLD PHASE] %s flees to %s.", prey.NameWithID(), target.Name)
 	gs.Logf("%s flees to %s", prey.NameWithID(), target.Name)
 	return CreatureEvent{CreatureID: prey.ID, FromLocationID: from.ID, ToLocationID: target.ID}, true
 }

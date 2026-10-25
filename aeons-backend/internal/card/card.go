@@ -53,7 +53,7 @@ type PlayableCard struct {
 	Effect effect.Effect
 	Cost int
 	Range int
-	OnCooldown bool // cannot be cast again until the next upkeep phase
+	OnCooldown bool // cannot be cast again until the next awakening phase
 }
 
 func (c *PlayableCard) Play() {

@@ -1,15 +1,15 @@
 package game
 
-const UpkeepEnergy = 4
+const AwakeningEnergy = 4
 
-// UpkeepEvent records one creature recovering from exhaustion in the upkeep phase.
-type UpkeepEvent struct {
+// AwakeningEvent records one creature recovering from exhaustion in the awakening phase.
+type AwakeningEvent struct {
 	CreatureID int
 }
 
-// ResolveUpkeepPhase runs the upkeep phase and returns what happened, in order.
-func (gs *GameState) ResolveUpkeepPhase() []UpkeepEvent {
-	gs.Logf("-- Upkeep phase --")
+// ResolveAwakeningPhase runs the awakening phase and returns what happened, in order.
+func (gs *GameState) ResolveAwakeningPhase() []AwakeningEvent {
+	gs.Logf("-- Awakening phase --")
 	gs.ResolveRegrowth()
 	gs.ResolvePlayerRefresh()
 	events := gs.ResolveCreatureRecovery()
@@ -31,17 +31,17 @@ func (gs *GameState) ResolvePlayerRefresh() {
 			continue
 		}
 		v.RemainingActions = 3
-		v.Energy = UpkeepEnergy
-		gs.Logf("%s refreshes to %d energy", v.Name, UpkeepEnergy)
+		v.Energy = AwakeningEnergy
+		gs.Logf("%s refreshes to %d energy", v.Name, AwakeningEnergy)
 	}
 }
 
 // ResolveCreatureRecovery ends the turn state of all creatures, exhausted ones produce an event.
-func (gs *GameState) ResolveCreatureRecovery() []UpkeepEvent {
-	events := []UpkeepEvent{}
+func (gs *GameState) ResolveCreatureRecovery() []AwakeningEvent {
+	events := []AwakeningEvent{}
 	for _, v := range gs.Creatures {
 		if v.Distracted {
-			events = append(events, UpkeepEvent{CreatureID: v.ID})
+			events = append(events, AwakeningEvent{CreatureID: v.ID})
 			gs.Logf("%s recovers from exhaustion", v.NameWithID())
 		}
 		v.Tick()

@@ -10,6 +10,8 @@ import (
 
 type GameState struct {
 	nextID int
+	Phase Phase
+	Cycle int // the turn counter, increases whenever an awakening phase starts
 	eventLog []string
 	Locations    []*location.Unit
 	Players      []*player.Unit
@@ -248,7 +250,7 @@ func (gs *GameState) EvaluatePlayerHandPlayability(p *player.Unit) {
 			default:
 				v.CanBeCast = true
 		}
-		if p.Energy < v.Cost {
+		if p.Energy < v.Cost || gs.Phase != PhaseSpirit {
 			v.CanBeCast = false
 		}
 	}

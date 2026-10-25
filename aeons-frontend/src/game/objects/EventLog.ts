@@ -1,14 +1,13 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
-import { PlayerSwitcher } from './PlayerSwitcher';
 
-//list of what happened above the phase buttons, newest at the bottom; the wheel scrolls through older entries
+//list of what happened below the phase button, newest at the bottom; the wheel scrolls through older entries
 export class EventLog extends Phaser.GameObjects.Container {
   private static readonly VISIBLE = 5;
-  private static readonly WIDTH = PlayerSwitcher.PHASE_BUTTONS_WIDTH;
+  static readonly WIDTH = 480;
   private static readonly ROW_HEIGHT = 30;
   private static readonly PADDING = 12;
-  private static readonly HEIGHT = EventLog.VISIBLE * EventLog.ROW_HEIGHT + 2 * EventLog.PADDING;
+  static readonly HEIGHT = EventLog.VISIBLE * EventLog.ROW_HEIGHT + 2 * EventLog.PADDING;
   private static readonly OUTLINE_COLOR = 0x2a1809;
 
   readonly dragHandle: Phaser.GameObjects.Rectangle;

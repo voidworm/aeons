@@ -16,6 +16,9 @@ import (
 // Move, distract, attack, bond and gather cards are implemented so far.
 // Gather cards return the collecting effect, all others return nil. The mode only matters to gather cards.
 func (gs *GameState) PlayCard(cardID, targetID int, mode collecting.Mode) (*collecting.Effect, error) {
+	if gs.Phase != PhaseSpirit {
+		return nil, fmt.Errorf("cards can only be played in the spirit phase, it is the %s phase", gs.Phase)
+	}
 	c, owner := gs.findCardInHands(cardID)
 	if c == nil {
 		return nil, fmt.Errorf("card %d is not in any hand", cardID)
@@ -106,7 +109,7 @@ func (gs *GameState) findCardInHands(cardID int) (*card.PlayableCard, *player.Un
 	return nil, nil
 }
 
-func (gs *GameState) ResolvePlayerPhaseStep() error {
+func (gs *GameState) ResolveSpiritPhaseStep() error {
 	
 
 	/*
@@ -117,7 +120,7 @@ func (gs *GameState) ResolvePlayerPhaseStep() error {
 		if err != nil {
 			return err
 		} else if cancelled {
-			gs.ResolvePlayerPhaseStep()
+			gs.ResolveSpiritPhaseStep()
 		} else {
 			activePlayer.RemainingActions -= 1
 			moveEffect := moving.MoveEffect{Entity: activePlayer, Target: location}
@@ -130,7 +133,7 @@ func (gs *GameState) ResolvePlayerPhaseStep() error {
 		if err != nil {
 			return err
 		} else if cancelled {
-			gs.ResolvePlayerPhaseStep()
+			gs.ResolveSpiritPhaseStep()
 		} else {
 			activePlayer.RemainingActions -= 1
 			effect := combat.DamageEffect{Target: target}
@@ -142,7 +145,7 @@ func (gs *GameState) ResolvePlayerPhaseStep() error {
 		if err != nil {
 			return err
 		} else if cancelled {
-			gs.ResolvePlayerPhaseStep()
+			gs.ResolveSpiritPhaseStep()
 		} else {
 			activePlayer.RemainingActions -= 1
 			effect := harvesting.Effect{TargetHarvestable: target, Player: activePlayer}
@@ -153,7 +156,7 @@ func (gs *GameState) ResolvePlayerPhaseStep() error {
 		if err != nil {
 			return err
 		} else if cancelled {
-			gs.ResolvePlayerPhaseStep()
+			gs.ResolveSpiritPhaseStep()
 		} else {
 			activePlayer.RemainingActions -= 1
 			effect := evading.Effect{EvadingPlayer: activePlayer, EvadedCreature: target}
@@ -162,7 +165,7 @@ func (gs *GameState) ResolvePlayerPhaseStep() error {
 	case "Yield":
 		activePlayer.RemainingActions -= 1
 	case "Cancel":
-		gs.ResolvePlayerPhaseStep()
+		gs.ResolveSpiritPhaseStep()
 	default:
 		fmt.Println("Selected unimplemented action")
 	}

@@ -16,6 +16,8 @@ import (
 )
 
 func (gs *GameState) Init() {
+	gs.Phase = PhaseSpirit
+	gs.Cycle = 1
 
 	gs.InitLocations()
 	gs.InitPlayers()
@@ -70,7 +72,7 @@ func (gs *GameState) InitPlayers() {
 		CardsInHand:        []*card.PlayableCard{},
 		ResourcesAvailable: 0,
 		RemainingActions:   3,
-		Energy:             UpkeepEnergy,
+		Energy:             AwakeningEnergy,
 	}
 
 	log.Println("[INIT] Setting up player Scoundrel...")
@@ -81,7 +83,7 @@ func (gs *GameState) InitPlayers() {
 		CardsInHand:        []*card.PlayableCard{},
 		ResourcesAvailable: 0,
 		RemainingActions:   3,
-		Energy:             UpkeepEnergy,
+		Energy:             AwakeningEnergy,
 	}
 	gs.Players = append(gs.Players, Druid, Scoundrel)
 }

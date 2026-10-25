@@ -77,13 +77,13 @@ type CreatureAloofConfig struct {
 }
 
 type CreatureHuntingConfig struct {
-	Aggressive bool // aggressive creatures attack players and prey at their location in the creature phase, aggressive and curious makes a hunter
+	Aggressive bool // aggressive creatures attack players and prey at their location in the world phase, aggressive and curious makes a hunter
 	Prey       bool // prey is hunted and attacked by aggressive creatures, attacked prey flees, or retaliates if it is aggressive itself
 }
 
 type CreatureMovementConfig struct {
-	Curious bool //curious creatures will move towards the closest player or creature in the creature phase, hunters only towards prey and players
-	Shy     bool //shy creatures will move away from a location if a player or an aggressive creature is there in their creature phase
+	Curious bool //curious creatures will move towards the closest player or creature in the world phase, hunters only towards prey and players
+	Shy     bool //shy creatures will move away from a location if a player or an aggressive creature is there in their world phase
 }
 
 type CreatureTurnStateConfig struct {

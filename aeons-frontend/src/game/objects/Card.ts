@@ -78,6 +78,7 @@ export class Card extends Phaser.GameObjects.Container {
   private zoomTimer: Phaser.Time.TimerEvent | null = null;
   private zoomTween: Phaser.Tweens.Tween | null = null;
   private restScale: number | null = null; // the card's scale before the hover zoom; non-null while zoomed
+  private zoomTargetScale: number | null = null; // where a running zoom tween is headed
 
   protected readonly config: CardConfig;
   protected tween: Phaser.Tweens.Tween | null = null;
@@ -469,12 +470,19 @@ export class Card extends Phaser.GameObjects.Container {
 
   private tweenZoom(scale: number): void {
     this.zoomTween?.stop();
+    this.zoomTargetScale = scale;
     this.zoomTween = this.tweensManager.add({
       targets: this,
       scale,
       duration: 250,
       ease: 'Sine.easeInOut',
+      onComplete: () => (this.zoomTargetScale = null),
     });
+  }
+
+  // the scale the card has when it is not hover zoomed, which is what anything laid out around it should go by
+  protected layoutScale(): number {
+    return this.restScale ?? this.zoomTargetScale ?? this.scaleX;
   }
 
   private startWiggle(): void {

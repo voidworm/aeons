@@ -13,5 +13,5 @@ type Effect struct {
 
 func (ee *Effect) Apply() {
 	ee.DistractedCreature.Distracted = true
-	log.Printf("[Player Phase] %s has distracted %s.", ee.DistractingPlayer.Name, ee.DistractedCreature.NameWithID())
+	log.Printf("[Spirit Phase] %s has distracted %s.", ee.DistractingPlayer.Name, ee.DistractedCreature.NameWithID())
 }

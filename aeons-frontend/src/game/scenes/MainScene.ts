@@ -7,6 +7,7 @@ import { connect } from '../../net/socket';
 import { CreatureCard } from '../objects/CreatureCard';
 import { NodeCard } from '../objects/NodeCard';
 import { GatherOptionCard } from '../objects/GatherOptionCard';
+import { ControlButton } from '../objects/ControlButton';
 import {
   EFFECT_PLAYER_ATTACK,
   EFFECT_PLAYER_BOND,
@@ -16,13 +17,14 @@ import {
   EFFECT_PLAYER_MOVE,
 } from '../objects/GameState';
 import type {
+  AwakeningEventDTO,
   CreatureEventDTO,
   GameStateDTO,
   LocationDTO,
   GatherResultDTO,
   PlayableCardDTO,
+  Phase,
   PlayerDTO,
-  UpkeepEventDTO,
 } from '../objects/GameState';
 import { PlayerCard } from '../objects/PlayerCard';
 import { HandContainer } from '../objects/HandContainer';
@@ -40,16 +42,18 @@ import { CURSOR_DEFAULT, CURSOR_GRAB, CURSOR_INTERACTIVE } from '../cursors';
 export class MainScene extends Phaser.Scene {
   private static readonly CARD_WIDTH = 252; // rendered card width
   private static readonly MARGIN = 50;
+  private static readonly DEBUG_BUTTON_WIDTH = 300;
   private static readonly CARD_HEIGHT = 352;
 
   private handContainer!: HandContainer;
   private playerSwitcher!: PlayerSwitcher;
   private eventLog!: EventLog;
   private gameStarted = false;
-  private phaseRunning = false; // a creature or upkeep phase is being animated
+  private phase: Phase = 'spirit';
+  private phaseRunning = false; // a world or awakening phase is being animated
   private splits: GatherOptionCard[] = []; // stand in for nodes that offer both harvesting and foraging, from drag start until the cast ends
   private dragSuppressed: Card[] = []; // cards disabled for the duration of a drag
-  private pendingState: GameStateDTO | null = null; // an update that arrived mid creature phase
+  private pendingState: GameStateDTO | null = null; // an update that arrived mid world phase
 
   private playableCards: PlayableCard[] = [];
   private locationCards: LocationCard[] = [];
@@ -82,6 +86,7 @@ export class MainScene extends Phaser.Scene {
   private static readonly ZOOM_SPEED = 0.001; // per wheel delta unit
 
   private zoomDebug!: Phaser.GameObjects.Text;
+  private debugButtons: ControlButton[] = []; // playtest controls under the zoom readout
   private connector: LocationConnector | null = null;
   private panLast: Phaser.Math.Vector2 | null = null;
 
@@ -102,17 +107,17 @@ export class MainScene extends Phaser.Scene {
     this.playerSwitcher = new PlayerSwitcher(
       this,
       () => this.switchActivePlayer(),
-      () => this.triggerCreaturePhase(),
-      () => this.triggerUpkeepPhase(),
+      () => this.onPhaseButton(),
     );
     this.eventLog = new EventLog(this);
     this.placeEventLog();
-    new DragGroup(this, [this.eventLog, ...this.playerSwitcher.phaseButtons]).enableOn(
+    new DragGroup(this, [this.eventLog, ...this.playerSwitcher.phaseObjects]).enableOn(
       this.eventLog.dragHandle,
     );
     this.uiCamera = this.cameras.add();
     this.initPanning();
     this.initZoomDebug();
+    this.initDebugButtons();
     this.initTargetingInput();
 
     this.socket = connect((msg) => {
@@ -123,11 +128,14 @@ export class MainScene extends Phaser.Scene {
         case 'updated_game_state':
           this.handleGameStateUpdate(msg.payload);
           break;
-        case 'creature_phase':
-          void this.playCreaturePhase(msg.payload.events);
+        case 'phase_changed':
+          this.setPhase(msg.payload.phase, msg.payload.cycle);
           break;
-        case 'upkeep_phase':
-          void this.playUpkeepPhase(msg.payload.events);
+        case 'world_phase':
+          void this.playWorldPhase(msg.payload.events);
+          break;
+        case 'awakening_phase':
+          void this.playAwakeningPhase(msg.payload.events);
           break;
         case 'log':
           this.eventLog.append(msg.payload.entries);
@@ -182,6 +190,7 @@ export class MainScene extends Phaser.Scene {
     this.playerSwitcher.resize(gameSize.width, gameSize.height);
     this.placeEventLog();
     this.zoomDebug.setX(gameSize.width - 12);
+    this.placeDebugButtons();
   }
 
   private initZoomDebug() {
@@ -196,9 +205,40 @@ export class MainScene extends Phaser.Scene {
     this.hideFrom(this.cameras.main, this.zoomDebug);
   }
 
+  private initDebugButtons() {
+    this.debugButtons = [
+      this.createDebugButton('World phase', () => this.triggerDebugPhase('trigger_world_phase')),
+      this.createDebugButton('Awakening phase', () => this.triggerDebugPhase('trigger_awakening_phase')),
+    ];
+    for (const button of this.debugButtons) {
+      button.setDepth(1000);
+      this.add.existing(button);
+      this.hideFrom(this.cameras.main, button);
+    }
+    this.placeDebugButtons();
+  }
+
+  private createDebugButton(text: string, onClick: () => void): ControlButton {
+    return new ControlButton(this, text, onClick, MainScene.DEBUG_BUTTON_WIDTH, ControlButton.DEBUG_PALETTE);
+  }
+
+  private placeDebugButtons() {
+    const { HEIGHT } = ControlButton;
+    const { DEBUG_BUTTON_WIDTH } = MainScene;
+    const scale = this.factor();
+    const top = 12 + this.zoomDebug.height + 8; // right below the zoom readout
+    this.debugButtons.forEach((button, i) => {
+      button.setScale(scale);
+      button.setPosition(
+        this.scale.width - 12 - (DEBUG_BUTTON_WIDTH * scale) / 2,
+        top + (HEIGHT * scale) / 2 + i * (HEIGHT * scale + 8),
+      );
+    });
+  }
+
   private placeEventLog() {
     this.eventLog.setScale(this.factor());
-    const { x, y } = this.playerSwitcher.abovePhaseButtons();
+    const { x, y } = this.playerSwitcher.eventLogBottomCentre();
     this.eventLog.setBottomCentre(x, y);
   }
 
@@ -315,6 +355,7 @@ export class MainScene extends Phaser.Scene {
 
   handleGameStart(inputGameState: GameStateDTO) {
     this.gameStarted = true;
+    this.setPhase(inputGameState.phase, inputGameState.cycle);
     this.playerStates = inputGameState.players;
     this.initHands(inputGameState);
     this.initPlayers(inputGameState);
@@ -352,7 +393,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   //TODO: sync health etc. onto the existing cards too
-  //the update arrives right behind the creature phase events, so it waits until the animation is done
+  //the update arrives right behind the world phase events, so it waits until the animation is done
   private handleGameStateUpdate(state: GameStateDTO) {
     if (this.phaseRunning) {
       this.pendingState = state;
@@ -422,20 +463,42 @@ export class MainScene extends Phaser.Scene {
     this.hideFrom(this.cameras.main, new FaintedPopup(this, player?.name ?? ''));
   }
 
-  private triggerCreaturePhase() {
+  //the phase button advances the game by one step, the board stays usable while it waits for the next click
+  private onPhaseButton() {
     if (!this.gameStarted || this.phaseRunning) return;
-    this.phaseRunning = true;
-    this.send('trigger_creature_phase');
+    switch (this.phase) {
+      case 'spirit':
+        this.setPhaseRunning(true);
+        this.send('end_spirit_phase');
+        break;
+      case 'world':
+        this.setPhaseRunning(true);
+        this.send('start_awakening_phase');
+        break;
+      case 'awakening':
+        this.send('start_spirit_phase'); // nothing to animate, the update arrives right away
+        break;
+    }
   }
 
-  private triggerUpkeepPhase() {
+  private triggerDebugPhase(type: 'trigger_world_phase' | 'trigger_awakening_phase') {
     if (!this.gameStarted || this.phaseRunning) return;
-    this.phaseRunning = true;
-    this.send('trigger_upkeep_phase');
+    this.setPhaseRunning(true);
+    this.send(type);
+  }
+
+  private setPhase(phase: Phase, cycle: number) {
+    this.phase = phase;
+    this.playerSwitcher.setPhase(phase, cycle);
+  }
+
+  private setPhaseRunning(running: boolean) {
+    this.phaseRunning = running;
+    this.playerSwitcher.setPhaseButtonEnabled(!running);
   }
 
   //one creature after another, each waits for the previous one to arrive and, if it exhausted, to turn
-  private async playCreaturePhase(events: CreatureEventDTO[]) {
+  private async playWorldPhase(events: CreatureEventDTO[]) {
     for (const event of events) {
       await this.moveCreature(event);
       if (event.exhausted)
@@ -448,7 +511,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   //exhausted creatures turn upright again, one after another
-  private async playUpkeepPhase(events: UpkeepEventDTO[]) {
+  private async playAwakeningPhase(events: AwakeningEventDTO[]) {
     for (const event of events) {
       await this.creatureCards.find((c) => c.id === event.creatureId)?.setExhausted(false);
     }
@@ -456,7 +519,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   private finishPhase() {
-    this.phaseRunning = false;
+    this.setPhaseRunning(false);
     if (this.pendingState) {
       this.syncState(this.pendingState);
       this.pendingState = null;

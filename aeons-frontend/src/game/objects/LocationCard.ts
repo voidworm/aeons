@@ -123,7 +123,7 @@ export class LocationCard extends Card {
   syncContents(): void {
     const turn = this.floating ? this.rotation : 0;
     for (const [card, offset] of this.offsets) {
-      const turned = offset.clone().scale(this.scaleX).rotate(turn);
+      const turned = offset.clone().scale(this.layoutScale()).rotate(turn);
       card.setPosition(this.x + turned.x, this.y + turned.y);
     }
   }
@@ -137,7 +137,7 @@ export class LocationCard extends Card {
 
   // while a contained card is dragged: it may go anywhere as long as it still touches the location
   constrainDrag(card: Card): void {
-    const s = this.scaleX;
+    const s = this.layoutScale();
     const reachX = ((LocationCard.LOC_WIDTH + card.cardWidth) / 2) * s;
     const reachY = ((LocationCard.LOC_HEIGHT + card.cardHeight) / 2) * s;
     const dx = Phaser.Math.Clamp(card.x - this.x, -reachX, reachX);

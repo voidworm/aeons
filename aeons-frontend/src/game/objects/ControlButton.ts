@@ -2,22 +2,35 @@ import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
 import { CURSOR_INTERACTIVE } from '../cursors';
 
-//a game control button, same palette as the location connectors; centred on its own origin
+export interface ButtonPalette {
+  color: number;
+  hover: number;
+  outline: number;
+}
+
+//a game control button, same palette as the location connectors unless told otherwise; centred on its own origin
 export class ControlButton extends Phaser.GameObjects.Container {
-  static readonly WIDTH = 230;
+  static readonly WIDTH = 230; // the default, wider labels pass their own
   static readonly HEIGHT = 48;
-  private static readonly COLOR = 0x5c3b1f;
-  private static readonly COLOR_HOVER = 0x74492a;
-  private static readonly OUTLINE_COLOR = 0x2a1809;
+  static readonly DEFAULT_PALETTE: ButtonPalette = { color: 0x5c3b1f, hover: 0x74492a, outline: 0x2a1809 };
+  static readonly DEBUG_PALETTE: ButtonPalette = { color: 0x555555, hover: 0x8a8a8a, outline: 0x2b2b2b }; // marks playtest controls
 
   readonly label: Phaser.GameObjects.Text;
+  private readonly background: Phaser.GameObjects.Rectangle;
 
-  constructor(scene: MainScene, text: string, onClick: () => void) {
+  constructor(
+    scene: MainScene,
+    text: string,
+    onClick: () => void,
+    width = ControlButton.WIDTH,
+    palette = ControlButton.DEFAULT_PALETTE,
+  ) {
     super(scene, 0, 0);
-    const { WIDTH, HEIGHT, COLOR, COLOR_HOVER, OUTLINE_COLOR } = ControlButton;
+    const { HEIGHT } = ControlButton;
+    const { color, hover, outline } = palette;
 
-    const background = new Phaser.GameObjects.Rectangle(scene, 0, 0, WIDTH, HEIGHT, COLOR)
-      .setStrokeStyle(4, OUTLINE_COLOR)
+    const background = new Phaser.GameObjects.Rectangle(scene, 0, 0, width, HEIGHT, color)
+      .setStrokeStyle(4, outline)
       .setInteractive({ cursor: CURSOR_INTERACTIVE });
     this.label = new Phaser.GameObjects.Text(scene, 0, 0, text, {
       fontSize: '26px',
@@ -25,10 +38,16 @@ export class ControlButton extends Phaser.GameObjects.Container {
       color: '#f3e3c3',
     }).setOrigin(0.5);
 
-    background.on('pointerover', () => background.setFillStyle(COLOR_HOVER));
-    background.on('pointerout', () => background.setFillStyle(COLOR));
+    background.on('pointerover', () => background.setFillStyle(hover));
+    background.on('pointerout', () => background.setFillStyle(color));
     background.on('pointerup', onClick);
 
+    this.background = background;
     this.add([background, this.label]);
+  }
+
+  setEnabled(enabled: boolean): void {
+    this.background.input!.enabled = enabled;
+    this.setAlpha(enabled ? 1 : 0.5);
   }
 }
