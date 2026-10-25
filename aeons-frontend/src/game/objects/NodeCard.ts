@@ -4,7 +4,7 @@ import { Card } from './Card';
 import type { CollectMode, NodeDTO, PoolDTO } from './GameState';
 
 export const poolText = (pool: PoolDTO, name: string) =>
-  pool.max > 0 ? `${name} ${pool.remaining}/${pool.max}` : `No ${name}`;
+  pool.max > 0 ? `${pool.remaining} ${name}` : `No ${name}`;
 
 export class NodeCard extends Card {
   public modes: CollectMode[];
