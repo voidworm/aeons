@@ -228,6 +228,7 @@ func (gs *GameState) GenerateKindredMoveCard() *card.PlayableCard {
 		Type:       card.PlayerMoveKindred,
 		Name:       "Kindred Move",
 		EffectText: "Cooldown\n*Move* your Kindred to target adjacent location.",
+		Flavor:     "It's time to go, my friend.",
 		TargetSpec: &card.TargetSpec{Type: card.TargetTypeLocation},
 		Candidates: []card.Targetable{},
 		Range:      1,
