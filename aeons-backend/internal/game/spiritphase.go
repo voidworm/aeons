@@ -93,6 +93,7 @@ func (gs *GameState) PlayCard(cardID, targetID int, mode collecting.Mode) (*coll
 	gs.logPlayedCard(c, owner)
 	gs.ReconcileDefeats()
 
+	gs.ReconcileVision()
 	gs.RefreshHands()
 	collected, _ := c.Effect.(*collecting.Effect)
 	return collected, nil

@@ -8,11 +8,14 @@ export const EFFECT_KINDRED_MOVE = 5;
 
 export type Phase = 'spirit' | 'world' | 'awakening';
 
+export type LocationVisibility = 'visible' | 'memory' | 'veiled';
+
 export interface LocationDTO {
   id: number;
   name: string;
   flavor: string;
   connections: number[];
+  visibility: LocationVisibility; // memory: unveiled once, veiled now; veiled: never unveiled
 }
 
 export interface PlayerDTO {

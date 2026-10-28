@@ -94,6 +94,14 @@ func (n *Node) Modes() []Mode {
 	return modes
 }
 
+// Snapshot is a copy of the node that does not change when the node does.
+func (n *Node) Snapshot() *Node {
+	food, material := *n.Food, *n.Material
+	snapshot := *n
+	snapshot.Food, snapshot.Material = &food, &material
+	return &snapshot
+}
+
 func (n *Node) Tick() {
 	n.Food.Tick()
 	n.Material.Tick()

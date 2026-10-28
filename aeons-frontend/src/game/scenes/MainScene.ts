@@ -18,9 +18,11 @@ import {
 } from '../objects/GameState';
 import type {
   AwakeningEventDTO,
+  CreatureDTO,
   CreatureEventDTO,
   GameStateDTO,
   LocationDTO,
+  NodeDTO,
   GatherResultDTO,
   PlayableCardDTO,
   Phase,
@@ -317,35 +319,53 @@ export class MainScene extends Phaser.Scene {
   }
 
   initNodes(inputGameState: GameStateDTO) {
-    const factor = this.factor();
-    for (const node of inputGameState.nodes) {
-      const { x, y } = this.stackAnchor(factor);
-
-      const c = NodeCard.fromDto(this, x, y, node);
-      c.setScale(this.factor());
-      this.hideFromUiCamera(c);
-      this.nodeCards.push(c);
-      c.on('cardDragEnd', this.onCardDrop, this);
-      c.on('cardPointerOver', this.onCardPointerOver, this);
-      c.on('cardDragStart', this.onCardDrag, this);
-      c.on('cardDragged', this.onCardDragged, this);
-    }
+    for (const node of inputGameState.nodes) this.spawnNode(node);
   }
 
   initCreatures(inputGameState: GameStateDTO) {
-    const factor = this.factor();
-    for (const creature of inputGameState.creatures) {
-      const { x, y } = this.stackAnchor(factor);
+    for (const creature of inputGameState.creatures) this.spawnCreature(creature);
+  }
 
-      const c = CreatureCard.fromDto(this, x, y, creature);
-      c.setScale(this.factor());
-      this.hideFromUiCamera(c);
-      this.creatureCards.push(c);
-      c.on('cardDragEnd', this.onCardDrop, this);
-      c.on('cardPointerOver', this.onCardPointerOver, this);
-      c.on('cardDragStart', this.onCardDrag, this);
-      c.on('cardDragged', this.onCardDragged, this);
+  private spawnNode(dto: NodeDTO): NodeCard {
+    const { x, y } = this.stackAnchor(this.factor());
+    const c = NodeCard.fromDto(this, x, y, dto);
+    this.prepareBoardCard(c);
+    this.nodeCards.push(c);
+    return c;
+  }
+
+  private spawnCreature(dto: CreatureDTO): CreatureCard {
+    const { x, y } = this.stackAnchor(this.factor());
+    const c = CreatureCard.fromDto(this, x, y, dto);
+    this.prepareBoardCard(c);
+    this.creatureCards.push(c);
+    return c;
+  }
+
+  private prepareBoardCard(c: Card) {
+    c.setScale(this.factor());
+    this.hideFromUiCamera(c);
+    c.on('cardDragEnd', this.onCardDrop, this);
+    c.on('cardPointerOver', this.onCardPointerOver, this);
+    c.on('cardDragStart', this.onCardDrag, this);
+    c.on('cardDragged', this.onCardDragged, this);
+  }
+
+  //a card at a location the players can't see any more is gone; one at a newly visible location appears there
+  private placeAtLocation(card: Card, locationId: number) {
+    const to = this.locationCards.find((l) => l.id === locationId);
+    if (!to) return;
+    to.addContent(card);
+    to.raiseContents();
+  }
+
+  private removeCreatureCards(state: GameStateDTO) {
+    const shown = new Set(state.creatures.map((c) => c.id));
+    for (const card of this.creatureCards.filter((c) => !shown.has(c.id))) {
+      card.homeLocation?.removeContent(card);
+      card.destroy();
     }
+    this.creatureCards = this.creatureCards.filter((c) => shown.has(c.id));
   }
 
   initFirstActivePlayer() {
@@ -409,9 +429,17 @@ export class MainScene extends Phaser.Scene {
     for (const dto of state.cardsInHand) {
       this.playableCards.find((c) => c.id === dto.id)?.setDisabled(!dto.canBeCast);
     }
+    for (const dto of state.locations) {
+      this.locationCards.find((l) => l.id === dto.id)?.setVisibility(dto.visibility);
+    }
+    this.removeCreatureCards(state);
     for (const dto of state.creatures) {
-      const card = this.creatureCards.find((c) => c.id === dto.id);
-      card?.setHealth(dto.health);
+      let card = this.creatureCards.find((c) => c.id === dto.id);
+      if (!card) {
+        card = this.spawnCreature(dto);
+        this.placeAtLocation(card, dto.locationId);
+      }
+      card.setHealth(dto.health);
       void card?.setExhausted(dto.exhausted);
       const owner = state.players.find((p) => p.id === dto.kindredOf);
       card?.setKindredOf(dto.kindredOf, owner?.name ?? '');
@@ -419,7 +447,13 @@ export class MainScene extends Phaser.Scene {
       if (card && to) void this.moveCardToLocation(card, to);
     }
     for (const dto of state.nodes) {
-      this.nodeCards.find((n) => n.id === dto.id)?.sync(dto);
+      let card = this.nodeCards.find((n) => n.id === dto.id);
+      if (card) {
+        card.sync(dto);
+      } else {
+        card = this.spawnNode(dto);
+        this.placeAtLocation(card, dto.locationId);
+      }
     }
     for (const dto of state.players) {
       const card = this.players.find((p) => p.id === dto.id);

@@ -15,6 +15,7 @@ func (gs *GameState) ResolveAwakeningPhase() []AwakeningEvent {
 	events := gs.ResolveCreatureRecovery()
 
 	gs.ResolveCooldownReset()
+	gs.ReconcileVision()
 	gs.RefreshHands()
 	return events
 }

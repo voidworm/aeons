@@ -17,7 +17,8 @@ type GameState struct {
 	Players      []*player.Unit
 	Creatures    []*creature.Unit
 	Nodes []*collecting.Node
-	PlayableCards 			[]*card.PlayableCard
+	KnownNodes map[int]*collecting.Node // the nodes as the players last saw them, by node id
+	PlayableCards			[]*card.PlayableCard
 }
 
 func (gs *GameState) NextID() int {

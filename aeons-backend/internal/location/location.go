@@ -10,6 +10,8 @@ type Unit struct {
 	Name                string
 	Flavor string
 	OutgoingConnections []*Unit
+	Veiled              bool // no unit controlled by a player is here right now
+	Known               bool // has been unveiled at least once, so a veiled location is a memory
 }
 
 // returns the path between two locations, including each of the locations.

@@ -4,6 +4,7 @@ import (
 	"aeons/internal/card"
 	"aeons/internal/game"
 	"aeons/internal/collecting"
+	"aeons/internal/location"
 	"aeons/internal/player"
 )
 
@@ -22,6 +23,24 @@ type LocationDTO struct {
 	Name        string `json:"name"`
 	Connections []int  `json:"connections"`
 	Flavor      string `json:"flavor"`
+	Visibility  string `json:"visibility"` // visible, memory (unveiled once, veiled now) or veiled
+}
+
+const (
+	visibilityVisible = "visible"
+	visibilityMemory  = "memory"
+	visibilityVeiled  = "veiled"
+)
+
+func visibility(l *location.Unit) string {
+	switch {
+	case !l.Veiled:
+		return visibilityVisible
+	case l.Known:
+		return visibilityMemory
+	default:
+		return visibilityVeiled
+	}
 }
 
 type PlayerDTO struct {
@@ -115,14 +134,15 @@ func playableCardDTO(c *card.PlayableCard) PlayableCardDTO {
 }
 
 func Snapshot(gs *game.GameState) GameStateDTO {
-	out := GameStateDTO{Phase: string(gs.Phase), Cycle: gs.Cycle}
+	// veiled locations can leave these empty, which must reach the frontend as [] and not null
+	out := GameStateDTO{Phase: string(gs.Phase), Cycle: gs.Cycle, Creatures: []CreatureDTO{}, Nodes: []NodeDTO{}}
 
 	for _, l := range gs.Locations {
 		conns := make([]int, 0, len(l.OutgoingConnections))
 		for _, c := range l.OutgoingConnections {
 			conns = append(conns, c.ID)
 		}
-		out.Locations = append(out.Locations, LocationDTO{ID: l.ID, Name: l.Name, Connections: conns, Flavor: l.Flavor})
+		out.Locations = append(out.Locations, LocationDTO{ID: l.ID, Name: l.Name, Connections: conns, Flavor: l.Flavor, Visibility: visibility(l)})
 	}
 
 	for _, p := range gs.Players {
@@ -138,6 +158,9 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 	}
 
 	for _, c := range gs.Creatures {
+		if c.CurrentLocation.Veiled {
+			continue
+		}
 		var kindredOf *int
 		if c.BondedTo != nil {
 			kindredOf = &c.BondedTo.ID
@@ -148,7 +171,11 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 		})
 	}
 
-	for _, n := range gs.Nodes {
+	for _, live := range gs.Nodes {
+		n, known := gs.KnownNodes[live.ID]
+		if !known {
+			continue
+		}
 		out.Nodes = append(out.Nodes, NodeDTO{
 			ID: n.ID, Name: n.Name, Flavor: n.Flavor, LocationID: n.StaticLocation.ID,
 			Food: poolDTO(n.Food), Material: poolDTO(n.Material), Modes: modeStrings(n.Modes()),

@@ -24,6 +24,9 @@ func (gs *GameState) Init() {
 	gs.InitNodes()
 	gs.InitCreatures()
 
+	gs.KnownNodes = map[int]*collecting.Node{}
+	gs.ReconcileVision()
+
 	//init hands also sets playability of cards, so needs to be evoked after all creatures and nodes have been added to the board
 	gs.initHandsForAllPlayers()
 }

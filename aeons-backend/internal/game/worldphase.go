@@ -57,6 +57,7 @@ func (gs *GameState) ResolveWorldPhase() []CreatureEvent {
 		events = append(events, preyReactions...)
 	}
 
+	gs.ReconcileVision()
 	gs.RefreshHands()
 	return events
 }

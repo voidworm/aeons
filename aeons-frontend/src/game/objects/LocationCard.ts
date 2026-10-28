@@ -1,9 +1,13 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
 import { Card } from './Card';
-import type { LocationDTO } from './GameState';
+import type { LocationDTO, LocationVisibility } from './GameState';
+
+const ART_LAYER_INDEX = 3; // in the surface, after the border, the face and the art
 
 export class LocationCard extends Card {
+  private static readonly FACE_COLOR = 0x105207;
+  private static readonly VEILED_FACE_COLOR = 0x03180a; // the frame of a location that has never been unveiled
   static readonly LOC_WIDTH = 352;
   static readonly LOC_HEIGHT = 252;
   // how far the contained cards reach up into the location from its lower border
@@ -19,6 +23,8 @@ export class LocationCard extends Card {
   public connections: number[] = []; // ids of the locations reachable from here
   private contents: Card[] = [];
   private offsets = new Map<Card, Phaser.Math.Vector2>(); // card centre relative to the location centre, unscaled
+  private memoryLabel: Phaser.GameObjects.Text;
+  private artVeil: Phaser.GameObjects.Graphics; // darkens the art of a location that is veiled or only remembered
 
   constructor(
     scene: MainScene,
@@ -33,7 +39,7 @@ export class LocationCard extends Card {
       id: id,
       name: cardname,
       flavor: cardtext,
-      faceColor: 0x105207,
+      faceColor: LocationCard.FACE_COLOR,
       width: WIDTH,
       height: HEIGHT,
       artHeight: HEIGHT - 36 - Card.INSET,
@@ -43,6 +49,13 @@ export class LocationCard extends Card {
       centerText: true,
       textBoxRect: { x: (WIDTH - 220) / 2, y: HEIGHT - 36 - 64, w: 220, h: 64 },
     });
+    this.memoryLabel = this.buildMemoryLabel();
+    const artTone = this.buildArtLayer(0.12).setVisible(true); // tones down the art of every location
+    this.artVeil = this.buildArtLayer(0.3);
+    // right above the art and below the text box, which reaches into the art
+    this.surface.addAt(this.artVeil, ART_LAYER_INDEX);
+    this.surface.addAt(artTone, ART_LAYER_INDEX);
+    this.addFrameDetails(this.memoryLabel);
     scene.events.on(Phaser.Scenes.Events.UPDATE, this.followWiggle, this);
     this.once(Phaser.GameObjects.Events.DESTROY, () =>
       scene.events.off(Phaser.Scenes.Events.UPDATE, this.followWiggle, this),
@@ -52,7 +65,39 @@ export class LocationCard extends Card {
   static fromDto(scene: MainScene, x: number, y: number, dto: LocationDTO) {
     const location = new LocationCard(scene, x, y, dto.id, dto.name, dto.flavor);
     location.connections = dto.connections;
+    location.setVisibility(dto.visibility);
     return location;
+  }
+
+  setVisibility(visibility: LocationVisibility): void {
+    this.setFaceColor(
+      visibility === 'veiled' ? LocationCard.VEILED_FACE_COLOR : LocationCard.FACE_COLOR,
+    );
+    this.artVeil.setVisible(visibility !== 'visible');
+    this.memoryLabel.setVisible(visibility === 'memory');
+  }
+
+  private buildArtLayer(alpha: number): Phaser.GameObjects.Graphics {
+    const { LOC_WIDTH, LOC_HEIGHT } = LocationCard;
+    return this.roundedRect(
+      Card.INSET,
+      Card.ART_Y,
+      LOC_WIDTH - 2 * Card.INSET,
+      LOC_HEIGHT - Card.ART_Y - Card.INSET,
+      Card.CORNER_RADIUS - Card.BORDER,
+      0x111111,
+      alpha,
+    ).setVisible(false);
+  }
+
+  private buildMemoryLabel(): Phaser.GameObjects.Text {
+    return this.label(LocationCard.LOC_WIDTH / 2, Card.ART_Y + 16, 'This location is a memory.', {
+      fontSize: '12.8px',
+      fontStyle: 'italic',
+      color: '#ffffff',
+    })
+      .setOrigin(0.5)
+      .setVisible(false);
   }
 
   // lays the cards out in a row straddling the lower border; from then on they are free to move
