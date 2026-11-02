@@ -8,6 +8,8 @@ const (
 	MsgSelectPlayer = "select_player"
 	MsgPlayCard = "play_card"
 	MsgChooseTarget = "choose_target"
+	MsgPayForQuest = "pay_for_quest"
+	MsgCancelPayment = "cancel_payment"
 	MsgEndSpiritPhase = "end_spirit_phase"
 	MsgStartAwakeningPhase = "start_awakening_phase"
 	MsgStartSpiritPhase = "start_spirit_phase"
@@ -55,6 +57,11 @@ type ChooseTargetPayload struct {
 	CardID   int `json:"cardId"`
 	TargetID int `json:"targetId"`
 	Mode     string `json:"mode"` // harvest or forage, only read for gather cards
+}
+
+type PayForQuestPayload struct {
+	QuestID  int         `json:"questId"`
+	Payments map[int]int `json:"payments"` // player id to the resources that player pays
 }
 
 type HandPayload struct {

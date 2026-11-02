@@ -5,9 +5,16 @@ import type { LocationDTO, LocationVisibility } from './GameState';
 
 const ART_LAYER_INDEX = 3; // in the surface, after the border, the face and the art
 
+const FRAME_LAYER_INDEX = 2; // in the surface, after the border and the face, below the art
+
+const VEIL_TEXT: Record<LocationVisibility, string> = {
+  visible: '',
+  memory: 'Your clan has been here before.',
+  veiled: 'This location is unknown to your clan.',
+};
+
 export class LocationCard extends Card {
   private static readonly FACE_COLOR = 0x105207;
-  private static readonly VEILED_FACE_COLOR = 0x03180a; // the frame of a location that has never been unveiled
   static readonly LOC_WIDTH = 352;
   static readonly LOC_HEIGHT = 252;
   // how far the contained cards reach up into the location from its lower border
@@ -23,8 +30,9 @@ export class LocationCard extends Card {
   public connections: number[] = []; // ids of the locations reachable from here
   private contents: Card[] = [];
   private offsets = new Map<Card, Phaser.Math.Vector2>(); // card centre relative to the location centre, unscaled
-  private memoryLabel: Phaser.GameObjects.Text;
+  private veilLabel: Phaser.GameObjects.Text;
   private artVeil: Phaser.GameObjects.Graphics; // darkens the art of a location that is veiled or only remembered
+  private frameVeil: Phaser.GameObjects.Graphics; // the same for its frame
 
   constructor(
     scene: MainScene,
@@ -49,13 +57,15 @@ export class LocationCard extends Card {
       centerText: true,
       textBoxRect: { x: (WIDTH - 220) / 2, y: HEIGHT - 36 - 64, w: 220, h: 64 },
     });
-    this.memoryLabel = this.buildMemoryLabel();
+    this.veilLabel = this.buildVeilLabel();
     const artTone = this.buildArtLayer(0.12).setVisible(true); // tones down the art of every location
-    this.artVeil = this.buildArtLayer(0.3);
+    this.artVeil = this.buildArtLayer(0.45);
+    this.frameVeil = this.buildFrameLayer(0.45);
     // right above the art and below the text box, which reaches into the art
     this.surface.addAt(this.artVeil, ART_LAYER_INDEX);
     this.surface.addAt(artTone, ART_LAYER_INDEX);
-    this.addFrameDetails(this.memoryLabel);
+    this.surface.addAt(this.frameVeil, FRAME_LAYER_INDEX);
+    this.addFrameDetails(this.veilLabel);
     scene.events.on(Phaser.Scenes.Events.UPDATE, this.followWiggle, this);
     this.once(Phaser.GameObjects.Events.DESTROY, () =>
       scene.events.off(Phaser.Scenes.Events.UPDATE, this.followWiggle, this),
@@ -70,11 +80,10 @@ export class LocationCard extends Card {
   }
 
   setVisibility(visibility: LocationVisibility): void {
-    this.setFaceColor(
-      visibility === 'veiled' ? LocationCard.VEILED_FACE_COLOR : LocationCard.FACE_COLOR,
-    );
-    this.artVeil.setVisible(visibility !== 'visible');
-    this.memoryLabel.setVisible(visibility === 'memory');
+    const veiled = visibility !== 'visible';
+    this.artVeil.setVisible(veiled);
+    this.frameVeil.setVisible(veiled);
+    this.veilLabel.setText(VEIL_TEXT[visibility]).setVisible(veiled);
   }
 
   private buildArtLayer(alpha: number): Phaser.GameObjects.Graphics {
@@ -90,10 +99,22 @@ export class LocationCard extends Card {
     ).setVisible(false);
   }
 
-  private buildMemoryLabel(): Phaser.GameObjects.Text {
-    return this.label(LocationCard.LOC_WIDTH / 2, Card.ART_Y + 16, 'This location is a memory.', {
+  private buildFrameLayer(alpha: number): Phaser.GameObjects.Graphics {
+    const { LOC_WIDTH, LOC_HEIGHT } = LocationCard;
+    return this.roundedRect(
+      Card.BORDER,
+      Card.BORDER,
+      LOC_WIDTH - 2 * Card.BORDER,
+      LOC_HEIGHT - 2 * Card.BORDER,
+      Card.CORNER_RADIUS - Card.BORDER,
+      0x111111,
+      alpha,
+    ).setVisible(false);
+  }
+
+  private buildVeilLabel(): Phaser.GameObjects.Text {
+    return this.label(LocationCard.LOC_WIDTH / 2, Card.ART_Y + 16, VEIL_TEXT.veiled, {
       fontSize: '12.8px',
-      fontStyle: 'italic',
       color: '#ffffff',
     })
       .setOrigin(0.5)
@@ -124,7 +145,11 @@ export class LocationCard extends Card {
 
   // lays the row out again with the card included, which also snaps the card to its slot
   addContent(card: Card): void {
-    this.setContents([...this.contents, card]);
+    this.addContents([card]);
+  }
+
+  addContents(cards: Card[]): void {
+    this.setContents([...this.contents, ...cards]);
   }
 
   // the contents ride along with the location, so they are raised with it and its shadow covers them

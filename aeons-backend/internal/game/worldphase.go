@@ -63,6 +63,10 @@ func (gs *GameState) ResolveWorldPhase() []CreatureEvent {
 }
 
 func (gs *GameState) ResolveCreatureMovement(input *creature.Unit) {
+	if input.Bonded {
+		log.Printf("[WORLD PHASE] %s is bonded. It does not move.", input.NameWithID())
+		return
+	}
 	if !input.Curious && !input.Shy {
 		log.Printf("[WORLD PHASE] %s is neither curious nor shy. It does not move.", input.NameWithID())
 		return
@@ -116,13 +120,7 @@ func (gs *GameState) DetermineMovementTargetForShyCreature(creature *creature.Un
 		return creatureLocation
 	}
 
-	possibleLocations := []*location.Unit{}
-	for _, v := range creatureLocation.OutgoingConnections {
-		if !gs.LocationHasEnemies(v) {
-			possibleLocations = append(possibleLocations, v)
-		}
-	}
-
+	possibleLocations := gs.ShyCreatureRefuges(creatureLocation)
 	if len(possibleLocations) == 0 {
 		creature.Enraged = true
 		log.Printf("[WORLD PHASE] %s is shy and wants to escape but can't. It becomes enraged.", creature.NameWithID())
@@ -133,6 +131,25 @@ func (gs *GameState) DetermineMovementTargetForShyCreature(creature *creature.Un
 	log.Printf("[WORLD PHASE] %s is shy and runs away to %s.", creature.NameWithID(), target.Name)
 	return target
 
+}
+
+// prefers connected locations without players and aggressive creatures, then those without aggressive creatures
+func (gs *GameState) ShyCreatureRefuges(from *location.Unit) []*location.Unit {
+	quiet := []*location.Unit{}
+	withoutAggressors := []*location.Unit{}
+	for _, l := range from.OutgoingConnections {
+		if gs.LocationHasAggressiveCreatures(l) {
+			continue
+		}
+		withoutAggressors = append(withoutAggressors, l)
+		if !gs.LocationHasActivePlayers(l) {
+			quiet = append(quiet, l)
+		}
+	}
+	if len(quiet) > 0 {
+		return quiet
+	}
+	return withoutAggressors
 }
 
 func (gs *GameState) DetermineMovementForCuriousCreature(creature *creature.Unit) *location.Unit {

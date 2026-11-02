@@ -7,6 +7,7 @@ export class PlayableCard extends Card {
   protected static readonly FACE_COLOR = 0x8b5e34;
 
   public effectType = -1;
+  public candidateIds: number[] = [];
 
   constructor(
     scene: MainScene,
@@ -44,6 +45,7 @@ export class PlayableCard extends Card {
 
   protected applyDto(dto: PlayableCardDTO): this {
     this.effectType = dto.effectType;
+    this.candidateIds = dto.candidateIds;
     this.setDisabled(!dto.canBeCast);
     return this;
   }

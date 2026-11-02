@@ -6,6 +6,7 @@ import (
 	"aeons/internal/collecting"
 	"aeons/internal/location"
 	"aeons/internal/player"
+	"aeons/internal/quest"
 )
 
 type GameState struct {
@@ -19,6 +20,8 @@ type GameState struct {
 	Nodes []*collecting.Node
 	KnownNodes map[int]*collecting.Node // the nodes as the players last saw them, by node id
 	PlayableCards			[]*card.PlayableCard
+	Scenario *quest.Group
+	PendingPayment *quest.Quest // a quest whose goals are met, waiting for the players to say who pays
 }
 
 func (gs *GameState) NextID() int {
@@ -166,6 +169,8 @@ func (gs *GameState) Candidates(kind card.TargetType) []card.Targetable{
 		return toTargetables(gs.Players)
 	case card.TargetTypeLocation:
 		return toTargetables(gs.Locations)
+	case card.TargetTypeQuest:
+		return toTargetables(gs.FinishableQuests())
 	default:
 		return []card.Targetable{}
 	}
@@ -214,6 +219,8 @@ func (gs *GameState) GetTargetWithIdAndType(id int, ttype card.TargetType) card.
 			return getEntryWithID(gs.Nodes,id)
 		case card.TargetTypeLocation:
 			return getEntryWithID(gs.Locations,id)
+		case card.TargetTypeQuest:
+			return getEntryWithID(gs.FinishableQuests(),id)
 		default:
 			return nil	
 		}
@@ -248,10 +255,15 @@ func (gs *GameState) EvaluatePlayerHandPlayability(p *player.Unit) {
 				v.CanBeCast = kindred != nil && !v.OnCooldown && len(kindred.CurrentLocation.OutgoingConnections) > 0
 			case card.PlayerGather:
 				v.CanBeCast = gs.LocationHasGatherable(p.CurrentLocation) && !gs.LocationHasBlockingCreature(p.CurrentLocation)
+			case card.PlayerFinishQuest:
+				v.CanBeCast = len(v.Candidates) > 0
 			default:
 				v.CanBeCast = true
 		}
 		if p.Energy < v.Cost || gs.Phase != PhaseSpirit {
+			v.CanBeCast = false
+		}
+		if v.Type != card.PlayerFinishQuest && gs.MandatoryFinishPending() {
 			v.CanBeCast = false
 		}
 	}

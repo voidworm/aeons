@@ -16,6 +16,15 @@ func (gs *GameState) KindredOf(p *player.Unit) *creature.Unit {
 	return nil
 }
 
+// a kindred at its player's location follows when the player moves
+func (gs *GameState) KindredFollowing(p *player.Unit, played *card.PlayableCard) *creature.Unit {
+	kindred := gs.KindredOf(p)
+	if played.Type != card.PlayerMove || kindred == nil || kindred.CurrentLocation != p.CurrentLocation {
+		return nil
+	}
+	return kindred
+}
+
 // a player with a kindred holds Move Kindred instead of Bond, the swap follows the creatures' bond state
 func (gs *GameState) ReconcileKindredCards() {
 	for _, p := range gs.Players {
@@ -47,6 +56,7 @@ func (gs *GameState) replaceCardInHand(p *player.Unit, old, replacement *card.Pl
 
 func (gs *GameState) RefreshHands() {
 	gs.ReconcileKindredCards()
+	gs.ReconcileQuestCards()
 	for _, p := range gs.Players {
 		gs.EvaluatePlayerHandPlayability(p)
 	}

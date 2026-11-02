@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
+import { CARD_FONT_FAMILY } from '../fonts';
 import { Card } from './Card';
 import type { PlayerCard } from './PlayerCard';
 import { MiniPlayerCard } from './MiniPlayerCard';
@@ -95,10 +96,12 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
     this.phaseButton = new ControlButton(scene, '', onPhaseButton, PlayerSwitcher.PHASE_BUTTON_WIDTH);
     const { PHASE_TITLE_GAP, CYCLE_HEIGHT } = PlayerSwitcher;
     this.cycleText = new Phaser.GameObjects.Text(scene, 0, -HEIGHT / 2 - PHASE_TITLE_GAP, '', {
+      fontFamily: CARD_FONT_FAMILY,
       fontSize: '20px',
       color: '#f3e3c3',
     }).setOrigin(0.5, 1);
     this.phaseTitle = new Phaser.GameObjects.Text(scene, 0, -HEIGHT / 2 - PHASE_TITLE_GAP - CYCLE_HEIGHT, '', {
+      fontFamily: CARD_FONT_FAMILY,
       fontSize: '26px',
       fontStyle: 'bold',
       color: '#f3e3c3',

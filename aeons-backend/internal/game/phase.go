@@ -16,6 +16,9 @@ func (gs *GameState) EndSpiritPhase() ([]CreatureEvent, error) {
 	if gs.Phase != PhaseSpirit {
 		return nil, fmt.Errorf("cannot end the spirit phase during the %s phase", gs.Phase)
 	}
+	if gs.MandatoryFinishPending() {
+		return nil, fmt.Errorf("a quest has to be finished before the spirit phase can end")
+	}
 	gs.Phase = PhaseWorld
 	return gs.ResolveWorldPhase(), nil
 }

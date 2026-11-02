@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
 import { PlayableCard } from '../objects/PlayableCard';
 import { KindredCard } from '../objects/KindredCard';
+import { FinishQuestCard } from '../objects/FinishQuestCard';
+import { QuestCard } from '../objects/QuestCard';
+import { PaymentPopup } from '../objects/PaymentPopup';
 import { LocationCard } from '../objects/LocationCard';
 import { Card } from '../objects/Card';
 import { connect } from '../../net/socket';
@@ -9,6 +12,7 @@ import { NodeCard } from '../objects/NodeCard';
 import { GatherOptionCard } from '../objects/GatherOptionCard';
 import { ControlButton } from '../objects/ControlButton';
 import {
+  EFFECT_FINISH_QUEST,
   EFFECT_PLAYER_ATTACK,
   EFFECT_PLAYER_BOND,
   EFFECT_KINDRED_MOVE,
@@ -27,6 +31,7 @@ import type {
   PlayableCardDTO,
   Phase,
   PlayerDTO,
+  QuestDTO,
 } from '../objects/GameState';
 import { PlayerCard } from '../objects/PlayerCard';
 import { HandContainer } from '../objects/HandContainer';
@@ -39,6 +44,7 @@ import { DragGroup } from '../objects/DragGroup';
 import { layoutLocations } from '../layout/locationLayout';
 import { uiScale } from '../layout/uiScale';
 import { TargetingArrow } from '../objects/TargetingArrow';
+import { CARD_FONT_FAMILY } from '../fonts';
 import { CURSOR_DEFAULT, CURSOR_GRAB, CURSOR_INTERACTIVE } from '../cursors';
 
 export class MainScene extends Phaser.Scene {
@@ -61,9 +67,17 @@ export class MainScene extends Phaser.Scene {
   private locationCards: LocationCard[] = [];
   private nodeCards: NodeCard[] = [];
   private creatureCards: CreatureCard[] = [];
+  private questCards: QuestCard[] = []; // shown by the ui camera in the upper right, not on the board
+  private questsShownOnce = false; // the quests of the first state just appear, later ones get an intro
+  private questHeader!: Phaser.GameObjects.Text; // the scenario's name above the quest cards
+  private paymentPopup: PaymentPopup | null = null;
+  private endSpiritPhaseBlocked = false; // a mandatory quest has to be finished first
   private players: PlayerCard[] = [];
   private playerStates: PlayerDTO[] = []; // latest server state, feeds the stats panel
 
+  private static readonly QUEST_SCALE = 0.85; // relative to the ui scale
+  private static readonly QUEST_MARGIN = 12;
+  private static readonly QUEST_DEPTH = 800; // above the board, below the hand
   private static readonly SPLIT_START_SCALE = 0.3; // relative to the node, the halves start this small
   private static readonly SPLIT_DURATION = 400; // ms the halves take to grow out of the node
   private static readonly SUMMON_HOLD = 600; // an untargeted card rests at the summon position before it resolves
@@ -120,6 +134,7 @@ export class MainScene extends Phaser.Scene {
     this.initPanning();
     this.initZoomDebug();
     this.initDebugButtons();
+    this.initQuestHeader();
     this.initTargetingInput();
 
     this.socket = connect((msg) => {
@@ -193,6 +208,7 @@ export class MainScene extends Phaser.Scene {
     this.placeEventLog();
     this.zoomDebug.setX(gameSize.width - 12);
     this.placeDebugButtons();
+    this.placeQuestCards();
   }
 
   private initZoomDebug() {
@@ -218,6 +234,15 @@ export class MainScene extends Phaser.Scene {
       this.hideFrom(this.cameras.main, button);
     }
     this.placeDebugButtons();
+  }
+
+  private initQuestHeader() {
+    this.questHeader = this.add
+      .text(0, 0, '', { fontFamily: CARD_FONT_FAMILY, fontSize: '22px', fontStyle: 'bold', color: '#ffffff' })
+      .setOrigin(0.5, 0)
+      .setDepth(MainScene.QUEST_DEPTH)
+      .setVisible(false);
+    this.hideFrom(this.cameras.main, this.questHeader);
   }
 
   private createDebugButton(text: string, onClick: () => void): ControlButton {
@@ -264,8 +289,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   private createPlayableCard(dto: PlayableCardDTO): PlayableCard {
-    const create =
-      dto.effectType === EFFECT_KINDRED_MOVE ? KindredCard.fromDto : PlayableCard.fromDto;
+    const create = this.playableCardFactory(dto.effectType);
     const c = create(this, 0, 0, dto);
     c.on('cardDragEnd', this.onCardDrop, this);
     c.on('cardPointerOver', this.onCardPointerOver, this);
@@ -273,6 +297,17 @@ export class MainScene extends Phaser.Scene {
     c.on('cardDragged', this.onCardDragged, this);
     this.playableCards.push(c);
     return c;
+  }
+
+  private playableCardFactory(effectType: number): typeof PlayableCard.fromDto {
+    switch (effectType) {
+      case EFFECT_KINDRED_MOVE:
+        return KindredCard.fromDto;
+      case EFFECT_FINISH_QUEST:
+        return FinishQuestCard.fromDto;
+      default:
+        return PlayableCard.fromDto;
+    }
   }
 
   initPlayers(inputGameState: GameStateDTO) {
@@ -324,6 +359,74 @@ export class MainScene extends Phaser.Scene {
 
   initCreatures(inputGameState: GameStateDTO) {
     for (const creature of inputGameState.creatures) this.spawnCreature(creature);
+  }
+
+  private spawnQuest(dto: QuestDTO): QuestCard {
+    const c = QuestCard.fromDto(this, 0, 0, dto);
+    c.setDepth(MainScene.QUEST_DEPTH);
+    c.on('cardPointerOver', this.onCardPointerOver, this);
+    this.hideFrom(this.cameras.main, c);
+    this.questCards.push(c);
+    return c;
+  }
+
+  //quests that are over leave, new ones appear; the rest are updated
+  private syncQuests(state: GameStateDTO) {
+    const shown = new Set(state.quests.map((q) => q.id));
+    for (const card of this.questCards.filter((c) => !shown.has(c.id))) card.shrinkAway();
+    this.questCards = this.questCards.filter((c) => shown.has(c.id));
+    const newQuests: QuestCard[] = [];
+    for (const dto of state.quests) {
+      const card = this.questCards.find((c) => c.id === dto.id);
+      if (card) card.sync(dto);
+      else newQuests.push(this.spawnQuest(dto));
+    }
+    this.questHeader.setText(state.scenarioName).setVisible(state.quests.length > 0);
+    this.questCards.sort(
+      (a, b) =>
+        state.quests.findIndex((q) => q.id === a.id) - state.quests.findIndex((q) => q.id === b.id),
+    );
+    this.placeQuestCards();
+    if (this.questsShownOnce) newQuests.forEach((card) => card.playIntro());
+    this.questsShownOnce = true;
+  }
+
+  //one column below the playtest buttons, right-aligned to the edge, under the scenario's name
+  private placeQuestCards() {
+    const scale = this.factor() * MainScene.QUEST_SCALE;
+    const { QUEST_MARGIN } = MainScene;
+    const height = QuestCard.QUEST_HEIGHT * scale;
+    const buttonsBottom = this.debugButtons.reduce(
+      (bottom, b) => Math.max(bottom, b.y + (ControlButton.HEIGHT * this.factor()) / 2),
+      0,
+    );
+    const centreX = this.scale.width - QUEST_MARGIN - (QuestCard.QUEST_WIDTH * scale) / 2;
+    const headerY = buttonsBottom + QUEST_MARGIN;
+    this.questHeader.setScale(this.factor()).setPosition(centreX, headerY);
+    const cardsTop = headerY + this.questHeader.displayHeight + QUEST_MARGIN;
+    this.questCards.forEach((card, i) => {
+      card.placeInSlot(centreX, cardsTop + height / 2 + i * (height + QUEST_MARGIN), scale);
+    });
+  }
+
+  //the popup stays as long as the server waits for the payment
+  private syncPayment(state: GameStateDTO) {
+    const payment = state.pendingPayment;
+    if (!payment) {
+      this.paymentPopup?.destroy();
+      this.paymentPopup = null;
+      return;
+    }
+    if (this.paymentPopup) return;
+    const quest = this.questCards.find((q) => q.id === payment.questId);
+    this.paymentPopup = new PaymentPopup(
+      this,
+      payment,
+      quest?.dto.name ?? '',
+      (payments) => this.send('pay_for_quest', { questId: payment.questId, payments }),
+      () => this.send('cancel_payment'),
+    );
+    this.hideFrom(this.cameras.main, this.paymentPopup);
   }
 
   private spawnNode(dto: NodeDTO): NodeCard {
@@ -382,6 +485,10 @@ export class MainScene extends Phaser.Scene {
     this.initLocations(inputGameState);
     this.initCreatures(inputGameState);
     this.initNodes(inputGameState);
+    this.syncQuests(inputGameState);
+    this.syncPayment(inputGameState);
+    this.endSpiritPhaseBlocked = inputGameState.endSpiritPhaseBlocked;
+    this.refreshPhaseButton();
     this.assignToLocations(inputGameState);
     this.initFirstActivePlayer();
     this.hideUiFromMainCamera();
@@ -427,12 +534,21 @@ export class MainScene extends Phaser.Scene {
     this.refreshStatsPanel();
     this.syncHands(state);
     for (const dto of state.cardsInHand) {
-      this.playableCards.find((c) => c.id === dto.id)?.setDisabled(!dto.canBeCast);
+      const card = this.playableCards.find((c) => c.id === dto.id);
+      card?.setDisabled(!dto.canBeCast);
+      if (card) card.candidateIds = dto.candidateIds;
     }
+    this.syncQuests(state);
+    this.syncPayment(state);
+    this.endSpiritPhaseBlocked = state.endSpiritPhaseBlocked;
+    this.refreshPhaseButton();
     for (const dto of state.locations) {
       this.locationCards.find((l) => l.id === dto.id)?.setVisibility(dto.visibility);
     }
     this.removeCreatureCards(state);
+    const arrivals = new Map<LocationCard, Card[]>(); // what arrives together glides together
+    const arriveAt = (to: LocationCard, card: Card) =>
+      arrivals.set(to, [...(arrivals.get(to) ?? []), card]);
     for (const dto of state.creatures) {
       let card = this.creatureCards.find((c) => c.id === dto.id);
       if (!card) {
@@ -444,7 +560,7 @@ export class MainScene extends Phaser.Scene {
       const owner = state.players.find((p) => p.id === dto.kindredOf);
       card?.setKindredOf(dto.kindredOf, owner?.name ?? '');
       const to = this.locationCards.find((l) => l.id === dto.locationId);
-      if (card && to) void this.moveCardToLocation(card, to);
+      if (card && to) arriveAt(to, card);
     }
     for (const dto of state.nodes) {
       let card = this.nodeCards.find((n) => n.id === dto.id);
@@ -459,8 +575,9 @@ export class MainScene extends Phaser.Scene {
       const card = this.players.find((p) => p.id === dto.id);
       card?.setDisabled(dto.fainted);
       const to = this.locationCards.find((l) => l.id === dto.locationId);
-      if (card && to) void this.moveCardToLocation(card, to);
+      if (card && to) arriveAt(to, card);
     }
+    for (const [to, cards] of arrivals) void this.moveCardsToLocation(cards, to);
   }
 
   //cards come and go with the server's hands, e.g. Bond is swapped for Move Kindred
@@ -524,11 +641,17 @@ export class MainScene extends Phaser.Scene {
   private setPhase(phase: Phase, cycle: number) {
     this.phase = phase;
     this.playerSwitcher.setPhase(phase, cycle);
+    this.refreshPhaseButton();
   }
 
   private setPhaseRunning(running: boolean) {
     this.phaseRunning = running;
-    this.playerSwitcher.setPhaseButtonEnabled(!running);
+    this.refreshPhaseButton();
+  }
+
+  private refreshPhaseButton() {
+    const blocked = this.phase === 'spirit' && this.endSpiritPhaseBlocked;
+    this.playerSwitcher.setPhaseButtonEnabled(!this.phaseRunning && !blocked);
   }
 
   //one creature after another, each waits for the previous one to arrive and, if it exhausted, to turn
@@ -567,27 +690,33 @@ export class MainScene extends Phaser.Scene {
     return this.moveCardToLocation(card, to);
   }
 
-  //re-homes the card to the location and glides it over from where it stands now
   private moveCardToLocation(card: Card, to: LocationCard): Promise<void> {
-    const from = card.homeLocation;
-    if (!from || from === to) return Promise.resolve();
+    return this.moveCardsToLocation([card], to);
+  }
 
-    const start = { x: card.x, y: card.y };
-    from.removeContent(card);
-    to.addContent(card); // snaps the card to its new slot, so we can read the destination
-    const end = { x: card.x, y: card.y };
-    card.setPosition(start.x, start.y);
+  //re-homes the cards to the location and glides them over together from where they stand now
+  private moveCardsToLocation(cards: Card[], to: LocationCard): Promise<void> {
+    const moving = cards.filter((c) => c.homeLocation && c.homeLocation !== to);
+    if (moving.length === 0) return Promise.resolve();
+
+    const starts = moving.map((c) => ({ x: c.x, y: c.y }));
+    for (const card of moving) card.homeLocation?.removeContent(card);
+    to.addContents(moving); // lays the row out once and snaps the cards to their slots, so we can read the destinations
+    const ends = moving.map((c) => ({ x: c.x, y: c.y }));
+    moving.forEach((card, i) => card.setPosition(starts[i].x, starts[i].y));
     to.raiseContents();
-    this.children.bringToTop(card); // travels above everything
+    for (const card of moving) this.children.bringToTop(card); // travels above everything
 
     return new Promise((resolve) => {
-      this.tweens.add({
-        targets: card,
-        x: end.x,
-        y: end.y,
-        duration: 500,
-        ease: 'Sine.easeInOut',
-        onComplete: () => resolve(),
+      moving.forEach((card, i) => {
+        this.tweens.add({
+          targets: card,
+          x: ends[i].x,
+          y: ends[i].y,
+          duration: 500,
+          ease: 'Sine.easeInOut',
+          onComplete: () => i === 0 && resolve(),
+        });
       });
     });
   }
@@ -692,6 +821,17 @@ export class MainScene extends Phaser.Scene {
     );
   }
 
+  //cards like the quests are seen through the ui camera only, so their hitbox is in screen coordinates
+  private isUiCard(card: Card): boolean {
+    return (card.cameraFilter & this.cameras.main.id) !== 0;
+  }
+
+  private pointerIsOn(card: Card): boolean {
+    const pointer = this.input.activePointer;
+    const { x, y } = this.isUiCard(card) ? pointer : this.boardPoint();
+    return card.getHitbox().contains(x, y);
+  }
+
   //pointer position in board coordinates, whichever camera the pointer is currently over
   private boardPoint(): Phaser.Math.Vector2 {
     const pointer = this.input.activePointer;
@@ -777,6 +917,7 @@ export class MainScene extends Phaser.Scene {
       ...this.players,
       ...this.creatureCards,
       ...this.nodeCards,
+      ...this.questCards,
     ];
     this.dragSuppressed.forEach((c) => c.setSuppressed(true));
   }
@@ -789,6 +930,7 @@ export class MainScene extends Phaser.Scene {
       EFFECT_PLAYER_GATHER,
       EFFECT_PLAYER_BOND,
       EFFECT_KINDRED_MOVE,
+      EFFECT_FINISH_QUEST,
     ].includes(card.effectType);
   }
 
@@ -801,6 +943,7 @@ export class MainScene extends Phaser.Scene {
       ...this.players,
       ...this.creatureCards,
       ...this.nodeCards,
+      ...this.questCards,
     ].filter((c) => c !== dragged && !legal.includes(c));
     this.dragSuppressed.forEach((c) => c.setSuppressed(true));
     const mover =
@@ -822,6 +965,9 @@ export class MainScene extends Phaser.Scene {
 
   private legalTargets(card: PlayableCard): Card[] {
     const here = this.players.find((p) => p.activePlayer)?.homeLocation;
+    if (card.effectType === EFFECT_FINISH_QUEST) {
+      return this.questCards.filter((q) => card.candidateIds.includes(q.id));
+    }
     if (card.effectType === EFFECT_PLAYER_MOVE) {
       return this.locationCards.filter((l) => here?.connections.includes(l.id));
     }
@@ -856,7 +1002,13 @@ export class MainScene extends Phaser.Scene {
   }
 
   private dropTargets(): Card[] {
-    return [...this.locationCards, ...this.creatureCards, ...this.nodeCards, ...this.splits];
+    return [
+      ...this.locationCards,
+      ...this.creatureCards,
+      ...this.nodeCards,
+      ...this.questCards,
+      ...this.splits,
+    ];
   }
 
   onCardDrop(card: Card) {
@@ -936,8 +1088,7 @@ export class MainScene extends Phaser.Scene {
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       if (!this.targeting?.pressed) return;
       this.targeting.pressed = false;
-      const { x, y } = this.boardPoint();
-      const target = this.targeting.legal.find((t) => t.getHitbox().contains(x, y));
+      const target = this.targeting.legal.find((t) => this.pointerIsOn(t));
       if (target) this.confirmTarget(target);
       else if (this.input.hitTestPointer(pointer).length === 0) this.cancelTargeting();
     });
@@ -947,15 +1098,14 @@ export class MainScene extends Phaser.Scene {
     if (!this.targeting) return;
     const { card, legal, arrow } = this.targeting;
     const pointer = this.input.activePointer;
-    const { x, y } = this.boardPoint();
-    const under = legal.filter((t) => t.getHitbox().contains(x, y));
+    const under = legal.filter((t) => this.pointerIsOn(t));
     const hovered = under.reduce<Card | null>(
       (top, t) => (top && this.children.getIndex(top) > this.children.getIndex(t) ? top : t),
       null,
     ); // of overlapping cards the one on top is the one the pointer is on
     for (const target of this.dropTargets()) target.setDropTarget(target === hovered);
     this.raiseHovered(hovered);
-    if (hovered) arrow.runBehind(hovered, this.cameras.main, this.uiCamera);
+    if (hovered && !this.isUiCard(hovered)) arrow.runBehind(hovered, this.cameras.main, this.uiCamera);
     else arrow.runAbove(this.cameras.main);
     arrow.pointFromTo(
       card.textBoxCentre(),

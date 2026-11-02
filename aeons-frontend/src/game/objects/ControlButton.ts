@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
+import { CARD_FONT_FAMILY } from '../fonts';
 import { CURSOR_INTERACTIVE } from '../cursors';
 
 export interface ButtonPalette {
@@ -33,6 +34,7 @@ export class ControlButton extends Phaser.GameObjects.Container {
       .setStrokeStyle(4, outline)
       .setInteractive({ cursor: CURSOR_INTERACTIVE });
     this.label = new Phaser.GameObjects.Text(scene, 0, 0, text, {
+      fontFamily: CARD_FONT_FAMILY,
       fontSize: '26px',
       fontStyle: 'bold',
       color: '#f3e3c3',

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
+import { CARD_FONT_FAMILY } from '../fonts';
 import { ControlButton } from './ControlButton';
 import type { CollectMode } from './GameState';
 
@@ -53,6 +54,7 @@ export class GatherResultPopup extends Phaser.GameObjects.Container {
 
   private text(scene: MainScene, content: string, y: number, fontSize: string, bold = false) {
     return new Phaser.GameObjects.Text(scene, 0, y, content, {
+      fontFamily: CARD_FONT_FAMILY,
       fontSize,
       fontStyle: bold ? 'bold' : 'normal',
       color: '#000000',

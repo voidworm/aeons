@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
+import { CARD_FONT_FAMILY } from '../fonts';
 import { ControlButton } from './ControlButton';
 
 //modal notice that a player fainted, closes on its button
@@ -30,6 +31,7 @@ export class FaintedPopup extends Phaser.GameObjects.Container {
 
   private text(scene: MainScene, content: string, y: number, fontSize: string, bold = false) {
     return new Phaser.GameObjects.Text(scene, 0, y, content, {
+      fontFamily: CARD_FONT_FAMILY,
       fontSize,
       fontStyle: bold ? 'bold' : 'normal',
       color: '#000000',

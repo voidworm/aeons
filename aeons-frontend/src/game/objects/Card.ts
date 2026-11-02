@@ -4,6 +4,7 @@ import type { LocationCard } from './LocationCard';
 import { CURSOR_INTERACTIVE } from '../cursors';
 import { RichText } from './RichText';
 import { TargetingArrow } from './TargetingArrow';
+import { CARD_FONT_FAMILY } from '../fonts';
 
 export type ShadowMode = 'hovers' | 'flat';
 
@@ -19,6 +20,7 @@ export interface CardConfig {
   italicText?: boolean; // default false
   titleBelowArt?: boolean; // default false; centred, bold, 20% larger, beneath the art instead of above it
   centerTitle?: boolean; // default false; centres the title horizontally at the top
+  showTitle?: boolean; // default true; false for cards that lay their title out themselves
   centerText?: boolean; // default false; centres the text box text horizontally and vertically
   footerHeight?: number; // default 0; shrinks the text box to make room for a footer line beneath it
   width?: number; // default Card.WIDTH
@@ -42,7 +44,7 @@ const SHADOW_HOVER: ShadowPose = { x: 16, y: -16, scale: 1.025, alpha: 0.35 };
 
 const TEXT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
   color: '#000000',
-  fontFamily: '"Times New Roman", Times, serif',
+  fontFamily: CARD_FONT_FAMILY,
 };
 
 export class Card extends Phaser.GameObjects.Container {
@@ -201,6 +203,7 @@ export class Card extends Phaser.GameObjects.Container {
       titleBelowArt = false,
       centerTitle = false,
       centerText = false,
+      showTitle = true,
     } = this.config;
 
     this.drawFace(faceColor);
@@ -208,18 +211,22 @@ export class Card extends Phaser.GameObjects.Container {
       this.roundedRect(0, 0, this.cardWidth, this.cardHeight, CORNER_RADIUS, 0x000000),
       this.face,
       this.roundedRect(INSET, ART_Y, INNER_WIDTH, artHeight, CORNER_RADIUS - BORDER, 0x2ecc71),
-      titleBelowArt
-        ? this.label(INSET + INNER_WIDTH / 2, (ART_Y + artHeight + BOTTOM) / 2, this.name, {
-            fontSize: '17.28px',
-            fontStyle: 'bold',
-            color: '#ffffff',
-          }).setOrigin(0.5)
-        : this.label(centerTitle ? this.cardWidth / 2 : INSET, TITLE_Y, this.name, {
-            fontSize: '14.4px',
-            fontStyle: 'bold',
-            color: '#ffffff',
-          }).setOrigin(centerTitle ? 0.5 : 0, 0),
     ]);
+    if (showTitle) {
+      this.surface.add(
+        titleBelowArt
+          ? this.label(INSET + INNER_WIDTH / 2, (ART_Y + artHeight + BOTTOM) / 2, this.name, {
+              fontSize: '17.28px',
+              fontStyle: 'bold',
+              color: '#ffffff',
+            }).setOrigin(0.5)
+          : this.label(centerTitle ? this.cardWidth / 2 : INSET, TITLE_Y, this.name, {
+              fontSize: '14.4px',
+              fontStyle: 'bold',
+              color: '#ffffff',
+            }).setOrigin(centerTitle ? 0.5 : 0, 0),
+      );
+    }
 
     if (showTextBox) {
       const box = this.textBox();
@@ -447,19 +454,33 @@ export class Card extends Phaser.GameObjects.Container {
   }
 
   private scheduleHoverZoom(): void {
-    if (this.floating || this.restScale !== null || this.zoomTimer || !this.isBoardCard()) return;
-    this.zoomTimer = this.scene.time.delayedCall(Card.HOVER_ZOOM_DELAY, () => {
+    if (this.floating || this.restScale !== null || this.zoomTimer || !this.canHoverZoom()) return;
+    this.zoomTimer = this.scene.time.delayedCall(this.hoverZoomDelay(), () => {
       this.zoomTimer = null;
       if (!this.active || !this.isHovering || this.floating) return;
-      this.restScale = this.scaleX;
-      this.scene.children.bringToTop(this);
-      this.scene.children.queueDepthSort();
-      this.tweenZoom(this.restScale * Card.HOVER_ZOOM_FACTOR);
+      this.startZoom(Card.HOVER_ZOOM_FACTOR);
     });
   }
 
+  protected canHoverZoom(): boolean {
+    return this.isBoardCard();
+  }
+
+  protected hoverZoomDelay(): number {
+    return Card.HOVER_ZOOM_DELAY;
+  }
+
+  // zooms relative to the current scale, or to the one the zoom grows from
+  protected startZoom(factor: number, fromScale = this.scaleX): void {
+    this.restScale = this.scaleX;
+    this.setScale(fromScale);
+    this.scene.children.bringToTop(this);
+    this.scene.children.queueDepthSort();
+    this.tweenZoom(this.restScale * factor);
+  }
+
   // ends the pending zoom or, if the card is already zoomed, shrinks it back to its rest scale
-  private cancelHoverZoom(): void {
+  protected cancelHoverZoom(): void {
     this.zoomTimer?.remove();
     this.zoomTimer = null;
     if (this.restScale === null) return;
@@ -468,12 +489,18 @@ export class Card extends Phaser.GameObjects.Container {
     this.tweenZoom(target);
   }
 
+  // where the card sits at a zoom level, if the zoom moves it
+  protected zoomOffset(_scale: number): { x?: number; y?: number } {
+    return {};
+  }
+
   private tweenZoom(scale: number): void {
     this.zoomTween?.stop();
     this.zoomTargetScale = scale;
     this.zoomTween = this.tweensManager.add({
       targets: this,
       scale,
+      ...this.zoomOffset(scale),
       duration: 250,
       ease: 'Sine.easeInOut',
       onComplete: () => (this.zoomTargetScale = null),

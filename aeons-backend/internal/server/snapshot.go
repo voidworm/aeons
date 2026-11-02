@@ -1,6 +1,7 @@
 package server
 
 import (
+	"slices"
 	"aeons/internal/card"
 	"aeons/internal/game"
 	"aeons/internal/collecting"
@@ -16,6 +17,37 @@ type GameStateDTO struct {
 	Creatures    []CreatureDTO     `json:"creatures"`
 	Nodes        []NodeDTO         `json:"nodes"`
 	CardsInHand  []PlayableCardDTO `json:"cardsInHand"`
+	ScenarioName string            `json:"scenarioName"`
+	Quests       []QuestDTO        `json:"quests"`
+	PendingPayment *PaymentDTO     `json:"pendingPayment"`
+	EndSpiritPhaseBlocked bool     `json:"endSpiritPhaseBlocked"`
+}
+
+type QuestDTO struct {
+	ID         int       `json:"id"`
+	Name       string    `json:"name"`
+	Flavor     string    `json:"flavor"`
+	Goals      []GoalDTO `json:"goals"`
+	Mandatory  bool      `json:"mandatory"`
+	Finishable bool      `json:"finishable"`
+}
+
+type GoalDTO struct {
+	Text string `json:"text"`
+	Met  bool   `json:"met"`
+}
+
+// the players have to say who pays how much before the quest is finished
+type PaymentDTO struct {
+	QuestID int        `json:"questId"`
+	Amount  int        `json:"amount"`
+	Payers  []PayerDTO `json:"payers"`
+}
+
+type PayerDTO struct {
+	PlayerID  int    `json:"playerId"`
+	Name      string `json:"name"`
+	Resources int    `json:"resources"`
 }
 
 type LocationDTO struct {
@@ -133,6 +165,35 @@ func playableCardDTO(c *card.PlayableCard) PlayableCardDTO {
 	return out
 }
 
+func questDTOs(gs *game.GameState) []QuestDTO {
+	finishable := gs.FinishableQuests()
+	out := []QuestDTO{}
+	for _, q := range gs.ActiveQuests() {
+		goals := make([]GoalDTO, 0, len(q.Goals))
+		for _, g := range q.Goals {
+			goals = append(goals, GoalDTO{Text: g.Text(), Met: g.Met(gs.QuestWorld())})
+		}
+		out = append(out, QuestDTO{
+			ID: q.ID, Name: q.Name, Flavor: q.Flavor, Goals: goals,
+			Mandatory: q.Mandatory, Finishable: slices.Contains(finishable, q),
+		})
+	}
+	return out
+}
+
+func paymentDTO(gs *game.GameState) *PaymentDTO {
+	q := gs.PendingPayment
+	if q == nil {
+		return nil
+	}
+	payment := q.PaymentGoal().Payment
+	out := &PaymentDTO{QuestID: q.ID, Amount: payment.Amount, Payers: []PayerDTO{}}
+	for _, p := range payment.Payers(gs.QuestWorld()) {
+		out.Payers = append(out.Payers, PayerDTO{PlayerID: p.ID, Name: p.Name, Resources: p.ResourcesAvailable})
+	}
+	return out
+}
+
 func Snapshot(gs *game.GameState) GameStateDTO {
 	// veiled locations can leave these empty, which must reach the frontend as [] and not null
 	out := GameStateDTO{Phase: string(gs.Phase), Cycle: gs.Cycle, Creatures: []CreatureDTO{}, Nodes: []NodeDTO{}}
@@ -185,6 +246,13 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 	for _, c := range gs.PlayableCards {
 		out.CardsInHand = append(out.CardsInHand, playableCardDTO(c))
 	}
+
+	if gs.Scenario != nil {
+		out.ScenarioName = gs.Scenario.Name
+	}
+	out.Quests = questDTOs(gs)
+	out.PendingPayment = paymentDTO(gs)
+	out.EndSpiritPhaseBlocked = gs.MandatoryFinishPending()
 
 	return out
 }

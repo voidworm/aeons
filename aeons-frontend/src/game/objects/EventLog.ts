@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
+import { CARD_FONT_FAMILY } from '../fonts';
 
 //list of what happened below the phase button, newest at the bottom; the wheel scrolls through older entries
 export class EventLog extends Phaser.GameObjects.Container {
@@ -30,6 +31,7 @@ export class EventLog extends Phaser.GameObjects.Container {
 
     for (let i = 0; i < VISIBLE; i++) {
       const row = new Phaser.GameObjects.Text(scene, PADDING, PADDING + i * ROW_HEIGHT, '', {
+        fontFamily: CARD_FONT_FAMILY,
         fontSize: '20px',
         color: '#f3e3c3',
       });

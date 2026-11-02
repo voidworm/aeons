@@ -71,6 +71,28 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 			}
 			s.sendLog(ctx, conn, gs)
 			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
+		case MsgPayForQuest:
+			if gs == nil {
+				s.send(ctx, conn, MsgError, "no game running")
+				continue
+			}
+			var payload PayForQuestPayload
+			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+				s.send(ctx, conn, MsgError, "bad pay_for_quest payload: "+err.Error())
+				continue
+			}
+			if err := gs.PayForPendingQuest(payload.QuestID, payload.Payments); err != nil {
+				s.send(ctx, conn, MsgError, err.Error())
+			}
+			s.sendLog(ctx, conn, gs)
+			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
+		case MsgCancelPayment:
+			if gs == nil {
+				s.send(ctx, conn, MsgError, "no game running")
+				continue
+			}
+			gs.CancelPayment()
+			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
 		case MsgEndSpiritPhase:
 			if gs == nil {
 				s.send(ctx, conn, MsgError, "no game running")

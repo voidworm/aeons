@@ -10,6 +10,7 @@ const (
 	TargetTypeCreature
 	TargetTypeLocation
 	TargetTypeNode // a place to harvest or forage at
+	TargetTypeQuest
 )
 
 type EffectType int
@@ -20,6 +21,7 @@ const (
 	PlayerGather
 	PlayerBond
 	PlayerMoveKindred
+	PlayerFinishQuest
 )
 
 type Targetable interface {

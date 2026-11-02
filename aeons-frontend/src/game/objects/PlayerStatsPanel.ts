@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
+import { CARD_FONT_FAMILY } from '../fonts';
 
 export interface PlayerStats {
   energy: number;
@@ -69,6 +70,7 @@ export class PlayerStatsPanel extends Phaser.GameObjects.Container {
 
   private rowText(scene: MainScene, row: number, content = ''): Phaser.GameObjects.Text {
     return new Phaser.GameObjects.Text(scene, -PlayerStatsPanel.WIDTH / 2 + PlayerStatsPanel.PADDING, this.rowY(row), content, {
+      fontFamily: CARD_FONT_FAMILY,
       fontSize: '24px',
       color: '#f3e3c3',
     }).setOrigin(0, 0.5);

@@ -23,12 +23,14 @@ func (gs *GameState) Init() {
 	gs.InitPlayers()
 	gs.InitNodes()
 	gs.InitCreatures()
+	gs.InitScenario()
 
 	gs.KnownNodes = map[int]*collecting.Node{}
 	gs.ReconcileVision()
 
 	//init hands also sets playability of cards, so needs to be evoked after all creatures and nodes have been added to the board
 	gs.initHandsForAllPlayers()
+	gs.RefreshHands()
 }
 
 func (gs *GameState) InitLocations() {
@@ -362,7 +364,7 @@ func (gs *GameState) NewPlant(at *location.Unit) *creature.Unit {
 		MovingEntity: moving.MovingEntity{CurrentLocation: at},
 		HealthPool:   combat.HealthPool{CurrentHealth: 2, MaxHealth: 2},
 		ID:           gs.NextID(),
-		Name:         "Suspicious Plant",
+		Name:         plantName,
 		Flavor:       "Hmmmmm...",
 		CreatureBehaviourConfig: &creature.CreatureBehaviourConfig{
 			CreatureAloofConfig:     creature.GenerateAloofConfig(true),

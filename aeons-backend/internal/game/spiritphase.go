@@ -19,6 +19,9 @@ func (gs *GameState) PlayCard(cardID, targetID int, mode collecting.Mode) (*coll
 	if gs.Phase != PhaseSpirit {
 		return nil, fmt.Errorf("cards can only be played in the spirit phase, it is the %s phase", gs.Phase)
 	}
+	if gs.PendingPayment != nil {
+		return nil, fmt.Errorf("%s waits for a payment", gs.PendingPayment.Name)
+	}
 	c, owner := gs.findCardInHands(cardID)
 	if c == nil {
 		return nil, fmt.Errorf("card %d is not in any hand", cardID)
@@ -28,6 +31,10 @@ func (gs *GameState) PlayCard(cardID, targetID int, mode collecting.Mode) (*coll
 	}
 	if owner.Energy < c.Cost {
 		return nil, fmt.Errorf("%s costs %d energy, %s has %d", c.Name, c.Cost, owner.Name, owner.Energy)
+	}
+
+	if c.Type == card.PlayerFinishQuest {
+		return nil, gs.playFinishQuest(targetID)
 	}
 
 	switch c.Type {
@@ -86,17 +93,25 @@ func (gs *GameState) PlayCard(cardID, targetID int, mode collecting.Mode) (*coll
 
 	owner.Energy -= c.Cost
 	gs.fillEffectForCard(c, owner, mode)
+	follower := gs.KindredFollowing(owner, c)
 	c.Play()
+	if kindred := follower; kindred != nil {
+		kindred.MoveTo(owner.CurrentLocation)
+		gs.Logf("%s follows %s to %s", kindred.NameWithID(), owner.Name, owner.CurrentLocation.Name)
+	}
 	if c.Type == card.PlayerMoveKindred {
 		c.OnCooldown = true
 	}
 	gs.logPlayedCard(c, owner)
-	gs.ReconcileDefeats()
-
-	gs.ReconcileVision()
-	gs.RefreshHands()
+	gs.reconcileAfterAction()
 	collected, _ := c.Effect.(*collecting.Effect)
 	return collected, nil
+}
+
+func (gs *GameState) reconcileAfterAction() {
+	gs.ReconcileDefeats()
+	gs.ReconcileVision()
+	gs.RefreshHands()
 }
 
 func (gs *GameState) findCardInHands(cardID int) (*card.PlayableCard, *player.Unit) {

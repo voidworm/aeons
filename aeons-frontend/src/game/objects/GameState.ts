@@ -5,6 +5,7 @@ export const EFFECT_PLAYER_ATTACK = 2;
 export const EFFECT_PLAYER_GATHER = 3;
 export const EFFECT_PLAYER_BOND = 4;
 export const EFFECT_KINDRED_MOVE = 5;
+export const EFFECT_FINISH_QUEST = 6;
 
 export type Phase = 'spirit' | 'world' | 'awakening';
 
@@ -74,6 +75,7 @@ export interface PlayableCardDTO {
   range: number;
   hand: number[];
   targetType: number | null;
+  candidateIds: number[]; // the targets the server accepts, only filled for cards that target quests
 }
 
 export interface GameStateDTO {
@@ -84,6 +86,37 @@ export interface GameStateDTO {
   creatures: CreatureDTO[];
   nodes: NodeDTO[];
   cardsInHand: PlayableCardDTO[];
+  scenarioName: string;
+  quests: QuestDTO[];
+  pendingPayment: PaymentDTO | null;
+  endSpiritPhaseBlocked: boolean; // a mandatory quest has to be finished first
+}
+
+export interface GoalDTO {
+  text: string;
+  met: boolean;
+}
+
+export interface QuestDTO {
+  id: number;
+  name: string;
+  flavor: string;
+  goals: GoalDTO[];
+  mandatory: boolean;
+  finishable: boolean;
+}
+
+export interface PayerDTO {
+  playerId: number;
+  name: string;
+  resources: number;
+}
+
+//a finished quest waits until the players have said who pays how much
+export interface PaymentDTO {
+  questId: number;
+  amount: number;
+  payers: PayerDTO[];
 }
 
 export interface CreatureAttackDTO {
