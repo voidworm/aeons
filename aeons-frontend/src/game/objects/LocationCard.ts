@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
 import { Card } from './Card';
+import { NodeCard } from './NodeCard';
 import type { LocationDTO, LocationVisibility } from './GameState';
 
 const ART_LAYER_INDEX = 3; // in the surface, after the border, the face and the art
@@ -30,6 +31,9 @@ export class LocationCard extends Card {
   public connections: number[] = []; // ids of the locations reachable from here
   private contents: Card[] = [];
   private offsets = new Map<Card, Phaser.Math.Vector2>(); // card centre relative to the location centre, unscaled
+  private visibility: LocationVisibility = 'visible';
+  private veilLifted = false;
+  private darkened = false;
   private veilLabel: Phaser.GameObjects.Text;
   private artVeil: Phaser.GameObjects.Graphics; // darkens the art of a location that is veiled or only remembered
   private frameVeil: Phaser.GameObjects.Graphics; // the same for its frame
@@ -80,10 +84,24 @@ export class LocationCard extends Card {
   }
 
   setVisibility(visibility: LocationVisibility): void {
-    const veiled = visibility !== 'visible';
-    this.artVeil.setVisible(veiled);
-    this.frameVeil.setVisible(veiled);
-    this.veilLabel.setText(VEIL_TEXT[visibility]).setVisible(veiled);
+    this.visibility = visibility;
+    this.applyVeil();
+  }
+
+  // takes the darkening off a veiled location while it is a target to move to, its text stays
+  setVeilLifted(lifted: boolean): void {
+    this.veilLifted = lifted;
+    this.applyVeil();
+  }
+
+  private applyVeil(): void {
+    const veiled = this.visibility !== 'visible';
+    const darkened = veiled && !this.veilLifted;
+    this.darkened = darkened;
+    this.syncContentVeils();
+    this.artVeil.setVisible(darkened);
+    this.frameVeil.setVisible(darkened);
+    this.veilLabel.setText(VEIL_TEXT[this.visibility]).setVisible(veiled);
   }
 
   private buildArtLayer(alpha: number): Phaser.GameObjects.Graphics {
@@ -124,6 +142,7 @@ export class LocationCard extends Card {
   // lays the cards out in a row straddling the lower border; from then on they are free to move
   setContents(cards: Card[]): void {
     this.contents = [...cards];
+    this.syncContentVeils();
     this.offsets.clear();
 
     const step = this.slotStep();
@@ -135,6 +154,11 @@ export class LocationCard extends Card {
       this.offsets.set(card, new Phaser.Math.Vector2(x, y));
     });
     this.syncContents();
+  }
+
+  // the gathering spots here are veiled with the location
+  private syncContentVeils(): void {
+    for (const card of this.contents) if (card instanceof NodeCard) card.setVeiled(this.darkened);
   }
 
   removeContent(card: Card): void {

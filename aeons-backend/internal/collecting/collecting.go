@@ -188,3 +188,14 @@ func GenerateFruitTree(id int, location *location.Unit) *Node {
 		Material:       NewPool(4, 13, 5),
 	}
 }
+
+// what is left of a defeated creature, it holds nothing yet
+func NewCorpse(id int, creatureName string, at *location.Unit) *Node {
+	return &Node{
+		ID:             id,
+		Name:           creatureName + " corpse",
+		StaticLocation: at,
+		Food:           NewPool(0, 0, 0),
+		Material:       NewPool(0, 0, 0),
+	}
+}

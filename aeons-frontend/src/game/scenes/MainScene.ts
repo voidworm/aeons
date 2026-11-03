@@ -18,6 +18,7 @@ import {
   EFFECT_KINDRED_MOVE,
   EFFECT_PLAYER_DISTRACT,
   EFFECT_PLAYER_GATHER,
+  EFFECT_PLAYER_HIDE,
   EFFECT_PLAYER_MOVE,
 } from '../objects/GameState';
 import type {
@@ -58,6 +59,8 @@ export class MainScene extends Phaser.Scene {
   private eventLog!: EventLog;
   private gameStarted = false;
   private phase: Phase = 'spirit';
+  private emphasised: Card | null = null; // the card a move card is about to move, enlarged while the card is cast
+  private veilLifted: LocationCard[] = []; // the veiled targets of a move card, shown without their veil while it is cast
   private phaseRunning = false; // a world or awakening phase is being animated
   private splits: GatherOptionCard[] = []; // stand in for nodes that offer both harvesting and foraging, from drag start until the cast ends
   private dragSuppressed: Card[] = []; // cards disabled for the duration of a drag
@@ -227,6 +230,7 @@ export class MainScene extends Phaser.Scene {
     this.debugButtons = [
       this.createDebugButton('World phase', () => this.triggerDebugPhase('trigger_world_phase')),
       this.createDebugButton('Awakening phase', () => this.triggerDebugPhase('trigger_awakening_phase')),
+      this.createFogToggleButton(),
     ];
     for (const button of this.debugButtons) {
       button.setDepth(1000);
@@ -247,6 +251,16 @@ export class MainScene extends Phaser.Scene {
 
   private createDebugButton(text: string, onClick: () => void): ControlButton {
     return new ControlButton(this, text, onClick, MainScene.DEBUG_BUTTON_WIDTH, ControlButton.DEBUG_PALETTE);
+  }
+
+  private createFogToggleButton(): ControlButton {
+    let fogLifted = false;
+    const button = this.createDebugButton('Lift the veil', () => {
+      fogLifted = !fogLifted;
+      button.label.setText(fogLifted ? 'The mist comes...' : 'Lift the veil');
+      this.send('set_fog_lifted', { lifted: fogLifted });
+    });
+    return button;
   }
 
   private placeDebugButtons() {
@@ -555,7 +569,8 @@ export class MainScene extends Phaser.Scene {
         card = this.spawnCreature(dto);
         this.placeAtLocation(card, dto.locationId);
       }
-      card.setHealth(dto.health);
+      card.setDistress(dto.distress);
+      card.setHidden(dto.hidden);
       void card?.setExhausted(dto.exhausted);
       const owner = state.players.find((p) => p.id === dto.kindredOf);
       card?.setKindredOf(dto.kindredOf, owner?.name ?? '');
@@ -574,6 +589,7 @@ export class MainScene extends Phaser.Scene {
     for (const dto of state.players) {
       const card = this.players.find((p) => p.id === dto.id);
       card?.setDisabled(dto.fainted);
+      card?.setAlpha(dto.hidden ? 0.7 : 1);
       const to = this.locationCards.find((l) => l.id === dto.locationId);
       if (card && to) arriveAt(to, card);
     }
@@ -657,6 +673,8 @@ export class MainScene extends Phaser.Scene {
   //one creature after another, each waits for the previous one to arrive and, if it exhausted, to turn
   private async playWorldPhase(events: CreatureEventDTO[]) {
     for (const event of events) {
+      if (event.ready)
+        await this.creatureCards.find((c) => c.id === event.creatureId)?.setExhausted(false);
       await this.moveCreature(event);
       if (event.exhausted)
         await this.creatureCards.find((c) => c.id === event.creatureId)?.setExhausted(true);
@@ -864,7 +882,7 @@ export class MainScene extends Phaser.Scene {
     for (const player of this.players) {
       player.setActivePlayer(player.id === ident);
     }
-    this.handContainer.setPlayerActive(ident);
+    this.handContainer.setPlayerActive(ident, this.players.find((p) => p.id === ident)?.name ?? '');
     this.playerSwitcher.showActive(ident);
     this.refreshStatsPanel();
   }
@@ -874,6 +892,12 @@ export class MainScene extends Phaser.Scene {
     const state = this.playerStates.find((p) => p.id === active?.id);
     if (!state) return;
     const location = this.locationCards.find((l) => l.id === state.locationId);
+    this.handContainer.setVitals({
+      wounds: state.wounds,
+      maxWounds: state.maxWounds,
+      energy: state.energy,
+      maxEnergy: state.maxEnergy,
+    });
     this.playerSwitcher.setStats({
       energy: state.energy,
       wounds: state.wounds,
@@ -931,12 +955,20 @@ export class MainScene extends Phaser.Scene {
       EFFECT_PLAYER_BOND,
       EFFECT_KINDRED_MOVE,
       EFFECT_FINISH_QUEST,
+      EFFECT_PLAYER_HIDE,
     ].includes(card.effectType);
   }
 
   //while a move, distract, attack, bond or gather card is dragged only its legal targets stay enabled
   private suppressAllButLegalTargets(dragged: PlayableCard) {
     const legal = this.legalTargets(dragged);
+    const isMove =
+      dragged.effectType === EFFECT_PLAYER_MOVE || dragged.effectType === EFFECT_KINDRED_MOVE;
+    const mover = !isMove
+      ? undefined
+      : dragged.effectType === EFFECT_KINDRED_MOVE
+        ? this.activeKindred()
+        : this.activePlayerCard();
     this.dragSuppressed = [
       ...this.playableCards,
       ...this.locationCards,
@@ -944,13 +976,18 @@ export class MainScene extends Phaser.Scene {
       ...this.creatureCards,
       ...this.nodeCards,
       ...this.questCards,
-    ].filter((c) => c !== dragged && !legal.includes(c));
+    ].filter((c) => c !== dragged && c !== mover && !legal.includes(c));
     this.dragSuppressed.forEach((c) => c.setSuppressed(true));
-    const mover =
-      dragged.effectType === EFFECT_KINDRED_MOVE ? this.activeKindred() : this.activePlayerCard();
-    if (dragged.effectType === EFFECT_PLAYER_MOVE || dragged.effectType === EFFECT_KINDRED_MOVE) {
-      if (mover?.homeLocation) this.connector?.focusOn(mover.homeLocation);
+    if (!isMove) return;
+
+    if (mover?.homeLocation) this.connector?.focusOn(mover.homeLocation);
+    if (mover) {
+      mover.homeLocation?.raiseContents();
+      mover.emphasise();
+      this.emphasised = mover;
     }
+    this.veilLifted = legal.filter((c): c is LocationCard => c instanceof LocationCard);
+    this.veilLifted.forEach((l) => l.setVeilLifted(true));
   }
 
   private activePlayerCard(): PlayerCard | undefined {
@@ -971,6 +1008,9 @@ export class MainScene extends Phaser.Scene {
     if (card.effectType === EFFECT_PLAYER_MOVE) {
       return this.locationCards.filter((l) => here?.connections.includes(l.id));
     }
+    if (card.effectType === EFFECT_PLAYER_HIDE) {
+      return this.locationCards.filter((l) => l === here);
+    }
     if (card.effectType === EFFECT_KINDRED_MOVE) {
       const kindredAt = this.activeKindred()?.homeLocation;
       return this.locationCards.filter((l) => kindredAt?.connections.includes(l.id));
@@ -978,7 +1018,7 @@ export class MainScene extends Phaser.Scene {
     if (card.effectType === EFFECT_PLAYER_GATHER) {
       return this.nodeCards.filter((n) => n.homeLocation === here && n.modes.length > 0);
     }
-    return this.creatureCards.filter((c) => c.homeLocation === here && c.kindredOf === null);
+    return this.creatureCards.filter((c) => card.candidateIds.includes(c.id));
   }
 
   onCardDragged(card: Card) {
@@ -999,6 +1039,10 @@ export class MainScene extends Phaser.Scene {
     this.dragSuppressed.forEach((c) => c.setSuppressed(false));
     this.dragSuppressed = [];
     this.connector?.clearFocus();
+    this.emphasised?.releaseEmphasis();
+    this.emphasised = null;
+    this.veilLifted.forEach((l) => l.setVeilLifted(false));
+    this.veilLifted = [];
   }
 
   private dropTargets(): Card[] {

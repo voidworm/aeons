@@ -22,6 +22,7 @@ const (
 	PlayerBond
 	PlayerMoveKindred
 	PlayerFinishQuest
+	PlayerHide
 )
 
 type Targetable interface {

@@ -87,6 +87,16 @@ func TestFinishingStartsTheNextQuestAndMandatoryBlocksEverythingElse(t *testing.
 	}
 	gs.RefreshHands()
 
+	unknown := gs.locationNamed("Redhorn Lake")
+	unknown.Known = false
+	if second.Finishable(gs.QuestWorld()) {
+		t.Fatal("Open the Eye is finishable with an unknown location")
+	}
+	for _, l := range gs.Locations {
+		l.Known = true
+	}
+	gs.RefreshHands()
+
 	if !second.Finishable(gs.QuestWorld()) || !gs.MandatoryFinishPending() {
 		t.Fatal("Open the Eye should be finishable and mandatory")
 	}
@@ -211,7 +221,7 @@ func TestEnragedSpiritSpawnsAtTheEndOfTheJourneyAndDefeatingItIsTheGoal(t *testi
 	if last.Finishable(gs.QuestWorld()) {
 		t.Fatal("finishable before the spirit is defeated")
 	}
-	spirit.CurrentHealth = 0
+	spirit.Distress = spirit.MaxDistress
 	gs.ReconcileDefeats()
 	if !last.Finishable(gs.QuestWorld()) {
 		t.Fatal("not finishable after the spirit is defeated")

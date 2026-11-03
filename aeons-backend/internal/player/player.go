@@ -8,6 +8,7 @@ import (
 const (
 	MaxWounds   = 3
 	MaxCarrying = 10 // food and resources share this inventory
+	Size        = 6  // players count as prey of this size to hunters
 )
 
 type Unit struct {
@@ -20,6 +21,7 @@ type Unit struct {
 	ResourcesAvailable int
 	RemainingActions   int
 	Energy             int
+	Hidden             bool // hidden players are ignored by animals until they cast a card
 }
 
 func (p *Unit) TakeDamage(amount int) int {
@@ -40,6 +42,19 @@ func (p *Unit) Gather(food, material int) {
 	foodTaken := min(food, space)
 	p.Food += foodTaken
 	p.ResourcesAvailable += min(material, space-foodTaken)
+}
+
+// a wound counts as one distress, a player can take as many distress as wounds
+func (p *Unit) RemainingDistress() int {
+	return MaxWounds - p.Wounds
+}
+
+func (p *Unit) GetSize() int {
+	return Size
+}
+
+func (p *Unit) IsHuntable() bool {
+	return !p.Fainted() && !p.Hidden
 }
 
 func (u *Unit) GetTargetType() card.TargetType {

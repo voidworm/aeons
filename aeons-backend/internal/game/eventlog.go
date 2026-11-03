@@ -2,7 +2,6 @@ package game
 
 import (
 	"aeons/internal/card"
-	"aeons/internal/combat"
 	"aeons/internal/creature"
 	"aeons/internal/collecting"
 	"aeons/internal/location"
@@ -28,6 +27,10 @@ func (gs *GameState) logPlayedCard(c *card.PlayableCard, owner *player.Unit) {
 			gs.Logf("Kindred %s moves to %s", gs.KindredOf(owner).NameWithID(), target.Name)
 			return
 		}
+		if c.Type == card.PlayerHide {
+			gs.Logf("%s hides at %s", owner.Name, target.Name)
+			return
+		}
 		gs.Logf("%s moves to %s", owner.Name, target.Name)
 	case *creature.Unit:
 		gs.logPlayedOnCreature(c, owner, target)
@@ -49,9 +52,5 @@ func (gs *GameState) logPlayedOnCreature(c *card.PlayableCard, owner *player.Uni
 			gs.Logf("%s is now kindred to %s", target.NameWithID(), owner.Name)
 		}
 		return
-	}
-	gs.Logf("%s attacks %s for %d (%d/%d)", owner.Name, target.NameWithID(), combat.BaseDamage, target.CurrentHealth, target.MaxHealth)
-	if target.CurrentHealth == 0 {
-		gs.Logf("%s is defeated", target.NameWithID())
 	}
 }

@@ -9,7 +9,7 @@ import (
 )
 
 func (gs *GameState) QuestWorld() quest.World {
-	return quest.World{Players: gs.Players, Creatures: gs.Creatures}
+	return quest.World{Players: gs.Players, Creatures: gs.Creatures, Locations: gs.Locations}
 }
 
 func (gs *GameState) ActiveQuests() []*quest.Quest {

@@ -6,6 +6,7 @@ import type { CreatureDTO } from './GameState';
 
 export class CreatureCard extends Card {
   private static readonly FACE_COLOR = 0xad3d2b;
+  private static readonly IDENT_LINE_HEIGHT = 16; // the identifier words take the first line of the text box
   private static readonly FACE_FADE_DURATION = 600; // ms, when becoming kindred
   private exhausted = false;
   private shownFaceColor = CreatureCard.FACE_COLOR; // changes along the colour fade
@@ -13,7 +14,8 @@ export class CreatureCard extends Card {
   private faceTween: Phaser.Tweens.Tween | null = null;
   private turnTween: Phaser.Tweens.Tween | null = null;
   private stats!: Phaser.GameObjects.Text;
-  private maxHealth: number;
+  private maxDistress: number;
+  private size: number;
   public kindredOf: number | null = null; // id of the player this creature is kindred to
   private kindredLabel: Phaser.GameObjects.Text | null = null;
 
@@ -23,14 +25,17 @@ export class CreatureCard extends Card {
     y: number,
     id: number,
     name: string,
+    identNames: string[],
     flavor: string,
-    health: number,
-    maxHealth: number,
+    distress: number,
+    maxDistress: number,
+    size: number,
   ) {
     super(scene, x, y, {
       id: id,
       name: name,
       flavor: flavor,
+      effectText: identNames.join(' · '),
       faceColor: CreatureCard.FACE_COLOR,
       artHeight: 136,
       shadow: 'flat',
@@ -39,8 +44,9 @@ export class CreatureCard extends Card {
       footerHeight: 19.2,
     });
 
-    this.maxHealth = maxHealth;
-    this.initFrameDetails(health);
+    this.maxDistress = maxDistress;
+    this.size = size;
+    this.initFrameDetails(distress);
   }
 
   // an exhausted creature lies on its side; the hitbox and shadow turn with it
@@ -75,7 +81,7 @@ export class CreatureCard extends Card {
     const textBoxTop = Card.ART_Y + this.config.artHeight + Card.GAP;
     this.kindredLabel = this.label(
       this.cardWidth / 2,
-      textBoxTop + Card.TEXT_PAD,
+      textBoxTop + Card.TEXT_PAD + CreatureCard.IDENT_LINE_HEIGHT,
       `Kindred to: ${ownerName}`,
       { fontSize: '11.2px', fontStyle: 'normal' },
     ).setOrigin(0.5, 0);
@@ -109,18 +115,22 @@ export class CreatureCard extends Card {
     });
   }
 
-  initFrameDetails(currentHealth: integer) {
-    this.stats = this.footer(this.statsText(currentHealth), 'center');
+  initFrameDetails(distress: number) {
+    this.stats = this.footer(this.statsText(distress), 'center');
     this.addFrameDetails(this.stats);
   }
 
-  setHealth(health: number) {
-    this.stats.setText(this.statsText(health));
+  setDistress(distress: number) {
+    this.stats.setText(this.statsText(distress));
   }
 
-  private statsText(health: number): string {
-    const hpPct = this.maxHealth > 0 ? Math.round((health / this.maxHealth) * 100) : 0;
-    return `${hpPct}% HP`;
+  // hidden creatures are faded out
+  setHidden(hidden: boolean) {
+    this.setAlpha(hidden ? 0.3 : 1);
+  }
+
+  private statsText(distress: number): string {
+    return `Size ${this.size} · ${distress}/${this.maxDistress} distress`;
   }
 
   static fromDto(scene: MainScene, x: number, y: number, dto: CreatureDTO) {
@@ -130,11 +140,14 @@ export class CreatureCard extends Card {
       y,
       dto.id,
       dto.name,
+      dto.identNames,
       dto.flavor,
-      dto.health,
-      dto.maxHealth,
+      dto.distress,
+      dto.maxDistress,
+      dto.size,
     );
     void card.setExhausted(dto.exhausted, false);
+    card.setHidden(dto.hidden);
     return card;
   }
 }

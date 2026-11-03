@@ -13,6 +13,10 @@ type Movable interface {
 	MoveTo(*location.Unit)
 }
 
+func (m *MovingEntity) Location() *location.Unit {
+	return m.CurrentLocation
+}
+
 // generic move towards function
 // will calc the path to the target and then move once towards the target
 // can be overwritten if your move towards is not a bfs

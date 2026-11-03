@@ -12,12 +12,11 @@ func (gs *GameState) ResolveAwakeningPhase() []AwakeningEvent {
 	gs.Logf("-- Awakening phase --")
 	gs.ResolveRegrowth()
 	gs.ResolvePlayerRefresh()
-	events := gs.ResolveCreatureRecovery()
 
 	gs.ResolveCooldownReset()
 	gs.ReconcileVision()
 	gs.RefreshHands()
-	return events
+	return []AwakeningEvent{}
 }
 
 func (gs *GameState) ResolveRegrowth() {
@@ -35,17 +34,4 @@ func (gs *GameState) ResolvePlayerRefresh() {
 		v.Energy = AwakeningEnergy
 		gs.Logf("%s refreshes to %d energy", v.Name, AwakeningEnergy)
 	}
-}
-
-// ResolveCreatureRecovery ends the turn state of all creatures, exhausted ones produce an event.
-func (gs *GameState) ResolveCreatureRecovery() []AwakeningEvent {
-	events := []AwakeningEvent{}
-	for _, v := range gs.Creatures {
-		if v.Distracted {
-			events = append(events, AwakeningEvent{CreatureID: v.ID})
-			gs.Logf("%s recovers from exhaustion", v.NameWithID())
-		}
-		v.Tick()
-	}
-	return events
 }

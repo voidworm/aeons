@@ -11,6 +11,7 @@ import (
 type World struct {
 	Players   []*player.Unit
 	Creatures []*creature.Unit
+	Locations []*location.Unit
 }
 
 // a location that may only be known once the quest is reached
@@ -53,6 +54,16 @@ func AllPlayersAt(where Place, text func() string) *Goal {
 		Text: text,
 		Met: func(w World) bool {
 			return len(playersAt(w, where())) == len(w.Players)
+		},
+	}
+}
+
+// a location is known once the players have seen it, even if they have left since
+func AllLocationsKnown(text string) *Goal {
+	return &Goal{
+		Text: Fixed(text),
+		Met: func(w World) bool {
+			return !slices.ContainsFunc(w.Locations, func(l *location.Unit) bool { return !l.Known })
 		},
 	}
 }

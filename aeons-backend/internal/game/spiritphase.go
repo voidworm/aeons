@@ -47,6 +47,11 @@ func (gs *GameState) PlayCard(cardID, targetID int, mode collecting.Mode) (*coll
 			return nil, fmt.Errorf("%s is not connected to %s", owner.CurrentLocation.Name, target.Name)
 		}
 		c.Target = target
+	case card.PlayerHide:
+		if targetID != owner.CurrentLocation.ID {
+			return nil, fmt.Errorf("%s can only hide at their own location", owner.Name)
+		}
+		c.Target = owner.CurrentLocation
 	case card.PlayerDistract, card.PlayerAttack, card.PlayerBond:
 		target, ok := getEntryWithID(gs.Creatures, targetID).(*creature.Unit)
 		if !ok {
@@ -55,11 +60,8 @@ func (gs *GameState) PlayCard(cardID, targetID int, mode collecting.Mode) (*coll
 		if target.CurrentLocation != owner.CurrentLocation {
 			return nil, fmt.Errorf("%s is not at %s", target.Name, owner.CurrentLocation.Name)
 		}
-		if target.Bonded && (c.Type == card.PlayerAttack || c.Type == card.PlayerDistract) {
-			return nil, fmt.Errorf("%s is kindred and cannot be targeted", target.NameWithID())
-		}
-		if c.Type == card.PlayerBond && !target.IsBondable() {
-			return nil, fmt.Errorf("%s cannot be bonded with right now", target.Name)
+		if !slices.Contains(c.Candidates, card.Targetable(target)) {
+			return nil, fmt.Errorf("%s cannot target %s", c.Name, target.NameWithID())
 		}
 		c.Target = target
 	case card.PlayerMoveKindred:
@@ -102,14 +104,33 @@ func (gs *GameState) PlayCard(cardID, targetID int, mode collecting.Mode) (*coll
 	if c.Type == card.PlayerMoveKindred {
 		c.OnCooldown = true
 	}
+	if kindred := gs.KindredOf(owner); kindred != nil && (follower != nil || c.Type == card.PlayerMoveKindred) {
+		gs.ReactToArrival(kindred)
+	}
 	gs.logPlayedCard(c, owner)
+	if breaksHiding(c) {
+		gs.breakHiding(owner)
+	}
 	gs.reconcileAfterAction()
 	collected, _ := c.Effect.(*collecting.Effect)
 	return collected, nil
 }
 
+// casting a card ends hiding, except for Hide itself, finishing a quest and moving the kindred
+func breaksHiding(c *card.PlayableCard) bool {
+	return c.Type != card.PlayerHide && c.Type != card.PlayerFinishQuest && c.Type != card.PlayerMoveKindred
+}
+
+func (gs *GameState) breakHiding(p *player.Unit) {
+	if p.Hidden {
+		p.Hidden = false
+		gs.Logf("%s is no longer hidden", p.Name)
+	}
+}
+
 func (gs *GameState) reconcileAfterAction() {
 	gs.ReconcileDefeats()
+	gs.ReconcileHiding()
 	gs.ReconcileVision()
 	gs.RefreshHands()
 }
@@ -217,8 +238,8 @@ func (gs *GameState) ResolveAttackForPlayer(player *player.Unit) {
 		}
 	}
 
-	log.Printf("%s attacks %s down to %d/%d health.\n", player.Name, enemy.NameWithID(), enemy.CurrentHealth, enemy.MaxHealth)
-	if enemy.CurrentHealth == 0 {
+	log.Printf("%s attacks %s up to %d/%d distress.\n", player.Name, enemy.NameWithID(), enemy.Distress, enemy.MaxDistress)
+	if enemy.IsDefeated() {
 		log.Printf("%s has defeated %s!", player.Name, enemy.NameWithID())
 	}
 

@@ -3,6 +3,7 @@ import type { MainScene } from '../scenes/MainScene';
 import { Card } from './Card';
 import type { PlayableCard } from './PlayableCard';
 import { uiScale } from '../layout/uiScale';
+import { ControlButton } from './ControlButton';
 
 //one hand instance per player
 //many hands per hand container
@@ -12,11 +13,27 @@ interface Hand {
   flight: Phaser.Tweens.Tween | null;
 }
 
+export interface Vitals {
+  wounds: number;
+  maxWounds: number;
+  energy: number;
+  maxEnergy: number;
+}
+
 export class HandContainer extends Phaser.GameObjects.Container {
   static readonly HEIGHT = 220;
   static readonly PADDING = 40;
   private static readonly ARC_LIFT = 60; // shifts the circle up, so it is wider at the bottom corners
   private static readonly CARD_Y = 160;
+  private static readonly DOT_SLOTS = 10; // created up front, so they are flagged for the right camera with the rest of the hand
+  private static readonly DOT_RADIUS = 11;
+  private static readonly DOT_GAP = 36;
+  private static readonly DOT_INDICATOR_GAP = 28; // between the indicator and its nearest dot
+  private static readonly DOT_EMPTY = 0x8a8a8a;
+  private static readonly DOT_WOUNDED = 0xc0392b;
+  private static readonly DOT_ENERGY = 0x2e86de;
+  private static readonly DOT_OUTLINE = 0x2a1809;
+  private static readonly INDICATOR_SINK = 20; // how far the active character's box dips into the arc
   private static readonly STEP = Card.WIDTH / 1.5;
   private static readonly OFFSCREEN_Y = HandContainer.HEIGHT + Card.HEIGHT; //movement goal for outside the screen
   private static readonly MIN_SCALE = 0.3;
@@ -29,6 +46,10 @@ export class HandContainer extends Phaser.GameObjects.Container {
   private static readonly DRAG_DEPTH = 950; // a card pulled out of the hand stays above the hand area
 
   private background: Phaser.GameObjects.Arc; // one big circle, only its top cap is on screen
+  private woundDots: Phaser.GameObjects.Arc[] = []; // left of the indicator
+  private energyDots: Phaser.GameObjects.Arc[] = []; // right of the indicator
+  private vitals: Vitals | null = null;
+  private activeIndicator: ControlButton; // the active character's name in a box, sitting on the top of the arc
   private hands = new Map<number, Hand>();
   private returning = new Set<PlayableCard>(); // cards currently shrinking on their way back
   private dragOrigins = new Map<PlayableCard, { x: number; y: number }>();
@@ -44,6 +65,12 @@ export class HandContainer extends Phaser.GameObjects.Container {
       hitAreaCallback: (_area: unknown, x: number, y: number) => this.insideBackground(x, y),
     }); // only there so board cards underneath don't register hovers through the hand
     this.add(this.background);
+
+    this.activeIndicator = new ControlButton(scene, '', () => {});
+    this.activeIndicator.disableInput();
+    this.add(this.activeIndicator);
+    this.woundDots = this.createDots(scene);
+    this.energyDots = this.createDots(scene);
 
     this.setDepth(HandContainer.DEPTH);
     this.resize(scene.scale.width, scene.scale.height);
@@ -62,7 +89,48 @@ export class HandContainer extends Phaser.GameObjects.Container {
     const radius = (halfChord ** 2 + HandContainer.HEIGHT ** 2) / (2 * HandContainer.HEIGHT);
     this.background.setRadius(radius).setIterations(2 / radius);
     this.background.setPosition(localWidth / 2, radius - HandContainer.ARC_LIFT);
+    this.activeIndicator.setPosition(localWidth / 2, this.indicatorY());
+    this.layoutDots();
     this.hands.forEach((hand) => hand.layer.setX(localWidth / 2));
+  }
+
+  private indicatorY(): number {
+    return -HandContainer.ARC_LIFT - ControlButton.HEIGHT / 2 + HandContainer.INDICATOR_SINK;
+  }
+
+  private createDots(scene: Phaser.Scene): Phaser.GameObjects.Arc[] {
+    const { DOT_SLOTS, DOT_RADIUS, DOT_EMPTY, DOT_OUTLINE } = HandContainer;
+    return Array.from({ length: DOT_SLOTS }, () => {
+      const dot = new Phaser.GameObjects.Arc(scene, 0, 0, DOT_RADIUS, 0, 360, false, DOT_EMPTY)
+        .setStrokeStyle(2, DOT_OUTLINE)
+        .setVisible(false);
+      this.add(dot);
+      return dot;
+    });
+  }
+
+  //wound dots sit left of the indicator and energy dots right of it, in the style of the stats panel
+  setVitals(vitals: Vitals): void {
+    this.vitals = vitals;
+    this.layoutDots();
+  }
+
+  private layoutDots(): void {
+    if (!this.vitals) return;
+    const { wounds, maxWounds, energy, maxEnergy } = this.vitals;
+    this.placeDots(this.woundDots, maxWounds, wounds, HandContainer.DOT_WOUNDED, -1);
+    this.placeDots(this.energyDots, Math.max(maxEnergy, energy), energy, HandContainer.DOT_ENERGY, 1);
+  }
+
+  private placeDots(dots: Phaser.GameObjects.Arc[], count: number, filled: number, color: number, side: -1 | 1): void {
+    const { DOT_GAP, DOT_INDICATOR_GAP, DOT_EMPTY } = HandContainer;
+    const nearest = this.containerWidth / 2 + side * (ControlButton.WIDTH / 2 + DOT_INDICATOR_GAP);
+    dots.forEach((dot, i) => {
+      dot
+        .setVisible(i < count)
+        .setFillStyle(i < filled ? color : DOT_EMPTY)
+        .setPosition(nearest + side * i * DOT_GAP, this.indicatorY());
+    });
   }
 
   addCard(playerId: number, card: PlayableCard): void {
@@ -155,7 +223,8 @@ export class HandContainer extends Phaser.GameObjects.Container {
   }
 
   //includes animation for hand flying
-  setPlayerActive(playerId: number): void {
+  setPlayerActive(playerId: number, name: string): void {
+    this.activeIndicator.label.setText(name);
     if (playerId === this.activeId) return;
 
     const leaving = this.activeId === null ? undefined : this.hands.get(this.activeId);

@@ -3,99 +3,129 @@ package creature
 import (
 	"aeons/internal/card"
 	"aeons/internal/combat"
+	"aeons/internal/location"
 	"aeons/internal/moving"
 	"aeons/internal/player"
 	"fmt"
+	"strings"
 )
 
+type Role int
+
+const (
+	Prey Role = iota
+	Predator
+	PredatorPrey
+	Plant // plants are neither hunters nor hunted
+)
+
+func (r Role) IsPredator() bool {
+	return r == Predator || r == PredatorPrey
+}
+
+func (r Role) IsPrey() bool {
+	return r == Prey || r == PredatorPrey
+}
+
+func (r Role) IsPlant() bool {
+	return r == Plant
+}
+
 type Unit struct {
-	ID   int
-	Name string
-	Flavor string
+	ID         int
+	Name       string
+	IdentNames []string // what cards address the creature as, so "each Hare" finds a hare named Tim
+	Flavor     string
+	Size       int // 1 to 10
+	Role       Role
 	moving.MovingEntity
-	combat.HealthPool
-	*CreatureBehaviourConfig
-}
 
-type CreatureBehaviourConfig struct {
-	*CreatureAloofConfig
-	*CreatureMovementConfig
-	*CreatureTurnStateConfig
-	*CreatureBondConfig
-	*CreatureHuntingConfig
-}
+	Distress    int
+	MaxDistress int // the distress at which the creature is defeated
 
-func GenerateHuntingConfig(aggressive bool, prey bool) *CreatureHuntingConfig {
-	return &CreatureHuntingConfig{
-		Aggressive: aggressive,
-		Prey:       prey,
-	}
-}
+	Home    *location.Unit // where it spawned, creatures that can hide hide here
+	Radius  int            // how many moves away from home it likes to wander
+	CanHide bool
+	Hidden  bool // hidden creatures cannot be hunted or targeted
+	HiddenInSight bool // the players saw the creature hide, only then do they see it while it is hidden
 
-func GenerateBondConfig(threshold int) *CreatureBondConfig {
-	return &CreatureBondConfig{
-		BondThreshold: threshold,
-	}
-}
+	Exhausted    bool
+	LastLocation *location.Unit
+	Chasing      Quarry // the prey a hunter locked on to
 
-func GenerateAloofConfig(on bool) *CreatureAloofConfig {
-	return &CreatureAloofConfig{
-		Aloof: on,
-	}
-}
-
-func GenerateShyConfig() *CreatureMovementConfig {
-	return &CreatureMovementConfig{
-		Shy:     true,
-		Curious: false,
-	}
-}
-
-func GenerateCuriousConfig() *CreatureMovementConfig {
-	return &CreatureMovementConfig{
-		Shy:     false,
-		Curious: true,
-	}
-}
-
-func GenerateCuriousShyConfig() *CreatureMovementConfig {
-	return &CreatureMovementConfig{
-		Shy:     true,
-		Curious: true,
-	}
-}
-
-func GenerateDefaultTurnStateConfig() *CreatureTurnStateConfig {
-	return &CreatureTurnStateConfig{
-		Enraged:   false,
-		Distracted: false,
-	}
-}
-
-type CreatureAloofConfig struct {
-	Aloof bool // aloof creatures at locations do not prevent player movement
-}
-
-type CreatureHuntingConfig struct {
-	Aggressive bool // aggressive creatures attack players and prey at their location in the world phase, aggressive and curious makes a hunter
-	Prey       bool // prey is hunted and attacked by aggressive creatures, attacked prey flees, or retaliates if it is aggressive itself
-}
-
-type CreatureMovementConfig struct {
-	Curious bool //curious creatures will move towards the closest player or creature in the world phase, hunters only towards prey and players
-	Shy     bool //shy creatures will move away from a location if a player or an aggressive creature is there in their world phase
-}
-
-type CreatureTurnStateConfig struct {
-	Enraged   bool //creatures enrage on damage, overwrites aloof for the turn
-	Distracted bool //creatures exhaust on evade or attack, putting them to functional aloof for the turn
-}
-
-type CreatureBondConfig struct {
-	Bonded        bool // bonded creatures do not attack, do not prevent player movement and cannot be attacked or distracted
+	Bonded        bool         // bonded creatures do not act on their own and cannot be targeted by players
 	BondedTo      *player.Unit // the player that pushed the bond counter to the threshold, the creature is their kindred
 	BondCounter   int
 	BondThreshold int // the bond counter at which the creature becomes bonded
+}
+
+// Quarry is what a hunter can hunt: prey and players
+type Quarry interface {
+	combat.Damageable
+	Location() *location.Unit
+	GetSize() int
+	RemainingDistress() int
+	IsHuntable() bool
+}
+
+// predators hunt prey that is smaller, predators that are no prey themselves also prey of the same size
+func (u *Unit) CanHunt(target Quarry) bool {
+	if !u.Role.IsPredator() || !target.IsHuntable() {
+		return false
+	}
+	if target.GetSize() < u.Size {
+		return true
+	}
+	return target.GetSize() == u.Size && !u.Role.IsPrey()
+}
+
+func (u *Unit) IsHuntable() bool {
+	return u.Role.IsPrey() && !u.Hidden && !u.IsDefeated()
+}
+
+func (u *Unit) GetSize() int {
+	return u.Size
+}
+
+func (u *Unit) RemainingDistress() int {
+	return u.MaxDistress - u.Distress
+}
+
+func (u *Unit) IsDefeated() bool {
+	return u.Distress >= u.MaxDistress
+}
+
+func (u *Unit) TakeDamage(amount int) int {
+	u.Distress = min(u.Distress+amount, u.MaxDistress)
+	return u.Distress
+}
+
+func (u *Unit) Hide(seenByPlayers bool) {
+	u.Hidden = true
+	u.HiddenInSight = seenByPlayers
+}
+
+func (u *Unit) Unhide() {
+	u.Hidden = false
+	u.HiddenInSight = false
+}
+
+func (u *Unit) Relieve(amount int) {
+	u.Distress = max(u.Distress-amount, 0)
+}
+
+func (u *Unit) HasIdentName(name string) bool {
+	for _, identName := range u.IdentNames {
+		if strings.EqualFold(identName, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// creatures that are no predators do not care who is around, aloof creatures at locations do not prevent player movement
+func (u *Unit) IsAloof() bool {
+	return !u.Role.IsPredator()
 }
 
 func (u *Unit) Bond(by *player.Unit) {
@@ -103,56 +133,22 @@ func (u *Unit) Bond(by *player.Unit) {
 	if u.BondCounter >= u.BondThreshold {
 		u.Bonded = true
 		u.BondedTo = by
+		u.Exhausted = false
 	}
 }
 
 func (u *Unit) IsBondable() bool {
-	return !u.Bonded && (u.Aloof || u.Distracted)
+	return !u.Bonded && !u.Hidden && (u.IsAloof() || u.Exhausted)
 }
 
-func (u *Unit) Tick() {
-	u.Enraged = false
-	u.Distracted = false
+// only prey can be confronted
+func (u *Unit) IsConfrontable() bool {
+	return u.Role.IsPrey() && !u.Bonded && !u.Hidden
 }
 
-// only damage dealt by players wears down the bond progress, hunters do not
-type PlayerAttackEffect struct {
-	Target *Unit
-}
-
-func (e *PlayerAttackEffect) Apply() {
-	if !e.Target.Bonded {
-		e.Target.BondCounter = 0
-	}
-	damage := combat.DamageEffect{Target: e.Target}
-	damage.Apply()
-}
-
-func (u *Unit) TakeDamage(amount int) int {
-	u.Enraged = true
-	u.CurrentHealth = max(u.CurrentHealth-amount, 0)
-	return u.CurrentHealth
-}
-
-func (u *Unit) IsEvadable() bool {
-
-	if u.Bonded {
-		return false
-	}
-
-	if u.Distracted {
-		return false
-	}
-
-	if u.Enraged {
-		return true
-	}
-
-	if u.Aloof {
-		return false
-	}
-
-	return true
+// only predators can be distracted
+func (u *Unit) IsDistractable() bool {
+	return u.Role.IsPredator() && !u.Bonded && !u.Hidden && !u.Exhausted
 }
 
 func (u *Unit) GetTargetType() card.TargetType {

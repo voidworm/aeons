@@ -38,6 +38,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 	var gs *game.GameState
+	fogLifted := false
 
 	for {
 		var msg Envelope
@@ -50,7 +51,7 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 			gs = &game.GameState{}
 			log.Print("Received new game request, initalising....")
 			gs.Init()
-			s.send(ctx, conn, MsgInitialGameState, Snapshot(gs))
+			s.send(ctx, conn, MsgInitialGameState, Snapshot(gs, fogLifted))
 		case MsgPlayCard:
 			if gs == nil {
 				s.send(ctx, conn, MsgError, "no game running")
@@ -70,7 +71,7 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 				})
 			}
 			s.sendLog(ctx, conn, gs)
-			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
+			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
 		case MsgPayForQuest:
 			if gs == nil {
 				s.send(ctx, conn, MsgError, "no game running")
@@ -85,14 +86,14 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 				s.send(ctx, conn, MsgError, err.Error())
 			}
 			s.sendLog(ctx, conn, gs)
-			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
+			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
 		case MsgCancelPayment:
 			if gs == nil {
 				s.send(ctx, conn, MsgError, "no game running")
 				continue
 			}
 			gs.CancelPayment()
-			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
+			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
 		case MsgEndSpiritPhase:
 			if gs == nil {
 				s.send(ctx, conn, MsgError, "no game running")
@@ -106,7 +107,7 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 			s.send(ctx, conn, MsgPhaseChanged, PhaseChangedPayload{Phase: string(gs.Phase), Cycle: gs.Cycle})
 			s.send(ctx, conn, MsgWorldPhase, worldPhasePayload(events))
 			s.sendLog(ctx, conn, gs)
-			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
+			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
 		case MsgStartAwakeningPhase:
 			if gs == nil {
 				s.send(ctx, conn, MsgError, "no game running")
@@ -120,7 +121,7 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 			s.send(ctx, conn, MsgPhaseChanged, PhaseChangedPayload{Phase: string(gs.Phase), Cycle: gs.Cycle})
 			s.send(ctx, conn, MsgAwakeningPhase, awakeningPhasePayload(events))
 			s.sendLog(ctx, conn, gs)
-			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
+			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
 		case MsgStartSpiritPhase:
 			if gs == nil {
 				s.send(ctx, conn, MsgError, "no game running")
@@ -132,7 +133,7 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 			}
 			s.send(ctx, conn, MsgPhaseChanged, PhaseChangedPayload{Phase: string(gs.Phase), Cycle: gs.Cycle})
 			s.sendLog(ctx, conn, gs)
-			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
+			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
 		case MsgTriggerWorldPhase:
 			if gs == nil {
 				s.send(ctx, conn, MsgError, "no game running")
@@ -140,7 +141,7 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 			}
 			s.send(ctx, conn, MsgWorldPhase, worldPhasePayload(gs.ResolveWorldPhase()))
 			s.sendLog(ctx, conn, gs)
-			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
+			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
 		case MsgTriggerAwakeningPhase:
 			if gs == nil {
 				s.send(ctx, conn, MsgError, "no game running")
@@ -148,7 +149,19 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 			}
 			s.send(ctx, conn, MsgAwakeningPhase, awakeningPhasePayload(gs.ResolveAwakeningPhase()))
 			s.sendLog(ctx, conn, gs)
-			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs))
+			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
+		case MsgSetFogLifted:
+			if gs == nil {
+				s.send(ctx, conn, MsgError, "no game running")
+				continue
+			}
+			var payload SetFogLiftedPayload
+			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+				s.send(ctx, conn, MsgError, "bad set_fog_lifted payload")
+				continue
+			}
+			fogLifted = payload.Lifted
+			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
 		case MsgPocHello:
 			log.Print("Received a hello!")
 			s.send(ctx,conn, MsgPocReply, "...")
@@ -190,7 +203,7 @@ func worldPhasePayload(events []game.CreatureEvent) WorldPhasePayload {
 		}
 		out.Events = append(out.Events, CreatureEventDTO{
 			CreatureID: e.CreatureID, FromLocationID: e.FromLocationID,
-			ToLocationID: e.ToLocationID, Attacks: attacks, Exhausted: e.Exhausted,
+			ToLocationID: e.ToLocationID, Attacks: attacks, Exhausted: e.Exhausted, Ready: e.Ready,
 		})
 	}
 	return out

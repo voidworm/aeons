@@ -6,6 +6,7 @@ export const EFFECT_PLAYER_GATHER = 3;
 export const EFFECT_PLAYER_BOND = 4;
 export const EFFECT_KINDRED_MOVE = 5;
 export const EFFECT_FINISH_QUEST = 6;
+export const EFFECT_PLAYER_HIDE = 7;
 
 export type Phase = 'spirit' | 'world' | 'awakening';
 
@@ -26,21 +27,26 @@ export interface PlayerDTO {
   wounds: number;
   maxWounds: number;
   fainted: boolean;
+  hidden: boolean;
   actions: number;
   hand: number[];
   food: number;
   resources: number;
   energy: number;
+  maxEnergy: number;
 }
 
 export interface CreatureDTO {
   id: number;
   name: string;
+  identNames: string[];
   locationId: number;
-  health: number;
-  maxHealth: number;
+  distress: number;
+  maxDistress: number;
+  size: number;
   flavor: string;
   exhausted: boolean;
+  hidden: boolean;
   bonded: boolean;
   kindredOf: number | null; // id of the player the creature is kindred to
 }
@@ -75,7 +81,7 @@ export interface PlayableCardDTO {
   range: number;
   hand: number[];
   targetType: number | null;
-  candidateIds: number[]; // the targets the server accepts, only filled for cards that target quests
+  candidateIds: number[]; // the targets the server accepts, filled for cards that target quests or creatures
 }
 
 export interface GameStateDTO {
@@ -130,6 +136,7 @@ export interface CreatureEventDTO {
   toLocationId: number;
   attacks: CreatureAttackDTO[];
   exhausted: boolean; // the creature became exhausted during this event
+  ready: boolean; // the creature readied during this event, before it moves
 }
 
 export interface WorldPhaseDTO {

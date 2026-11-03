@@ -10,6 +10,7 @@ export class NodeCard extends Card {
   public modes: CollectMode[];
   public dto: NodeDTO; // latest server state of this node
   private stock!: Phaser.GameObjects.Text;
+  private veil: Phaser.GameObjects.Graphics; // darkens a gathering spot at a veiled location
 
   constructor(scene: MainScene, x: number, y: number, dto: NodeDTO) {
     super(scene, x, y, {
@@ -27,6 +28,12 @@ export class NodeCard extends Card {
     this.modes = dto.modes;
     this.stock = this.footer(NodeCard.stockText(dto), 'center');
     this.addFrameDetails(this.stock);
+    this.veil = this.roundedRect(0, 0, this.cardWidth, this.cardHeight, Card.CORNER_RADIUS, 0x111111, 0.45).setVisible(false);
+    this.surface.add(this.veil);
+  }
+
+  setVeiled(veiled: boolean) {
+    this.veil.setVisible(veiled);
   }
 
   sync(dto: NodeDTO) {

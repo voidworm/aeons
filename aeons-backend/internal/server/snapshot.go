@@ -64,8 +64,10 @@ const (
 	visibilityVeiled  = "veiled"
 )
 
-func visibility(l *location.Unit) string {
+func visibility(l *location.Unit, fogLifted bool) string {
 	switch {
+	case fogLifted:
+		return visibilityVisible
 	case !l.Veiled:
 		return visibilityVisible
 	case l.Known:
@@ -82,21 +84,26 @@ type PlayerDTO struct {
 	Wounds     int    `json:"wounds"`
 	MaxWounds  int    `json:"maxWounds"`
 	Fainted    bool   `json:"fainted"`
+	Hidden     bool   `json:"hidden"`
 	Actions    int    `json:"actions"`
 	Hand       []int  `json:"hand"`
 	Food       int    `json:"food"`
 	Resources  int    `json:"resources"`
 	Energy     int    `json:"energy"`
+	MaxEnergy  int    `json:"maxEnergy"`
 }
 
 type CreatureDTO struct {
 	ID         int    `json:"id"`
 	Name       string `json:"name"`
+	IdentNames []string `json:"identNames"`
 	LocationID int    `json:"locationId"`
-	Health     int    `json:"health"`
-	MaxHealth  int    `json:"maxHealth"`
+	Distress    int    `json:"distress"`
+	MaxDistress int    `json:"maxDistress"`
+	Size        int    `json:"size"`
 	Flavor     string `json:"flavor"`
 	Exhausted  bool   `json:"exhausted"`
+	Hidden     bool   `json:"hidden"`
 	Bonded     bool   `json:"bonded"`
 	KindredOf  *int   `json:"kindredOf"` // id of the player this creature is kindred to
 }
@@ -194,7 +201,8 @@ func paymentDTO(gs *game.GameState) *PaymentDTO {
 	return out
 }
 
-func Snapshot(gs *game.GameState) GameStateDTO {
+//fogLifted is a playtest aid: the players see everything, whatever they actually know
+func Snapshot(gs *game.GameState, fogLifted bool) GameStateDTO {
 	// veiled locations can leave these empty, which must reach the frontend as [] and not null
 	out := GameStateDTO{Phase: string(gs.Phase), Cycle: gs.Cycle, Creatures: []CreatureDTO{}, Nodes: []NodeDTO{}}
 
@@ -203,7 +211,7 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 		for _, c := range l.OutgoingConnections {
 			conns = append(conns, c.ID)
 		}
-		out.Locations = append(out.Locations, LocationDTO{ID: l.ID, Name: l.Name, Connections: conns, Flavor: l.Flavor, Visibility: visibility(l)})
+		out.Locations = append(out.Locations, LocationDTO{ID: l.ID, Name: l.Name, Connections: conns, Flavor: l.Flavor, Visibility: visibility(l, fogLifted)})
 	}
 
 	for _, p := range gs.Players {
@@ -213,13 +221,16 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 		}
 		out.Players = append(out.Players, PlayerDTO{
 			ID: p.ID, Name: p.Name, LocationID: p.CurrentLocation.ID,
-			Wounds: p.Wounds, MaxWounds: player.MaxWounds, Fainted: p.Fainted(),
-			Actions: p.RemainingActions, Hand: hand, Food: p.Food, Resources: p.ResourcesAvailable, Energy: p.Energy,
+			Wounds: p.Wounds, MaxWounds: player.MaxWounds, Fainted: p.Fainted(), Hidden: p.Hidden,
+			Actions: p.RemainingActions, Hand: hand, Food: p.Food, Resources: p.ResourcesAvailable, Energy: p.Energy, MaxEnergy: game.AwakeningEnergy,
 		})
 	}
 
 	for _, c := range gs.Creatures {
-		if c.CurrentLocation.Veiled {
+		if c.CurrentLocation.Veiled && !fogLifted {
+			continue
+		}
+		if c.Hidden && !c.HiddenInSight && !fogLifted {
 			continue
 		}
 		var kindredOf *int
@@ -227,13 +238,17 @@ func Snapshot(gs *game.GameState) GameStateDTO {
 			kindredOf = &c.BondedTo.ID
 		}
 		out.Creatures = append(out.Creatures, CreatureDTO{KindredOf: kindredOf,
-			ID: c.ID, Name: c.Name, Flavor: c.Flavor, LocationID: c.CurrentLocation.ID,
-			Health: c.CurrentHealth, MaxHealth: c.MaxHealth, Exhausted: c.Distracted, Bonded: c.Bonded,
+			ID: c.ID, Name: c.Name, IdentNames: c.IdentNames, Flavor: c.Flavor, LocationID: c.CurrentLocation.ID,
+			Distress: c.Distress, MaxDistress: c.MaxDistress, Size: c.Size,
+			Exhausted: c.Exhausted, Hidden: c.Hidden, Bonded: c.Bonded,
 		})
 	}
 
 	for _, live := range gs.Nodes {
 		n, known := gs.KnownNodes[live.ID]
+		if fogLifted {
+			n, known = live, true
+		}
 		if !known {
 			continue
 		}

@@ -15,6 +15,7 @@ const (
 	MsgStartSpiritPhase = "start_spirit_phase"
 	MsgTriggerWorldPhase = "trigger_world_phase" // playtest, runs the phase without changing the game's phase
 	MsgTriggerAwakeningPhase = "trigger_awakening_phase" // playtest, runs the phase without changing the game's phase
+	MsgSetFogLifted = "set_fog_lifted" // playtest, shows everything regardless of what the players know
 
 	//server to client messages
 	MsgInitialGameState = "initial_game_state"
@@ -64,6 +65,10 @@ type PayForQuestPayload struct {
 	Payments map[int]int `json:"payments"` // player id to the resources that player pays
 }
 
+type SetFogLiftedPayload struct {
+	Lifted bool `json:"lifted"`
+}
+
 type HandPayload struct {
 	PlayerID int   `json:"playerId"`
 	CardIDs  []int `json:"cardIds"`
@@ -89,6 +94,7 @@ type CreatureEventDTO struct {
 	ToLocationID   int                 `json:"toLocationId"`
 	Attacks        []CreatureAttackDTO `json:"attacks"`
 	Exhausted      bool                `json:"exhausted"`
+	Ready          bool                `json:"ready"`
 }
 
 type AwakeningPhasePayload struct {

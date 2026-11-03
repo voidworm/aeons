@@ -32,59 +32,30 @@ func (gs *GameState) NextID() int {
 func (gs *GameState) ReconcileDefeats() {
 	aliveCreatures := gs.Creatures[:0]
 	for _, v := range gs.Creatures {
-		if v.CurrentHealth > 0 {
+		if !v.IsDefeated() {
 			aliveCreatures = append(aliveCreatures, v)
+			continue
 		}
+		gs.Logf("%s is defeated", v.NameWithID())
+		gs.Nodes = append(gs.Nodes, collecting.NewCorpse(gs.NextID(), v.Name, v.CurrentLocation))
 	}
 	gs.Creatures = aliveCreatures
 }
 
-func (gs *GameState) LocationHasEnemies(le *location.Unit) bool {
+func (gs *GameState) CreaturesAtLocationWhere(le *location.Unit, matches func(*creature.Unit) bool) []*creature.Unit {
+	found := []*creature.Unit{}
 	for _, v := range gs.Creatures {
-		if le == v.CurrentLocation && !v.Bonded {
-			return true
+		if le == v.CurrentLocation && matches(v) {
+			found = append(found, v)
 		}
 	}
-	return false
-}
-
-func (gs *GameState) LocationHasActivePlayers(le *location.Unit) bool {
-	for _, v := range gs.Players {
-		if le == v.CurrentLocation && !v.Fainted() {
-			return true
-		}
-	}
-	return false
-}
-
-func (gs *GameState) LocationHaEvadableCreatures(le *location.Unit) bool {
-
-	if !gs.LocationHasEnemies(le) {
-		return false
-	}
-
-	for _, v := range gs.Creatures {
-		if v.IsEvadable() {
-			if v.CurrentLocation == le {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func (gs *GameState) LocationHasBondableCreatures(le *location.Unit) bool {
-	for _, v := range gs.Creatures {
-		if v.CurrentLocation == le && v.IsBondable() {
-			return true
-		}
-	}
-	return false
+	return found
 }
 
 func (gs *GameState) LocationHasBlockingCreature(le *location.Unit) bool {
 	for _, v := range gs.Creatures {
-		if le == v.CurrentLocation && !v.Aloof && !v.Distracted && !v.Bonded {
+		blocks := v.Role.IsPredator() && v.Size >= player.Size
+		if le == v.CurrentLocation && blocks && !v.Exhausted && !v.Bonded && !v.Hidden {
 			return true
 		}
 	}
@@ -115,17 +86,6 @@ func (gs *GameState) EnemiesAtLocation(le *location.Unit) []*creature.Unit {
 	}
 	return found
 }
-func (gs *GameState) EvadableEnemiesAtLocation(le *location.Unit) []*creature.Unit {
-
-	found := []*creature.Unit{}
-	for _, v := range gs.Creatures {
-		if le == v.CurrentLocation && v.IsEvadable() {
-			found = append(found, v)
-		}
-	}
-	return found
-}
-
 func (gs *GameState) NodesAtLocation(le *location.Unit) []*collecting.Node {
 
 	found := []*collecting.Node{}
@@ -236,20 +196,17 @@ func (gs *GameState) EvaluatePlayerHandPlayability(p *player.Unit) {
 				}else {
 					v.CanBeCast = false
 				}
-			case card.PlayerAttack: 
-				if gs.LocationHasEnemies(p.CurrentLocation){
-					v.CanBeCast = true
-				}else {
-					v.CanBeCast = false
-				}
+			case card.PlayerAttack:
+				v.Candidates = toTargetables(gs.CreaturesAtLocationWhere(p.CurrentLocation, (*creature.Unit).IsConfrontable))
+				v.CanBeCast = len(v.Candidates) > 0
 			case card.PlayerDistract:
-				if gs.LocationHaEvadableCreatures(p.CurrentLocation) {
-					v.CanBeCast = true
-				}else {
-					v.CanBeCast = false
-				}
+				v.Candidates = toTargetables(gs.CreaturesAtLocationWhere(p.CurrentLocation, (*creature.Unit).IsDistractable))
+				v.CanBeCast = len(v.Candidates) > 0
 			case card.PlayerBond:
-				v.CanBeCast = gs.KindredOf(p) == nil && gs.LocationHasBondableCreatures(p.CurrentLocation)
+				v.Candidates = toTargetables(gs.CreaturesAtLocationWhere(p.CurrentLocation, (*creature.Unit).IsBondable))
+				v.CanBeCast = gs.KindredOf(p) == nil && len(v.Candidates) > 0
+			case card.PlayerHide:
+				v.CanBeCast = !p.Hidden
 			case card.PlayerMoveKindred:
 				kindred := gs.KindredOf(p)
 				v.CanBeCast = kindred != nil && !v.OnCooldown && len(kindred.CurrentLocation.OutgoingConnections) > 0

@@ -55,6 +55,7 @@ export class Card extends Phaser.GameObjects.Container {
   static readonly PLAY_DURATION = 900; // ms a cast card takes to settle
   static readonly HOVER_ZOOM_DELAY = 3000; // ms of uninterrupted hovering before a board card zooms
   static readonly HOVER_ZOOM_FACTOR = 2.5;
+  private static readonly EMPHASIS_FACTOR = 1.15;
   static readonly LIFT_DURATION = 150; // ms
 
   // layout, all in top-left card coordinates
@@ -477,6 +478,16 @@ export class Card extends Phaser.GameObjects.Container {
     this.scene.children.bringToTop(this);
     this.scene.children.queueDepthSort();
     this.tweenZoom(this.restScale * factor);
+  }
+
+  // a board card the player is about to move: a bit larger and in front, until the emphasis is released
+  emphasise(): void {
+    if (this.restScale !== null) return;
+    this.startZoom(Card.EMPHASIS_FACTOR);
+  }
+
+  releaseEmphasis(): void {
+    this.cancelHoverZoom();
   }
 
   // ends the pending zoom or, if the card is already zoomed, shrinks it back to its rest scale

@@ -10,8 +10,6 @@ import (
 	"slices"
 )
 
-const plantName = "Suspicious Plant"
-
 // Spawns a creature when the quest it belongs to starts and remembers it for the goals.
 type spawnCreature struct {
 	gs      *GameState
@@ -69,8 +67,8 @@ func (gs *GameState) InitScenario() {
 		Flavor:    "The wind alone...",
 		Mandatory: true,
 		Goals: []*quest.Goal{
-			quest.AllPlayersAt(hermitsRecluse, quest.Fixed("Each player is at Hermit's Recluse")),
-			quest.OnlyBondedCreaturesWithPlayers("There's no creature but bonded creatures at your location."),
+			quest.AllPlayersAndBondedCreaturesAt(hermitsRecluse, quest.Fixed("Every player and their bonded creature is at Hermit's Recluse")),
+			quest.AllLocationsKnown("Every location is known to your clan."),
 		},
 	}
 
@@ -83,7 +81,7 @@ func (gs *GameState) InitScenario() {
 
 	plantSpawn := &spawnCreature{
 		gs:     gs,
-		create: gs.NewPlant,
+		create: gs.NewSuspiciousPlant,
 		where:  randomLocationMovesFrom(coniferousGrove(), 2, gs.Locations),
 	}
 	becomeOne := &quest.Quest{
@@ -103,7 +101,7 @@ func (gs *GameState) InitScenario() {
 		Flavor:    "May you wander with the tundra.",
 		Goals: []*quest.Goal{
 			quest.AnyPlayerAt(windsweptPlains, "1+ player is at Windswept Plains"),
-			quest.CreaturesAt(windsweptPlains, 2, func(c *creature.Unit) bool { return c.Distracted }, "2+ distracted creatures at Windswept Plains"),
+			quest.CreaturesAt(windsweptPlains, 2, func(c *creature.Unit) bool { return c.Exhausted }, "2+ distracted creatures at Windswept Plains"),
 		},
 	}
 

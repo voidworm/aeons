@@ -48,6 +48,11 @@ export class ControlButton extends Phaser.GameObjects.Container {
     this.add([background, this.label]);
   }
 
+  //for buttons that only show something
+  disableInput(): void {
+    this.background.disableInteractive();
+  }
+
   setEnabled(enabled: boolean): void {
     this.background.input!.enabled = enabled;
     this.setAlpha(enabled ? 1 : 0.5);

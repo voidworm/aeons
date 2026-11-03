@@ -25,6 +25,20 @@ func (le *Unit) DistanceTo(target *Unit) int {
 	return len(le.breathSearchFirst(target))
 }
 
+// the number of moves it takes to get to the target
+func (le *Unit) StepsTo(target *Unit) int {
+	return le.DistanceTo(target) - 1
+}
+
+// the location one move along the shortest path to the target, nil if already there
+func (le *Unit) NextStepTo(target *Unit) *Unit {
+	path := le.GetShortestPathTo(target)
+	if len(path) < 2 {
+		return nil
+	}
+	return path[1]
+}
+
 func (le *Unit) breathSearchFirst(target *Unit) []*Unit {
 	//stuff we need to check
 	queue := []*Unit{le}
