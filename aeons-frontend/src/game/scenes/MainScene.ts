@@ -1045,21 +1045,27 @@ export class MainScene extends Phaser.Scene {
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       if (!this.targeting?.pressed) return;
       this.targeting.pressed = false;
-      const target = this.targeting.legal.find((t) => this.pointerIsOn(t));
+      const target = this.legalTargetUnderPointer(this.targeting.legal);
       if (target) this.confirmTarget(target);
       else if (this.input.hitTestPointer(pointer).length === 0) this.cancelTargeting();
     });
+  }
+
+  //of overlapping cards the one on top is the one the pointer is on
+  private legalTargetUnderPointer(legal: Card[]): Card | null {
+    return legal
+      .filter((t) => this.pointerIsOn(t))
+      .reduce<Card | null>(
+        (top, t) => (top && this.children.getIndex(top) > this.children.getIndex(t) ? top : t),
+        null,
+      );
   }
 
   private updateTargeting() {
     if (!this.targeting) return;
     const { card, legal, arrow } = this.targeting;
     const pointer = this.input.activePointer;
-    const under = legal.filter((t) => this.pointerIsOn(t));
-    const hovered = under.reduce<Card | null>(
-      (top, t) => (top && this.children.getIndex(top) > this.children.getIndex(t) ? top : t),
-      null,
-    ); // of overlapping cards the one on top is the one the pointer is on
+    const hovered = this.legalTargetUnderPointer(legal);
     for (const target of this.dropTargets()) target.setDropTarget(target === hovered);
     this.raiseHovered(hovered);
     if (hovered && !this.isUiCard(hovered)) arrow.runBehind(hovered, this.cameras.main, this.uiCamera);
