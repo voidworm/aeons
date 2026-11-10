@@ -24,6 +24,7 @@ type GameState struct {
 	KnownNodes map[int]*collecting.Node // the nodes as the players last saw them, by node id
 	PlayableCards			[]*card.PlayableCard
 	Scenario *quest.Group
+	AdminMode bool // playtest, hands the players the cards that only admins have
 	PendingPayment *quest.Quest // a quest whose goals are met, waiting for the players to say who pays
 }
 
@@ -210,13 +211,15 @@ func (gs *GameState) EvaluatePlayerHandPlayability(p *player.Unit) {
 				v.CanBeCast = gs.LocationHasGatherable(p.CurrentLocation) && !gs.LocationHasBlockingCreature(p.CurrentLocation)
 			case card.PlayerFinishQuest:
 				v.CanBeCast = len(v.Candidates) > 0
+			case card.PlayerTeleport:
+				v.CanBeCast = true
 			default:
 				v.CanBeCast = true
 		}
 		if p.Energy < v.Cost {
 			v.CanBeCast = false
 		}
-		if v.Type != card.PlayerFinishQuest && gs.MandatoryFinishPending() {
+		if v.Type != card.PlayerFinishQuest && v.Type != card.PlayerTeleport && gs.MandatoryFinishPending() {
 			v.CanBeCast = false
 		}
 	}

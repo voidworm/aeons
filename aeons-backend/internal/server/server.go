@@ -51,6 +51,7 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 			gs = &game.GameState{}
 			log.Print("Received new game request, initalising....")
 			gs.Init()
+			gs.SetAdminMode(fogLifted)
 			s.send(ctx, conn, MsgInitialGameState, Snapshot(gs, fogLifted))
 		case MsgPlayCard:
 			if gs == nil {
@@ -115,6 +116,7 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 				continue
 			}
 			fogLifted = payload.Lifted
+			gs.SetAdminMode(fogLifted)
 			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
 		case MsgPocHello:
 			log.Print("Received a hello!")

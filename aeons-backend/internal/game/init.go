@@ -276,6 +276,11 @@ func (gs *GameState) fillEffectForCard(c *card.PlayableCard, owner *player.Unit,
 				Entity: owner,
 				Target: location,
 			}
+		case card.PlayerTeleport:
+			c.Effect = &moving.TeleportEffect {
+				Entity: owner,
+				Target: c.Target.(*location.Unit),
+			}
 		case card.PlayerMoveKindred:
 			c.Effect = &moving.MoveEffect {
 				Entity: gs.KindredOf(owner),

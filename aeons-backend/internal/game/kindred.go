@@ -19,7 +19,7 @@ func (gs *GameState) KindredOf(p *player.Unit) *creature.Unit {
 // a kindred at its player's location follows when the player moves
 func (gs *GameState) KindredFollowing(p *player.Unit, played *card.PlayableCard) *creature.Unit {
 	kindred := gs.KindredOf(p)
-	if played.Type != card.PlayerMove || kindred == nil || kindred.CurrentLocation != p.CurrentLocation {
+	if (played.Type != card.PlayerMove && played.Type != card.PlayerTeleport) || kindred == nil || kindred.CurrentLocation != p.CurrentLocation {
 		return nil
 	}
 	return kindred
@@ -57,6 +57,7 @@ func (gs *GameState) replaceCardInHand(p *player.Unit, old, replacement *card.Pl
 func (gs *GameState) RefreshHands() {
 	gs.ReconcileKindredCards()
 	gs.ReconcileQuestCards()
+	gs.ReconcileTeleportCards()
 	for _, p := range gs.Players {
 		gs.EvaluatePlayerHandPlayability(p)
 	}

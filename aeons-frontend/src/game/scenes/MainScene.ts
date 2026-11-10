@@ -21,6 +21,7 @@ import {
   EFFECT_PLAYER_HIDE,
   EFFECT_PLAYER_MOVE,
   EFFECT_PLAYER_REST,
+  EFFECT_PLAYER_TELEPORT,
 } from '../objects/GameState';
 import type {
   ActivationDTO,
@@ -868,14 +869,16 @@ export class MainScene extends Phaser.Scene {
       EFFECT_KINDRED_MOVE,
       EFFECT_FINISH_QUEST,
       EFFECT_PLAYER_HIDE,
+      EFFECT_PLAYER_TELEPORT,
     ].includes(card.effectType);
   }
 
   //while a move, distract, attack, bond or gather card is dragged only its legal targets stay enabled
   private suppressAllButLegalTargets(dragged: PlayableCard) {
     const legal = this.legalTargets(dragged);
-    const isMove =
-      dragged.effectType === EFFECT_PLAYER_MOVE || dragged.effectType === EFFECT_KINDRED_MOVE;
+    const isMove = [EFFECT_PLAYER_MOVE, EFFECT_KINDRED_MOVE, EFFECT_PLAYER_TELEPORT].includes(
+      dragged.effectType,
+    );
     const mover = !isMove
       ? undefined
       : dragged.effectType === EFFECT_KINDRED_MOVE
@@ -919,6 +922,9 @@ export class MainScene extends Phaser.Scene {
     }
     if (card.effectType === EFFECT_PLAYER_MOVE) {
       return this.locationCards.filter((l) => here?.connections.includes(l.id));
+    }
+    if (card.effectType === EFFECT_PLAYER_TELEPORT) {
+      return this.locationCards;
     }
     if (card.effectType === EFFECT_PLAYER_HIDE) {
       return this.locationCards.filter((l) => l === here);

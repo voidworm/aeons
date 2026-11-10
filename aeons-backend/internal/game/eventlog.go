@@ -31,6 +31,10 @@ func (gs *GameState) logPlayedCard(c *card.PlayableCard, owner *player.Unit) {
 			gs.Logf("%s hides at %s", owner.Name, target.Name)
 			return
 		}
+		if c.Type == card.PlayerTeleport {
+			gs.Logf("%s teleports to %s", owner.Name, target.Name)
+			return
+		}
 		gs.Logf("%s moves to %s", owner.Name, target.Name)
 	case *creature.Unit:
 		gs.logPlayedOnCreature(c, owner, target)

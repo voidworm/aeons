@@ -8,6 +8,7 @@ export const EFFECT_KINDRED_MOVE = 5;
 export const EFFECT_FINISH_QUEST = 6;
 export const EFFECT_PLAYER_HIDE = 7;
 export const EFFECT_PLAYER_REST = 8;
+export const EFFECT_PLAYER_TELEPORT = 9;
 
 export type LocationVisibility = 'visible' | 'memory' | 'veiled';
 

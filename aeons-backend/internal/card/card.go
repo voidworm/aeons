@@ -24,6 +24,7 @@ const (
 	PlayerFinishQuest
 	PlayerHide
 	PlayerRest
+	PlayerTeleport
 )
 
 type Targetable interface {

@@ -48,6 +48,12 @@ func (gs *GameState) PlayCard(cardID, targetID int, mode collecting.Mode) (*coll
 			return nil, fmt.Errorf("%s is not connected to %s", owner.CurrentLocation.Name, target.Name)
 		}
 		c.Target = target
+	case card.PlayerTeleport:
+		target, ok := getEntryWithID(gs.Locations, targetID).(*location.Unit)
+		if !ok {
+			return nil, fmt.Errorf("%d is not a location", targetID)
+		}
+		c.Target = target
 	case card.PlayerHide:
 		if targetID != owner.CurrentLocation.ID {
 			return nil, fmt.Errorf("%s can only hide at their own location", owner.Name)
