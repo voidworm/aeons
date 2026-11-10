@@ -70,6 +70,7 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 					NodeID: gathered.Node.ID, Mode: string(gathered.Mode),
 				})
 			}
+			s.sendWorldPhase(ctx, conn, gs)
 			s.sendLog(ctx, conn, gs)
 			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
 		case MsgPayForQuest:
@@ -94,60 +95,13 @@ func (s *Server) readLoop(ctx context.Context, conn *websocket.Conn) {
 			}
 			gs.CancelPayment()
 			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
-		case MsgEndSpiritPhase:
+		case MsgAdvanceWorld:
 			if gs == nil {
 				s.send(ctx, conn, MsgError, "no game running")
 				continue
 			}
-			events, err := gs.EndSpiritPhase()
-			if err != nil {
-				s.send(ctx, conn, MsgError, err.Error())
-				continue
-			}
-			s.send(ctx, conn, MsgPhaseChanged, PhaseChangedPayload{Phase: string(gs.Phase), Cycle: gs.Cycle})
-			s.send(ctx, conn, MsgWorldPhase, worldPhasePayload(events))
-			s.sendLog(ctx, conn, gs)
-			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
-		case MsgStartAwakeningPhase:
-			if gs == nil {
-				s.send(ctx, conn, MsgError, "no game running")
-				continue
-			}
-			events, err := gs.StartAwakeningPhase()
-			if err != nil {
-				s.send(ctx, conn, MsgError, err.Error())
-				continue
-			}
-			s.send(ctx, conn, MsgPhaseChanged, PhaseChangedPayload{Phase: string(gs.Phase), Cycle: gs.Cycle})
-			s.send(ctx, conn, MsgAwakeningPhase, awakeningPhasePayload(events))
-			s.sendLog(ctx, conn, gs)
-			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
-		case MsgStartSpiritPhase:
-			if gs == nil {
-				s.send(ctx, conn, MsgError, "no game running")
-				continue
-			}
-			if err := gs.StartSpiritPhase(); err != nil {
-				s.send(ctx, conn, MsgError, err.Error())
-				continue
-			}
-			s.send(ctx, conn, MsgPhaseChanged, PhaseChangedPayload{Phase: string(gs.Phase), Cycle: gs.Cycle})
-			s.sendLog(ctx, conn, gs)
-			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
-		case MsgTriggerWorldPhase:
-			if gs == nil {
-				s.send(ctx, conn, MsgError, "no game running")
-				continue
-			}
-			s.send(ctx, conn, MsgWorldPhase, worldPhasePayload(gs.ResolveWorldPhase()))
-			s.sendLog(ctx, conn, gs)
-			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
-		case MsgTriggerAwakeningPhase:
-			if gs == nil {
-				s.send(ctx, conn, MsgError, "no game running")
-				continue
-			}
-			s.send(ctx, conn, MsgAwakeningPhase, awakeningPhasePayload(gs.ResolveAwakeningPhase()))
+			gs.ActivateNextCreature()
+			s.sendWorldPhase(ctx, conn, gs)
 			s.sendLog(ctx, conn, gs)
 			s.send(ctx, conn, MsgUpdatedGameState, Snapshot(gs, fogLifted))
 		case MsgSetFogLifted:
@@ -194,6 +148,12 @@ func (s *Server) sendLog(ctx context.Context, conn *websocket.Conn, gs *game.Gam
 	s.send(ctx, conn, MsgLog, LogPayload{Entries: entries})
 }
 
+func (s *Server) sendWorldPhase(ctx context.Context, conn *websocket.Conn, gs *game.GameState) {
+	if events := gs.DrainCreatureEvents(); len(events) > 0 {
+		s.send(ctx, conn, MsgWorldPhase, worldPhasePayload(events))
+	}
+}
+
 func worldPhasePayload(events []game.CreatureEvent) WorldPhasePayload {
 	out := WorldPhasePayload{Events: make([]CreatureEventDTO, 0, len(events))}
 	for _, e := range events {
@@ -205,14 +165,6 @@ func worldPhasePayload(events []game.CreatureEvent) WorldPhasePayload {
 			CreatureID: e.CreatureID, FromLocationID: e.FromLocationID,
 			ToLocationID: e.ToLocationID, Attacks: attacks, Exhausted: e.Exhausted, Ready: e.Ready,
 		})
-	}
-	return out
-}
-
-func awakeningPhasePayload(events []game.AwakeningEvent) AwakeningPhasePayload {
-	out := AwakeningPhasePayload{Events: make([]AwakeningEventDTO, 0, len(events))}
-	for _, e := range events {
-		out.Events = append(out.Events, AwakeningEventDTO{CreatureID: e.CreatureID})
 	}
 	return out
 }

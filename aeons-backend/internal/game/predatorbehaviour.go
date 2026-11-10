@@ -5,15 +5,9 @@ import (
 	"aeons/internal/location"
 )
 
-// An exhausted predator readies. A ready one does two actions, each attacks if there is something to hunt
+// A predator does two actions, each attacks if there is something to hunt
 // at its location and moves otherwise. Only a distract card exhausts a predator.
 func (gs *GameState) ActivatePredator(hunter *creature.Unit) []CreatureEvent {
-	if hunter.Exhausted {
-		hunter.Exhausted = false
-		gs.Logf("%s readies", hunter.NameWithID())
-		return []CreatureEvent{readyEvent(hunter)}
-	}
-
 	events := []CreatureEvent{}
 	for range actionsPerActivation {
 		if targets := gs.HuntableAt(hunter); len(targets) > 0 {
@@ -52,7 +46,7 @@ func (gs *GameState) huntMove(hunter *creature.Unit) []CreatureEvent {
 
 // towards the target it chases, anywhere but where it just was otherwise
 func (gs *GameState) huntDestination(hunter *creature.Unit) *location.Unit {
-	if hunter.Chasing != nil && stillChasing(hunter) {
+	if hunter.Chasing != nil && gs.stillChasing(hunter) {
 		return hunter.CurrentLocation.NextStepTo(hunter.Chasing.Location())
 	}
 	hunter.Chasing = nil
@@ -60,7 +54,7 @@ func (gs *GameState) huntDestination(hunter *creature.Unit) *location.Unit {
 }
 
 // a chase ends when the target hides, is gone, or gets two moves away
-func stillChasing(hunter *creature.Unit) bool {
+func (gs *GameState) stillChasing(hunter *creature.Unit) bool {
 	target := hunter.Chasing
-	return hunter.CanHunt(target) && hunter.CurrentLocation.StepsTo(target.Location()) < 2
+	return gs.canHunt(hunter, target) && hunter.CurrentLocation.StepsTo(target.Location()) < 2
 }

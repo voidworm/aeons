@@ -14,7 +14,6 @@ export class ControlButton extends Phaser.GameObjects.Container {
   static readonly WIDTH = 230; // the default, wider labels pass their own
   static readonly HEIGHT = 48;
   static readonly DEFAULT_PALETTE: ButtonPalette = { color: 0x5c3b1f, hover: 0x74492a, outline: 0x2a1809 };
-  static readonly DEBUG_PALETTE: ButtonPalette = { color: 0x555555, hover: 0x8a8a8a, outline: 0x2b2b2b }; // marks playtest controls
 
   readonly label: Phaser.GameObjects.Text;
   private readonly background: Phaser.GameObjects.Rectangle;

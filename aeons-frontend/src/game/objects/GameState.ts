@@ -7,8 +7,7 @@ export const EFFECT_PLAYER_BOND = 4;
 export const EFFECT_KINDRED_MOVE = 5;
 export const EFFECT_FINISH_QUEST = 6;
 export const EFFECT_PLAYER_HIDE = 7;
-
-export type Phase = 'spirit' | 'world' | 'awakening';
+export const EFFECT_PLAYER_REST = 8;
 
 export type LocationVisibility = 'visible' | 'memory' | 'veiled';
 
@@ -86,7 +85,6 @@ export interface PlayableCardDTO {
 
 export interface GameStateDTO {
   cycle: number;
-  phase: Phase;
   locations: LocationDTO[];
   players: PlayerDTO[];
   creatures: CreatureDTO[];
@@ -95,7 +93,12 @@ export interface GameStateDTO {
   scenarioName: string;
   quests: QuestDTO[];
   pendingPayment: PaymentDTO | null;
-  endSpiritPhaseBlocked: boolean; // a mandatory quest has to be finished first
+  activationOrder: ActivationDTO[]; // the creatures in the order they activate next, only filled while the veil is lifted
+}
+
+export interface ActivationDTO {
+  creatureId: number;
+  name: string;
 }
 
 export interface GoalDTO {
@@ -143,15 +146,7 @@ export interface WorldPhaseDTO {
   events: CreatureEventDTO[];
 }
 
-export interface AwakeningEventDTO {
-  creatureId: number; // the creature recovers from exhaustion
-}
-
 export interface GatherResultDTO {
   nodeId: number;
   mode: CollectMode;
-}
-
-export interface AwakeningPhaseDTO {
-  events: AwakeningEventDTO[];
 }

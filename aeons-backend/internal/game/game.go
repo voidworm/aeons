@@ -11,8 +11,11 @@ import (
 
 type GameState struct {
 	nextID int
-	Phase Phase
-	Cycle int // the turn counter, increases whenever an awakening phase starts
+	Cycle int // the round counter, increases whenever a round ends
+	ForwardStack []*creature.Unit // the creatures yet to act in the first pass of the round
+	ReverseStack []*creature.Unit // the creatures that acted in the first pass, they act again in reverse
+	Resting bool // the players rest, they and their bonded creatures are out of the hunters' sight
+	creatureEvents []CreatureEvent
 	eventLog []string
 	Locations    []*location.Unit
 	Players      []*player.Unit
@@ -109,15 +112,6 @@ func (gs *GameState) PlayersAtLocation(ee *creature.Unit) []*player.Unit {
 	return found
 }
 
-func (gs *GameState) PlayerHaveActionsRemaining() bool {
-	for _, v := range gs.Players {
-		if v.RemainingActions > 0 {
-			return true
-		}
-	}
-	return false
-}
-
 func (gs *GameState) Candidates(kind card.TargetType) []card.Targetable{
 
 	switch kind {
@@ -207,6 +201,8 @@ func (gs *GameState) EvaluatePlayerHandPlayability(p *player.Unit) {
 				v.CanBeCast = gs.KindredOf(p) == nil && len(v.Candidates) > 0
 			case card.PlayerHide:
 				v.CanBeCast = !p.Hidden
+			case card.PlayerRest:
+				v.CanBeCast = true
 			case card.PlayerMoveKindred:
 				kindred := gs.KindredOf(p)
 				v.CanBeCast = kindred != nil && !v.OnCooldown && len(kindred.CurrentLocation.OutgoingConnections) > 0
@@ -217,7 +213,7 @@ func (gs *GameState) EvaluatePlayerHandPlayability(p *player.Unit) {
 			default:
 				v.CanBeCast = true
 		}
-		if p.Energy < v.Cost || gs.Phase != PhaseSpirit {
+		if p.Energy < v.Cost {
 			v.CanBeCast = false
 		}
 		if v.Type != card.PlayerFinishQuest && gs.MandatoryFinishPending() {

@@ -10,7 +10,7 @@ import { connect } from '../../net/socket';
 import { CreatureCard } from '../objects/CreatureCard';
 import { NodeCard } from '../objects/NodeCard';
 import { GatherOptionCard } from '../objects/GatherOptionCard';
-import { ControlButton } from '../objects/ControlButton';
+import { AdminPanel } from '../objects/AdminPanel';
 import {
   EFFECT_FINISH_QUEST,
   EFFECT_PLAYER_ATTACK,
@@ -20,9 +20,10 @@ import {
   EFFECT_PLAYER_GATHER,
   EFFECT_PLAYER_HIDE,
   EFFECT_PLAYER_MOVE,
+  EFFECT_PLAYER_REST,
 } from '../objects/GameState';
 import type {
-  AwakeningEventDTO,
+  ActivationDTO,
   CreatureDTO,
   CreatureEventDTO,
   GameStateDTO,
@@ -30,7 +31,6 @@ import type {
   NodeDTO,
   GatherResultDTO,
   PlayableCardDTO,
-  Phase,
   PlayerDTO,
   QuestDTO,
 } from '../objects/GameState';
@@ -51,17 +51,15 @@ import { CURSOR_DEFAULT, CURSOR_GRAB, CURSOR_INTERACTIVE } from '../cursors';
 export class MainScene extends Phaser.Scene {
   private static readonly CARD_WIDTH = 252; // rendered card width
   private static readonly MARGIN = 50;
-  private static readonly DEBUG_BUTTON_WIDTH = 300;
   private static readonly CARD_HEIGHT = 352;
 
   private handContainer!: HandContainer;
   private playerSwitcher!: PlayerSwitcher;
   private eventLog!: EventLog;
   private gameStarted = false;
-  private phase: Phase = 'spirit';
   private emphasised: Card | null = null; // the card a move card is about to move, enlarged while the card is cast
   private veilLifted: LocationCard[] = []; // the veiled targets of a move card, shown without their veil while it is cast
-  private phaseRunning = false; // a world or awakening phase is being animated
+  private phaseRunning = false; // creature activations are being animated
   private splits: GatherOptionCard[] = []; // stand in for nodes that offer both harvesting and foraging, from drag start until the cast ends
   private dragSuppressed: Card[] = []; // cards disabled for the duration of a drag
   private pendingState: GameStateDTO | null = null; // an update that arrived mid world phase
@@ -74,7 +72,6 @@ export class MainScene extends Phaser.Scene {
   private questsShownOnce = false; // the quests of the first state just appear, later ones get an intro
   private questHeader!: Phaser.GameObjects.Text; // the scenario's name above the quest cards
   private paymentPopup: PaymentPopup | null = null;
-  private endSpiritPhaseBlocked = false; // a mandatory quest has to be finished first
   private players: PlayerCard[] = [];
   private playerStates: PlayerDTO[] = []; // latest server state, feeds the stats panel
 
@@ -104,8 +101,7 @@ export class MainScene extends Phaser.Scene {
   private static readonly WORLD_SIZE = 2000; // the map is laid out as if the screen were this big, whatever it really is
   private static readonly ZOOM_SPEED = 0.001; // per wheel delta unit
 
-  private zoomDebug!: Phaser.GameObjects.Text;
-  private debugButtons: ControlButton[] = []; // playtest controls under the zoom readout
+  private adminPanel!: AdminPanel;
   private connector: LocationConnector | null = null;
   private panLast: Phaser.Math.Vector2 | null = null;
 
@@ -123,20 +119,18 @@ export class MainScene extends Phaser.Scene {
     this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this);
 
     this.handContainer = new HandContainer(this);
-    this.playerSwitcher = new PlayerSwitcher(
+    this.playerSwitcher = new PlayerSwitcher(this, () => this.switchActivePlayer());
+    this.adminPanel = new AdminPanel(
       this,
-      () => this.switchActivePlayer(),
-      () => this.onPhaseButton(),
+      (lifted) => this.send('set_fog_lifted', { lifted }),
+      () => this.onAdvanceWorld(),
     );
     this.eventLog = new EventLog(this);
     this.placeEventLog();
-    new DragGroup(this, [this.eventLog, ...this.playerSwitcher.phaseObjects]).enableOn(
-      this.eventLog.dragHandle,
-    );
+    new DragGroup(this, [this.eventLog]).enableOn(this.eventLog.dragHandle);
     this.uiCamera = this.cameras.add();
     this.initPanning();
-    this.initZoomDebug();
-    this.initDebugButtons();
+    this.placeAdminPanel();
     this.initQuestHeader();
     this.initTargetingInput();
 
@@ -148,14 +142,8 @@ export class MainScene extends Phaser.Scene {
         case 'updated_game_state':
           this.handleGameStateUpdate(msg.payload);
           break;
-        case 'phase_changed':
-          this.setPhase(msg.payload.phase, msg.payload.cycle);
-          break;
         case 'world_phase':
           void this.playWorldPhase(msg.payload.events);
-          break;
-        case 'awakening_phase':
-          void this.playAwakeningPhase(msg.payload.events);
           break;
         case 'log':
           this.eventLog.append(msg.payload.entries);
@@ -209,72 +197,28 @@ export class MainScene extends Phaser.Scene {
     this.handContainer.resize(gameSize.width, gameSize.height);
     this.playerSwitcher.resize(gameSize.width, gameSize.height);
     this.placeEventLog();
-    this.zoomDebug.setX(gameSize.width - 12);
-    this.placeDebugButtons();
+    this.placeAdminPanel();
     this.placeQuestCards();
   }
 
-  private initZoomDebug() {
-    this.zoomDebug = this.add
-      .text(this.scale.width - 12, 12, '', {
-        fontFamily: 'monospace',
-        fontSize: '18px',
-        color: '#ffffff',
-      })
-      .setOrigin(1, 0)
-      .setDepth(1000);
-    this.hideFrom(this.cameras.main, this.zoomDebug);
-  }
-
-  private initDebugButtons() {
-    this.debugButtons = [
-      this.createDebugButton('World phase', () => this.triggerDebugPhase('trigger_world_phase')),
-      this.createDebugButton('Awakening phase', () => this.triggerDebugPhase('trigger_awakening_phase')),
-      this.createFogToggleButton(),
-    ];
-    for (const button of this.debugButtons) {
-      button.setDepth(1000);
-      this.add.existing(button);
-      this.hideFrom(this.cameras.main, button);
-    }
-    this.placeDebugButtons();
+  private syncActivationOrder(order: ActivationDTO[]) {
+    this.adminPanel.setActivationOrder(order.map((entry) => entry.name));
   }
 
   private initQuestHeader() {
     this.questHeader = this.add
-      .text(0, 0, '', { fontFamily: CARD_FONT_FAMILY, fontSize: '22px', fontStyle: 'bold', color: '#ffffff' })
+      .text(0, 0, '', { fontFamily: CARD_FONT_FAMILY, fontSize: '26px', fontStyle: 'bold', color: '#a89878' })
       .setOrigin(0.5, 0)
       .setDepth(MainScene.QUEST_DEPTH)
       .setVisible(false);
     this.hideFrom(this.cameras.main, this.questHeader);
   }
 
-  private createDebugButton(text: string, onClick: () => void): ControlButton {
-    return new ControlButton(this, text, onClick, MainScene.DEBUG_BUTTON_WIDTH, ControlButton.DEBUG_PALETTE);
-  }
-
-  private createFogToggleButton(): ControlButton {
-    let fogLifted = false;
-    const button = this.createDebugButton('Lift the veil', () => {
-      fogLifted = !fogLifted;
-      button.label.setText(fogLifted ? 'The mist comes...' : 'Lift the veil');
-      this.send('set_fog_lifted', { lifted: fogLifted });
-    });
-    return button;
-  }
-
-  private placeDebugButtons() {
-    const { HEIGHT } = ControlButton;
-    const { DEBUG_BUTTON_WIDTH } = MainScene;
+  //the panel sits in the upper left corner
+  private placeAdminPanel() {
     const scale = this.factor();
-    const top = 12 + this.zoomDebug.height + 8; // right below the zoom readout
-    this.debugButtons.forEach((button, i) => {
-      button.setScale(scale);
-      button.setPosition(
-        this.scale.width - 12 - (DEBUG_BUTTON_WIDTH * scale) / 2,
-        top + (HEIGHT * scale) / 2 + i * (HEIGHT * scale + 8),
-      );
-    });
+    const margin = MainScene.QUEST_MARGIN;
+    this.adminPanel.setScale(scale).setPosition(margin, margin);
   }
 
   private placeEventLog() {
@@ -288,9 +232,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   update(_timer: number, _delta: number) {
-    this.zoomDebug.setText(
-      `zoom ${Math.round(this.cameras.main.zoom * 100)}% · ${Math.round(this.game.loop.actualFps)} fps`,
-    );
+    this.adminPanel.setReadout(Math.round(this.cameras.main.zoom * 100), Math.round(this.game.loop.actualFps));
     this.connector?.redraw();
     this.updateTargeting();
     if (this.inDragging || this.panLast) this.game.canvas.style.cursor = CURSOR_GRAB; // phaser swaps it on every hover change
@@ -405,17 +347,13 @@ export class MainScene extends Phaser.Scene {
     this.questsShownOnce = true;
   }
 
-  //one column below the playtest buttons, right-aligned to the edge, under the scenario's name
+  //one column in the upper right corner, under the scenario's name
   private placeQuestCards() {
     const scale = this.factor() * MainScene.QUEST_SCALE;
     const { QUEST_MARGIN } = MainScene;
     const height = QuestCard.QUEST_HEIGHT * scale;
-    const buttonsBottom = this.debugButtons.reduce(
-      (bottom, b) => Math.max(bottom, b.y + (ControlButton.HEIGHT * this.factor()) / 2),
-      0,
-    );
     const centreX = this.scale.width - QUEST_MARGIN - (QuestCard.QUEST_WIDTH * scale) / 2;
-    const headerY = buttonsBottom + QUEST_MARGIN;
+    const headerY = QUEST_MARGIN;
     this.questHeader.setScale(this.factor()).setPosition(centreX, headerY);
     const cardsTop = headerY + this.questHeader.displayHeight + QUEST_MARGIN;
     this.questCards.forEach((card, i) => {
@@ -501,7 +439,8 @@ export class MainScene extends Phaser.Scene {
 
   handleGameStart(inputGameState: GameStateDTO) {
     this.gameStarted = true;
-    this.setPhase(inputGameState.phase, inputGameState.cycle);
+    this.eventLog.setCycle(inputGameState.cycle);
+    this.syncActivationOrder(inputGameState.activationOrder);
     this.playerStates = inputGameState.players;
     this.initHands(inputGameState);
     this.initPlayers(inputGameState);
@@ -510,8 +449,6 @@ export class MainScene extends Phaser.Scene {
     this.initNodes(inputGameState);
     this.syncQuests(inputGameState);
     this.syncPayment(inputGameState);
-    this.endSpiritPhaseBlocked = inputGameState.endSpiritPhaseBlocked;
-    this.refreshPhaseButton();
     this.assignToLocations(inputGameState);
     this.initFirstActivePlayer();
     this.hideUiFromMainCamera();
@@ -538,6 +475,7 @@ export class MainScene extends Phaser.Scene {
   //camera filters are per object, so everything the hand/switcher own has to be flagged once it exists
   private hideUiFromMainCamera() {
     this.hideFrom(this.cameras.main, this.handContainer);
+    this.hideFrom(this.cameras.main, this.adminPanel);
     this.hideFrom(this.cameras.main, this.playerSwitcher);
     this.hideFrom(this.cameras.main, this.eventLog);
   }
@@ -563,8 +501,8 @@ export class MainScene extends Phaser.Scene {
     }
     this.syncQuests(state);
     this.syncPayment(state);
-    this.endSpiritPhaseBlocked = state.endSpiritPhaseBlocked;
-    this.refreshPhaseButton();
+    this.eventLog.setCycle(state.cycle);
+    this.syncActivationOrder(state.activationOrder);
     for (const dto of state.locations) {
       this.locationCards.find((l) => l.id === dto.id)?.setVisibility(dto.visibility);
     }
@@ -640,48 +578,20 @@ export class MainScene extends Phaser.Scene {
     this.hideFrom(this.cameras.main, new FaintedPopup(this, player?.name ?? ''));
   }
 
-  //the phase button advances the game by one step, the board stays usable while it waits for the next click
-  private onPhaseButton() {
+  //the next creature on the stacks takes its turn, the board stays usable while it is animated
+  private onAdvanceWorld() {
     if (!this.gameStarted || this.phaseRunning) return;
-    switch (this.phase) {
-      case 'spirit':
-        this.setPhaseRunning(true);
-        this.send('end_spirit_phase');
-        break;
-      case 'world':
-        this.setPhaseRunning(true);
-        this.send('start_awakening_phase');
-        break;
-      case 'awakening':
-        this.send('start_spirit_phase'); // nothing to animate, the update arrives right away
-        break;
-    }
-  }
-
-  private triggerDebugPhase(type: 'trigger_world_phase' | 'trigger_awakening_phase') {
-    if (!this.gameStarted || this.phaseRunning) return;
-    this.setPhaseRunning(true);
-    this.send(type);
-  }
-
-  private setPhase(phase: Phase, cycle: number) {
-    this.phase = phase;
-    this.playerSwitcher.setPhase(phase, cycle);
-    this.refreshPhaseButton();
+    this.send('advance_world');
   }
 
   private setPhaseRunning(running: boolean) {
     this.phaseRunning = running;
-    this.refreshPhaseButton();
-  }
-
-  private refreshPhaseButton() {
-    const blocked = this.phase === 'spirit' && this.endSpiritPhaseBlocked;
-    this.playerSwitcher.setPhaseButtonEnabled(!this.phaseRunning && !blocked);
+    this.adminPanel.setWorldwakeEnabled(!running);
   }
 
   //one creature after another, each waits for the previous one to arrive and, if it exhausted, to turn
   private async playWorldPhase(events: CreatureEventDTO[]) {
+    this.setPhaseRunning(true); // the state update right behind the events waits for the animation
     for (const event of events) {
       if (event.ready)
         await this.creatureCards.find((c) => c.id === event.creatureId)?.setExhausted(false);
@@ -693,14 +603,6 @@ export class MainScene extends Phaser.Scene {
     for (const attack of events.flatMap((e) => e.attacks).filter((a) => a.fainted)) {
       this.showFainted(attack.targetPlayerId);
     }
-  }
-
-  //exhausted creatures turn upright again, one after another
-  private async playAwakeningPhase(events: AwakeningEventDTO[]) {
-    for (const event of events) {
-      await this.creatureCards.find((c) => c.id === event.creatureId)?.setExhausted(false);
-    }
-    this.finishPhase();
   }
 
   private finishPhase() {
@@ -1089,7 +991,8 @@ export class MainScene extends Phaser.Scene {
     }
     await placed;
     await new Promise((resolve) => this.time.delayedCall(MainScene.SUMMON_HOLD, resolve));
-    this.send('poc_hello', { played_card: card.name });
+    if (card.effectType === EFFECT_PLAYER_REST) this.send('play_card', { cardId: card.id, targetId: 0 });
+    else this.send('poc_hello', { played_card: card.name });
     this.finishSummon(card);
   }
 

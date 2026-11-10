@@ -11,7 +11,6 @@ import (
 
 type GameStateDTO struct {
 	Cycle        int               `json:"cycle"`
-	Phase        string            `json:"phase"`
 	Locations    []LocationDTO     `json:"locations"`
 	Players      []PlayerDTO       `json:"players"`
 	Creatures    []CreatureDTO     `json:"creatures"`
@@ -20,7 +19,12 @@ type GameStateDTO struct {
 	ScenarioName string            `json:"scenarioName"`
 	Quests       []QuestDTO        `json:"quests"`
 	PendingPayment *PaymentDTO     `json:"pendingPayment"`
-	EndSpiritPhaseBlocked bool     `json:"endSpiritPhaseBlocked"`
+	ActivationOrder []ActivationDTO `json:"activationOrder"` // the creatures in the order they activate next, only while the fog is lifted
+}
+
+type ActivationDTO struct {
+	CreatureID int    `json:"creatureId"`
+	Name       string `json:"name"`
 }
 
 type QuestDTO struct {
@@ -85,7 +89,6 @@ type PlayerDTO struct {
 	MaxWounds  int    `json:"maxWounds"`
 	Fainted    bool   `json:"fainted"`
 	Hidden     bool   `json:"hidden"`
-	Actions    int    `json:"actions"`
 	Hand       []int  `json:"hand"`
 	Food       int    `json:"food"`
 	Resources  int    `json:"resources"`
@@ -204,7 +207,7 @@ func paymentDTO(gs *game.GameState) *PaymentDTO {
 //fogLifted is a playtest aid: the players see everything, whatever they actually know
 func Snapshot(gs *game.GameState, fogLifted bool) GameStateDTO {
 	// veiled locations can leave these empty, which must reach the frontend as [] and not null
-	out := GameStateDTO{Phase: string(gs.Phase), Cycle: gs.Cycle, Creatures: []CreatureDTO{}, Nodes: []NodeDTO{}}
+	out := GameStateDTO{Cycle: gs.Cycle, ActivationOrder: []ActivationDTO{}, Creatures: []CreatureDTO{}, Nodes: []NodeDTO{}}
 
 	for _, l := range gs.Locations {
 		conns := make([]int, 0, len(l.OutgoingConnections))
@@ -222,7 +225,7 @@ func Snapshot(gs *game.GameState, fogLifted bool) GameStateDTO {
 		out.Players = append(out.Players, PlayerDTO{
 			ID: p.ID, Name: p.Name, LocationID: p.CurrentLocation.ID,
 			Wounds: p.Wounds, MaxWounds: player.MaxWounds, Fainted: p.Fainted(), Hidden: p.Hidden,
-			Actions: p.RemainingActions, Hand: hand, Food: p.Food, Resources: p.ResourcesAvailable, Energy: p.Energy, MaxEnergy: game.AwakeningEnergy,
+			Hand: hand, Food: p.Food, Resources: p.ResourcesAvailable, Energy: p.Energy, MaxEnergy: game.MaxEnergy,
 		})
 	}
 
@@ -267,7 +270,11 @@ func Snapshot(gs *game.GameState, fogLifted bool) GameStateDTO {
 	}
 	out.Quests = questDTOs(gs)
 	out.PendingPayment = paymentDTO(gs)
-	out.EndSpiritPhaseBlocked = gs.MandatoryFinishPending()
+	if fogLifted {
+		for _, c := range gs.UpcomingActivations() {
+			out.ActivationOrder = append(out.ActivationOrder, ActivationDTO{CreatureID: c.ID, Name: c.NameWithID()})
+		}
+	}
 
 	return out
 }

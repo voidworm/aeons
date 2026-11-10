@@ -8,6 +8,7 @@ export class EventLog extends Phaser.GameObjects.Container {
   static readonly WIDTH = 480;
   private static readonly ROW_HEIGHT = 30;
   private static readonly PADDING = 12;
+  private static readonly CYCLE_GAP = 8; // between the log and the cycle counter above it
   static readonly HEIGHT = EventLog.VISIBLE * EventLog.ROW_HEIGHT + 2 * EventLog.PADDING;
   private static readonly OUTLINE_COLOR = 0x2a1809;
 
@@ -16,6 +17,7 @@ export class EventLog extends Phaser.GameObjects.Container {
   private firstShown = 0; // index of the topmost visible entry
   private followsNewest = true;
   private rows: Phaser.GameObjects.Text[] = [];
+  private readonly cycleText: Phaser.GameObjects.Text;
 
   constructor(scene: MainScene) {
     super(scene, 0, 0);
@@ -39,8 +41,20 @@ export class EventLog extends Phaser.GameObjects.Container {
       this.add(row);
     }
 
+    this.cycleText = new Phaser.GameObjects.Text(scene, WIDTH / 2, -EventLog.CYCLE_GAP, '', {
+      fontFamily: CARD_FONT_FAMILY,
+      fontSize: '26px',
+      fontStyle: 'bold',
+      color: '#f3e3c3',
+    }).setOrigin(0.5, 1);
+    this.add(this.cycleText);
+
     this.setDepth(1000);
     scene.add.existing(this);
+  }
+
+  setCycle(cycle: number): void {
+    this.cycleText.setText(`Cycle ${cycle}`);
   }
 
   setBottomCentre(x: number, y: number): void {

@@ -170,19 +170,6 @@ func TestPredatorAttacksTwiceAndStaysReady(t *testing.T) {
 	}
 }
 
-func TestExhaustedPredatorOnlyReadies(t *testing.T) {
-	gs, plains := newBoard()
-	hare := gs.place(gs.NewHare(plains))
-	hare.CanHide = false
-	wolfpack := gs.place(gs.NewWolfpack(plains))
-	wolfpack.Exhausted = true
-
-	gs.ActivatePredator(wolfpack)
-	if wolfpack.Exhausted || hare.Distress != 0 {
-		t.Errorf("exhausted = %v, hare distress = %d, want it ready and nothing attacked", wolfpack.Exhausted, hare.Distress)
-	}
-}
-
 func TestPredatorWithoutTargetMovesAwayFromWhereItWasAndLocksOnToPrey(t *testing.T) {
 	gs, plains := newBoard()
 	lake := gs.locationNamed("Redhorn Lake")
@@ -204,16 +191,16 @@ func TestChaseEndsWhenThePreyHidesOrGetsTwoMovesAway(t *testing.T) {
 	wolfpack := gs.place(gs.NewWolfpack(plains))
 	wolfpack.Chasing = hare
 
-	if !stillChasing(wolfpack) {
+	if !gs.stillChasing(wolfpack) {
 		t.Error("the chase ended with the prey one move away")
 	}
 	hare.CurrentLocation = gs.locationNamed("Slumbering Crag")
-	if stillChasing(wolfpack) {
+	if gs.stillChasing(wolfpack) {
 		t.Error("the chase goes on with the prey two moves away")
 	}
 	hare.CurrentLocation = gs.locationNamed("Redhorn Lake")
 	hare.Hidden = true
-	if stillChasing(wolfpack) {
+	if gs.stillChasing(wolfpack) {
 		t.Error("the chase goes on with the prey hidden")
 	}
 }
@@ -273,7 +260,7 @@ func TestExhaustedPreyReadiesThenMoves(t *testing.T) {
 	stag := gs.place(gs.NewStag(plains))
 	stag.Exhausted = true
 
-	events := gs.ActivatePrey(stag)
+	events := gs.activate(stag)
 	if stag.Exhausted || len(events) != 2 {
 		t.Errorf("exhausted = %v, events = %d, want ready and one move", stag.Exhausted, len(events))
 	}
@@ -343,7 +330,6 @@ func TestPlayCardRejectsHiddenAndWrongKindOfTarget(t *testing.T) {
 	wolfpack := gs.place(gs.NewWolfpack(plains))
 	gs.place(gs.NewStag(plains))
 	gs.Players[0].CurrentLocation = plains
-	gs.Phase = PhaseSpirit
 	gs.RefreshHands()
 
 	confront := cardOfType(gs.Players[0].CardsInHand, card.PlayerAttack)
@@ -380,14 +366,14 @@ func TestPreyThatIsNoPredatorWandersTowardsPlants(t *testing.T) {
 	}
 }
 
-func TestBondedCreaturesAndPlantsDoNotActInTheWorldPhase(t *testing.T) {
+func TestBondedCreaturesAndPlantsDoNotAct(t *testing.T) {
 	gs, plains := newBoard()
 	hare := gs.place(gs.NewHare(plains))
 	hare.Bonded, hare.BondedTo = true, gs.Players[0]
 	plant := gs.place(gs.NewSuspiciousPlant(plains))
 
 	for range 20 {
-		gs.ResolveWorldPhase()
+		gs.ActivateNextCreature()
 	}
 	if hare.CurrentLocation != plains || plant.CurrentLocation != plains {
 		t.Error("a bonded creature or a plant moved")
@@ -467,29 +453,14 @@ func TestPreyOnAPlantLocationStillLeaves(t *testing.T) {
 	}
 }
 
-func TestPreyHeldInHidingByAPredatorMovesOnceAfterThePredatorLeft(t *testing.T) {
-	for range 30 {
-		gs, plains := newBoard()
-		hare := gs.place(gs.NewHare(plains))
-		hare.Hide(true)
-		wolfpack := gs.place(gs.NewWolfpack(plains))
-		wolfpack.LastLocation = gs.locationNamed("Secluded Den")
-
-		gs.ResolveWorldPhase()
-		if hare.Hidden || hare.CurrentLocation == plains {
-			t.Fatalf("hare hidden = %v, at %s, want it out and moved on", hare.Hidden, hare.CurrentLocation.Name)
-		}
-	}
-}
-
 func TestPreyStaysHiddenWhileThePredatorStays(t *testing.T) {
 	gs, plains := newBoard()
 	hare := gs.place(gs.NewHare(plains))
 	hare.Hide(true)
-	wolfpack := gs.place(gs.NewWolfpack(plains))
-	wolfpack.Exhausted = true
+	gs.place(gs.NewWolfpack(plains))
 
-	gs.ResolveWorldPhase()
+	gs.ActivatePrey(hare)
+	gs.ReconcileHiding()
 	if !hare.Hidden || hare.CurrentLocation != plains {
 		t.Errorf("hare hidden = %v, at %s, want it hidden at the plains", hare.Hidden, hare.CurrentLocation.Name)
 	}
@@ -582,24 +553,9 @@ func TestExhaustedPreyReadiesInAnEventBeforeItMoves(t *testing.T) {
 	stag := gs.place(gs.NewStag(plains))
 	stag.Exhausted = true
 
-	events := gs.ActivatePrey(stag)
+	events := gs.activate(stag)
 	if len(events) != 2 || !events[0].Ready || events[1].FromLocationID == events[1].ToLocationID {
 		t.Errorf("events = %+v, want a ready event and then a move", events)
 	}
 }
 
-func TestCreaturesDoNotMoveAgainInThePhaseTheyExhaustedIn(t *testing.T) {
-	for range 200 {
-		gs, plains := newBoard()
-		for _, newCreature := range []func(*location.Unit) *creature.Unit{gs.NewWolfpack, gs.NewWolfpack, gs.NewStag, gs.NewRaccoon, gs.NewHare, gs.NewFox, gs.NewFox} {
-			gs.place(newCreature(plains))
-		}
-		exhausted := map[int]bool{}
-		for _, event := range gs.ResolveWorldPhase() {
-			if exhausted[event.CreatureID] && event.FromLocationID != event.ToLocationID {
-				t.Fatalf("creature %d moved after it exhausted", event.CreatureID)
-			}
-			exhausted[event.CreatureID] = exhausted[event.CreatureID] || event.Exhausted
-		}
-	}
-}

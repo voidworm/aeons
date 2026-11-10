@@ -105,9 +105,6 @@ func TestFinishingStartsTheNextQuestAndMandatoryBlocksEverythingElse(t *testing.
 			t.Errorf("%s can be cast while a mandatory finish is pending", c.Name)
 		}
 	}
-	if _, err := gs.EndSpiritPhase(); err == nil {
-		t.Error("the spirit phase ended while a mandatory finish is pending")
-	}
 
 	playFinish(t, gs, second)
 	if got := activeQuestNames(gs); len(got) != 3 {

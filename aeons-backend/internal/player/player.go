@@ -19,7 +19,6 @@ type Unit struct {
 	Wounds             int
 	Food               int
 	ResourcesAvailable int
-	RemainingActions   int
 	Energy             int
 	Hidden             bool // hidden players are ignored by animals until they cast a card
 }

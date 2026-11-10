@@ -16,7 +16,6 @@ import (
 )
 
 func (gs *GameState) Init() {
-	gs.Phase = PhaseSpirit
 	gs.Cycle = 1
 
 	gs.InitLocations()
@@ -24,6 +23,7 @@ func (gs *GameState) Init() {
 	gs.InitNodes()
 	gs.InitCreatures()
 	gs.InitScenario()
+	gs.StartRound()
 
 	gs.KnownNodes = map[int]*collecting.Node{}
 	gs.ReconcileVision()
@@ -76,8 +76,7 @@ func (gs *GameState) InitPlayers() {
 		Name:               "Druid",
 		CardsInHand:        []*card.PlayableCard{},
 		ResourcesAvailable: 0,
-		RemainingActions:   3,
-		Energy:             AwakeningEnergy,
+		Energy:             MaxEnergy,
 	}
 
 	log.Println("[INIT] Setting up player Scoundrel...")
@@ -87,8 +86,7 @@ func (gs *GameState) InitPlayers() {
 		Name:               "Scoundrel",
 		CardsInHand:        []*card.PlayableCard{},
 		ResourcesAvailable: 0,
-		RemainingActions:   3,
-		Energy:             AwakeningEnergy,
+		Energy:             MaxEnergy,
 	}
 	gs.Players = append(gs.Players, Druid, Scoundrel)
 }
@@ -102,7 +100,7 @@ func (gs *GameState)initHandsForAllPlayers() {
 
 func (gs *GameState) GenerateBasicHand() []*card.PlayableCard {
 	basicHand := []*card.PlayableCard{}
-	basicHand = append(basicHand, gs.GenerateBasicMoveCard(), gs.GenerateBasicAttackCard(), gs.GenerateBasicDistractCard(), gs.GenerateBasicGatherCard(), gs.GenerateBasicBondCard(), gs.GenerateBasicHideCard())
+	basicHand = append(basicHand, gs.GenerateBasicMoveCard(), gs.GenerateBasicAttackCard(), gs.GenerateBasicDistractCard(), gs.GenerateBasicGatherCard(), gs.GenerateBasicBondCard(), gs.GenerateBasicHideCard(), gs.GenerateRestCard())
 	gs.PlayableCards = append(gs.PlayableCards, basicHand...)
 	return basicHand
 }
@@ -238,6 +236,18 @@ func (gs *GameState) GenerateBasicHideCard() *card.PlayableCard {
 		TargetSpec: &card.TargetSpec{Type: card.TargetTypeLocation},
 		Range:      1,
 		Cost:       2,
+	}
+}
+
+func (gs *GameState) GenerateRestCard() *card.PlayableCard {
+	return &card.PlayableCard{
+		ID:         gs.NextID(),
+		Type:       card.PlayerRest,
+		Name:       "Rest",
+		EffectText: "Both players agree to *rest*.\nRefill your energy and prepare all cards the spirits control.\n*Worldwake* 3",
+		Flavor:     "...and still I chase the sun.",
+		Candidates: []card.Targetable{},
+		Cost:       0,
 	}
 }
 

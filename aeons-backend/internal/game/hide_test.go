@@ -68,7 +68,7 @@ func TestCastingAnyOtherCardBreaksHiding(t *testing.T) {
 	if druid.Hidden {
 		t.Error("the player stays hidden after casting a card")
 	}
-	druid.Energy = AwakeningEnergy
+	druid.Energy = MaxEnergy
 	gs.RefreshHands()
 	if !hideCardOf(gs, 0).CanBeCast {
 		t.Error("Hide stays disabled after hiding ended")

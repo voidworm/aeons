@@ -23,6 +23,7 @@ const (
 	PlayerMoveKindred
 	PlayerFinishQuest
 	PlayerHide
+	PlayerRest
 )
 
 type Targetable interface {
@@ -56,7 +57,7 @@ type PlayableCard struct {
 	Effect effect.Effect
 	Cost int
 	Range int
-	OnCooldown bool // cannot be cast again until the next awakening phase
+	OnCooldown bool // cannot be cast again until the round ends
 }
 
 func (c *PlayableCard) Play() {

@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import type { MainScene } from '../scenes/MainScene';
-import { CARD_FONT_FAMILY } from '../fonts';
 import { Card } from './Card';
 import type { PlayerCard } from './PlayerCard';
 import { MiniPlayerCard } from './MiniPlayerCard';
@@ -11,19 +10,6 @@ import { uiScale } from '../layout/uiScale';
 import { EventLog } from './EventLog';
 import { PlayerStatsPanel } from './PlayerStatsPanel';
 import type { PlayerStats } from './PlayerStatsPanel';
-import type { Phase } from './GameState';
-
-const PHASE_TITLES: Record<Phase, string> = {
-  spirit: 'Spirit Phase',
-  world: 'World Phase',
-  awakening: 'Awakening Phase',
-};
-// what the phase button does next, in each phase
-const PHASE_BUTTON_LABELS: Record<Phase, string> = {
-  spirit: 'End Spirit Phase',
-  world: 'Start Awakening Phase',
-  awakening: 'Start Spirit Phase',
-};
 
 export class PlayerSwitcher extends Phaser.GameObjects.Container {
   private static readonly PREVIEW_SCALE = 0.45;
@@ -34,18 +20,13 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
   private static readonly STATS_GAP = 16; // between the stack and the stats panel
   private static readonly CLUSTER_WIDTH = PlayerStatsPanel.WIDTH + PlayerSwitcher.STATS_GAP + PlayerSwitcher.STACK_WIDTH; // previews and stats panel together
   private static readonly NAME_GAP = 8; // between the stats panel and the name button above it
-  private static readonly LOG_GAP = 16; // between the event log and the phase button above it
-  private static readonly PHASE_TITLE_GAP = 8; // between the phase button and the cycle counter above it
-  private static readonly CYCLE_HEIGHT = 26; // the room the cycle counter takes between the title and the button
-  private static readonly PHASE_BUTTON_WIDTH = 360;
   private static readonly BOTTOM_INSET = 20; // also the gap to the side edges
 
   private static readonly PANEL_LIFT = 15; // raises the whole switcher off the bottom edge
-  private static readonly BUTTONS_LIFT = 40; // raises the event log, and the phase button above it, off the bottom edge
+  private static readonly BUTTONS_LIFT = 40; // raises the event log off the bottom edge
   private static readonly BACK_PREVIEW_OFFSET_Y = 24; // the back preview sits this much higher than the front one
 
   // the origin is the bottom right corner of the stats panel, the stack sits left of it, the name button above it
-  // the phase buttons sit right of the hand, their positions are relative to this origin and set on resize
   // within the stack the active preview sits front-left and lower, the inactive one behind it, up and to the right
   private static readonly FRONT_SLOT = {
     x: -PlayerSwitcher.PREVIEW_OFFSET_X,
@@ -62,12 +43,9 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
   private labelTween: Phaser.Tweens.Tween | null = null;
   private statsPanel: PlayerStatsPanel;
   private stack: Phaser.GameObjects.Container; // the player previews, left of the stats panel
-  private phaseButton: ControlButton;
-  private phaseTitle: Phaser.GameObjects.Text;
-  private cycleText: Phaser.GameObjects.Text;
-  private phaseControl: Phaser.GameObjects.Container; // the phase title above the phase button, centred on the button
+  private logCentreX = 0; // relative to the origin, set on resize
 
-  constructor(scene: MainScene, onSwitch: () => void, onPhaseButton: () => void) {
+  constructor(scene: MainScene, onSwitch: () => void) {
     super(scene, 0, 0);
     const { PREVIEW_HEIGHT, BACK_PREVIEW_OFFSET_Y: OFFSET_Y, STATS_GAP, NAME_GAP, STACK_WIDTH } = PlayerSwitcher;
     const { HEIGHT } = ControlButton;
@@ -93,22 +71,7 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
     this.nameButton = new ControlButton(scene, '', onSwitch);
     this.nameButton.setPosition(-PlayerStatsPanel.WIDTH / 2, -PlayerStatsPanel.HEIGHT - NAME_GAP - HEIGHT / 2);
 
-    this.phaseButton = new ControlButton(scene, '', onPhaseButton, PlayerSwitcher.PHASE_BUTTON_WIDTH);
-    const { PHASE_TITLE_GAP, CYCLE_HEIGHT } = PlayerSwitcher;
-    this.cycleText = new Phaser.GameObjects.Text(scene, 0, -HEIGHT / 2 - PHASE_TITLE_GAP, '', {
-      fontFamily: CARD_FONT_FAMILY,
-      fontSize: '20px',
-      color: '#f3e3c3',
-    }).setOrigin(0.5, 1);
-    this.phaseTitle = new Phaser.GameObjects.Text(scene, 0, -HEIGHT / 2 - PHASE_TITLE_GAP - CYCLE_HEIGHT, '', {
-      fontFamily: CARD_FONT_FAMILY,
-      fontSize: '26px',
-      fontStyle: 'bold',
-      color: '#f3e3c3',
-    }).setOrigin(0.5, 1);
-    this.phaseControl = new Phaser.GameObjects.Container(scene, 0, 0, [this.phaseButton, this.cycleText, this.phaseTitle]);
-
-    this.add([this.stack, this.statsPanel, this.nameButton, this.phaseControl]);
+    this.add([this.stack, this.statsPanel, this.nameButton]);
     // the previews, name and stats are one unit that follows a drag on the stats panel
     new DragGroup(scene, [this.stack, this.statsPanel, this.nameButton]).enableOn(this.statsPanel.dragHandle);
     this.setDepth(1000); //if i dont do this the stupid things keeps moving in front of the cards
@@ -117,7 +80,7 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
   }
 
   resize(width: number, height: number): void {
-    const { BOTTOM_INSET, BUTTONS_LIFT, CLUSTER_WIDTH } = PlayerSwitcher;
+    const { BOTTOM_INSET, CLUSTER_WIDTH } = PlayerSwitcher;
     const scale = uiScale(width, height);
     const inset = BOTTOM_INSET * scale;
     const originX = inset + CLUSTER_WIDTH * scale; // previews, name and stats sit in the bottom left corner
@@ -125,30 +88,14 @@ export class PlayerSwitcher extends Phaser.GameObjects.Container {
     this.setScale(scale);
     this.setPosition(originX, originY);
 
-    // the event log sits in the bottom right corner, the phase button centred above it
-    const logCentreX = (width - inset - (EventLog.WIDTH * scale) / 2 - originX) / scale;
-    const logTop = -BUTTONS_LIFT - EventLog.HEIGHT;
-    this.phaseControl.setPosition(logCentreX, logTop - PlayerSwitcher.LOG_GAP - ControlButton.HEIGHT / 2);
+    // the event log sits in the bottom right corner
+    this.logCentreX = (width - inset - (EventLog.WIDTH * scale) / 2 - originX) / scale;
   }
 
-  get phaseObjects(): Phaser.GameObjects.Container[] {
-    return [this.phaseControl];
-  }
-
-  setPhase(phase: Phase, cycle: number): void {
-    this.phaseTitle.setText(PHASE_TITLES[phase]);
-    this.cycleText.setText(`Cycle ${cycle}`);
-    this.phaseButton.label.setText(PHASE_BUTTON_LABELS[phase]);
-  }
-
-  setPhaseButtonEnabled(enabled: boolean): void {
-    this.phaseButton.setEnabled(enabled);
-  }
-
-  //screen position of the bottom centre of the event log, below the phase button
+  //screen position of the bottom centre of the event log
   eventLogBottomCentre(): { x: number; y: number } {
     return {
-      x: this.x + this.phaseControl.x * this.scaleX,
+      x: this.x + this.logCentreX * this.scaleX,
       y: this.y - PlayerSwitcher.BUTTONS_LIFT * this.scaleY,
     };
   }

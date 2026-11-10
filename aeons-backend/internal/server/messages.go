@@ -10,11 +10,7 @@ const (
 	MsgChooseTarget = "choose_target"
 	MsgPayForQuest = "pay_for_quest"
 	MsgCancelPayment = "cancel_payment"
-	MsgEndSpiritPhase = "end_spirit_phase"
-	MsgStartAwakeningPhase = "start_awakening_phase"
-	MsgStartSpiritPhase = "start_spirit_phase"
-	MsgTriggerWorldPhase = "trigger_world_phase" // playtest, runs the phase without changing the game's phase
-	MsgTriggerAwakeningPhase = "trigger_awakening_phase" // playtest, runs the phase without changing the game's phase
+	MsgAdvanceWorld = "advance_world" // the next creature takes its turn, without a player action
 	MsgSetFogLifted = "set_fog_lifted" // playtest, shows everything regardless of what the players know
 
 	//server to client messages
@@ -22,9 +18,7 @@ const (
 	MsgUpdatedGameState = "updated_game_state"
 	MsgHAnd = "hand"
 	MsgTargets = "targets"
-	MsgPhaseChanged = "phase_changed"
 	MsgWorldPhase = "world_phase"
-	MsgAwakeningPhase = "awakening_phase"
 	MsgGatherResult = "gather_result"
 	MsgLog = "log"
 	MsgError = "error"
@@ -79,11 +73,6 @@ type TargetsPayload struct {
 	TargetIDs []int `json:"targetIds"`
 }
 
-type PhaseChangedPayload struct {
-	Phase string `json:"phase"`
-	Cycle int    `json:"cycle"`
-}
-
 type WorldPhasePayload struct {
 	Events []CreatureEventDTO `json:"events"`
 }
@@ -95,14 +84,6 @@ type CreatureEventDTO struct {
 	Attacks        []CreatureAttackDTO `json:"attacks"`
 	Exhausted      bool                `json:"exhausted"`
 	Ready          bool                `json:"ready"`
-}
-
-type AwakeningPhasePayload struct {
-	Events []AwakeningEventDTO `json:"events"`
-}
-
-type AwakeningEventDTO struct {
-	CreatureID int `json:"creatureId"`
 }
 
 type LogPayload struct {

@@ -16,9 +16,6 @@ import (
 // Move, distract, attack, bond and gather cards are implemented so far.
 // Gather cards return the collecting effect, all others return nil. The mode only matters to gather cards.
 func (gs *GameState) PlayCard(cardID, targetID int, mode collecting.Mode) (*collecting.Effect, error) {
-	if gs.Phase != PhaseSpirit {
-		return nil, fmt.Errorf("cards can only be played in the spirit phase, it is the %s phase", gs.Phase)
-	}
 	if gs.PendingPayment != nil {
 		return nil, fmt.Errorf("%s waits for a payment", gs.PendingPayment.Name)
 	}
@@ -35,6 +32,10 @@ func (gs *GameState) PlayCard(cardID, targetID int, mode collecting.Mode) (*coll
 
 	if c.Type == card.PlayerFinishQuest {
 		return nil, gs.playFinishQuest(targetID)
+	}
+	if c.Type == card.PlayerRest {
+		gs.Rest()
+		return nil, nil
 	}
 
 	switch c.Type {
@@ -112,13 +113,14 @@ func (gs *GameState) PlayCard(cardID, targetID int, mode collecting.Mode) (*coll
 		gs.breakHiding(owner)
 	}
 	gs.reconcileAfterAction()
+	gs.ActivateNextCreature()
 	collected, _ := c.Effect.(*collecting.Effect)
 	return collected, nil
 }
 
-// casting a card ends hiding, except for Hide itself, finishing a quest and moving the kindred
+// casting a card ends hiding, except for Hide itself, finishing a quest, moving the kindred and resting
 func breaksHiding(c *card.PlayableCard) bool {
-	return c.Type != card.PlayerHide && c.Type != card.PlayerFinishQuest && c.Type != card.PlayerMoveKindred
+	return c.Type != card.PlayerHide && c.Type != card.PlayerFinishQuest && c.Type != card.PlayerMoveKindred && c.Type != card.PlayerRest
 }
 
 func (gs *GameState) breakHiding(p *player.Unit) {

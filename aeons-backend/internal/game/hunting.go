@@ -12,12 +12,12 @@ import (
 func (gs *GameState) HuntableAt(hunter *creature.Unit) []creature.Quarry {
 	found := []creature.Quarry{}
 	for _, c := range gs.EnemiesAtLocation(hunter.CurrentLocation) {
-		if c != hunter && hunter.CanHunt(c) {
+		if c != hunter && gs.canHunt(hunter, c) {
 			found = append(found, c)
 		}
 	}
 	for _, p := range gs.PlayersAtLocation(hunter) {
-		if hunter.CanHunt(p) {
+		if gs.canHunt(hunter, p) {
 			found = append(found, p)
 		}
 	}

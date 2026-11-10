@@ -17,8 +17,7 @@ func (gs *GameState) moveCreatureTo(c *creature.Unit, to *location.Unit) Creatur
 	return CreatureEvent{CreatureID: c.ID, FromLocationID: from.ID, ToLocationID: to.ID}
 }
 
-// A hidden prey stays hidden and relieves distress. Otherwise an exhausted prey readies and moves once.
-// A ready prey moves once, or up to twice while it is under distress.
+// A hidden prey stays hidden and relieves distress. Otherwise it moves once, or up to twice while it is under distress.
 func (gs *GameState) ActivatePrey(prey *creature.Unit) []CreatureEvent {
 	events := []CreatureEvent{}
 	if prey.Hidden {
@@ -29,11 +28,7 @@ func (gs *GameState) ActivatePrey(prey *creature.Unit) []CreatureEvent {
 	}
 
 	moves := 1
-	if prey.Exhausted {
-		prey.Exhausted = false
-		gs.Logf("%s readies", prey.NameWithID())
-		events = append(events, readyEvent(prey))
-	} else if prey.Distress > 0 {
+	if prey.Distress > 0 {
 		moves = actionsPerActivation
 	}
 	for range moves {
@@ -150,7 +145,7 @@ func (gs *GameState) neighboursWithoutHunters(prey *creature.Unit) []*location.U
 
 func (gs *GameState) LocationHasHunterOf(l *location.Unit, prey *creature.Unit) bool {
 	for _, c := range gs.EnemiesAtLocation(l) {
-		if c != prey && c.CanHunt(prey) {
+		if c != prey && gs.canHunt(c, prey) {
 			return true
 		}
 	}
@@ -171,7 +166,7 @@ func (gs *GameState) hideAtHome(prey *creature.Unit) bool {
 func (gs *GameState) ReactToArrival(hunter *creature.Unit) []CreatureEvent {
 	events := []CreatureEvent{}
 	for _, other := range gs.EnemiesAtLocation(hunter.CurrentLocation) {
-		scared := other != hunter && !other.Bonded && !other.Hidden && !other.Exhausted && hunter.CanHunt(other)
+		scared := other != hunter && !other.Bonded && !other.Hidden && !other.Exhausted && gs.canHunt(hunter, other)
 		if !scared {
 			continue
 		}
