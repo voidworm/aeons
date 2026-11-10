@@ -95,9 +95,7 @@ func (gs *GameState) activate(c *creature.Unit) []CreatureEvent {
 	} else {
 		events = append(events, gs.ActivatePrey(c)...)
 	}
-	if c.Role.IsPrey() {
-		gs.eatFoodAtLocation(c)
-	}
+	gs.eatAtLocation(c)
 	gs.ReconcileDefeats()
 	gs.ReconcileHiding()
 	gs.ReconcileVision()

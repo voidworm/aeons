@@ -31,6 +31,13 @@ func (r Role) IsPlant() bool {
 	return r == Plant
 }
 
+// tags that decide what a creature eats, they are part of its IdentNames
+const (
+	Scavenger = "Scavenger"
+	Grazer    = "Grazer"
+	Gatherer  = "Gatherer"
+)
+
 type Unit struct {
 	ID         int
 	Name       string

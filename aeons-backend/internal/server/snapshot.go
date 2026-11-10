@@ -132,6 +132,7 @@ type NodeDTO struct {
 	Material   PoolDTO  `json:"material"`
 	Modes      []string `json:"modes"` // what can be collected here right now
 	Flavor     string   `json:"flavor"`
+	Tags       []string `json:"tags"`
 }
 
 type PoolDTO struct {
@@ -257,7 +258,7 @@ func Snapshot(gs *game.GameState, fogLifted bool) GameStateDTO {
 		}
 		out.Nodes = append(out.Nodes, NodeDTO{
 			ID: n.ID, Name: n.Name, Flavor: n.Flavor, LocationID: n.StaticLocation.ID,
-			Food: poolDTO(n.Food), Material: poolDTO(n.Material), Modes: modeStrings(n.Modes()),
+			Food: poolDTO(n.Food), Material: poolDTO(n.Material), Modes: modeStrings(n.Modes()), Tags: n.Tags,
 		})
 	}
 

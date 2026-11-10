@@ -59,6 +59,7 @@ export interface NodeDTO {
   food: PoolDTO;
   material: PoolDTO;
   modes: CollectMode[]; // what can be collected here right now
+  tags: string[];
 }
 
 export type CollectMode = 'harvest' | 'forage';

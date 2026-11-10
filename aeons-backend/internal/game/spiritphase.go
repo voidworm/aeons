@@ -113,7 +113,7 @@ func (gs *GameState) PlayCard(cardID, targetID int, mode collecting.Mode) (*coll
 	}
 	if kindred := gs.KindredOf(owner); kindred != nil && (follower != nil || c.Type == card.PlayerMoveKindred) {
 		gs.ReactToArrival(kindred)
-		gs.eatFoodAtLocation(kindred)
+		gs.eatAtLocation(kindred)
 	}
 	gs.logPlayedCard(c, owner)
 	if breaksHiding(c) {

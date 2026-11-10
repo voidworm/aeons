@@ -21,7 +21,7 @@ func (gs *GameState) spawn(creatureTemplate creature.Unit, at *location.Unit) *c
 func (gs *GameState) NewWolfpack(at *location.Unit) *creature.Unit {
 	return gs.spawn(creature.Unit{
 		Name:        "Wolfpack",
-		IdentNames:  []string{"Wolf", "Collective", "Animal"},
+		IdentNames:  []string{"Wolf", "Collective", "Animal", creature.Scavenger},
 		Flavor:      "Run with the wolves.",
 		Size:        6,
 		Role:        creature.Predator,
@@ -33,7 +33,7 @@ func (gs *GameState) NewWolfpack(at *location.Unit) *creature.Unit {
 func (gs *GameState) NewMoose(at *location.Unit) *creature.Unit {
 	return gs.spawn(creature.Unit{
 		Name:        "Moose",
-		IdentNames:  []string{"Moose", "Animal", "Grazer"},
+		IdentNames:  []string{"Moose", "Animal", creature.Grazer},
 		Flavor:      "In solitude it wanders.",
 		Size:        7,
 		Role:        creature.Prey,
@@ -45,7 +45,7 @@ func (gs *GameState) NewMoose(at *location.Unit) *creature.Unit {
 func (gs *GameState) NewStag(at *location.Unit) *creature.Unit {
 	return gs.spawn(creature.Unit{
 		Name:        "Stag",
-		IdentNames:  []string{"Stag", "Animal", "Grazer"},
+		IdentNames:  []string{"Stag", "Animal", creature.Grazer},
 		Flavor:      "Gentle and with purpose.",
 		Size:        6,
 		Role:        creature.Prey,
@@ -57,7 +57,7 @@ func (gs *GameState) NewStag(at *location.Unit) *creature.Unit {
 func (gs *GameState) NewRaccoon(at *location.Unit) *creature.Unit {
 	return gs.spawn(creature.Unit{
 		Name:        "Raccoon",
-		IdentNames:  []string{"Raccoon", "Animal"},
+		IdentNames:  []string{"Raccoon", "Animal", creature.Scavenger, creature.Gatherer},
 		Flavor:      "A nifty little raccoon, known to steal berries. Especially yours.",
 		Size:        3,
 		Role:        creature.Prey,
@@ -70,7 +70,7 @@ func (gs *GameState) NewRaccoon(at *location.Unit) *creature.Unit {
 func (gs *GameState) NewHare(at *location.Unit) *creature.Unit {
 	return gs.spawn(creature.Unit{
 		Name:        "Hare",
-		IdentNames:  []string{"Hare", "Critter", "Animal"},
+		IdentNames:  []string{"Hare", "Critter", "Animal", creature.Grazer},
 		Flavor:      "The warren is empty.",
 		Size:        2,
 		Role:        creature.Prey,
@@ -83,7 +83,7 @@ func (gs *GameState) NewHare(at *location.Unit) *creature.Unit {
 func (gs *GameState) NewFox(at *location.Unit) *creature.Unit {
 	return gs.spawn(creature.Unit{
 		Name:        "Fox",
-		IdentNames:  []string{"Fox", "Animal"},
+		IdentNames:  []string{"Fox", "Animal", creature.Scavenger, creature.Gatherer},
 		Flavor:      "A fox does what a fox must do.",
 		Size:        4,
 		Role:        creature.PredatorPrey,

@@ -6,6 +6,7 @@ import (
 	"aeons/internal/player"
 	"log"
 	"math/rand/v2"
+	"slices"
 )
 
 // Collecting is the general term: harvesting gathers food, foraging gathers material.
@@ -75,6 +76,12 @@ func (p *Pool) TicksUntilRegrowth() int {
 	return p.RegrowthTimer - p.ticks
 }
 
+const (
+	Fruitful = "Fruitful"
+	Leafy    = "Leafy"
+	Carcass  = "Carcass"
+)
+
 type Node struct {
 	ID             int
 	Name           string
@@ -82,6 +89,11 @@ type Node struct {
 	StaticLocation *location.Unit
 	Food           *Pool
 	Material       *Pool
+	Tags           []string
+}
+
+func (n *Node) HasTag(tag string) bool {
+	return slices.Contains(n.Tags, tag)
 }
 
 func (n *Node) pool(mode Mode) *Pool {
@@ -170,6 +182,7 @@ func GenerateBerryBush(id int, location *location.Unit) *Node {
 		StaticLocation: location,
 		Food:           NewPool(2, 3, 3),
 		Material:       NewPool(2, 3, 3),
+		Tags:           []string{Fruitful, Leafy},
 	}
 }
 
@@ -181,6 +194,7 @@ func GenerateBrush(id int, location *location.Unit) *Node {
 		StaticLocation: location,
 		Food:           NewPool(0, 0, 0),
 		Material:       NewPool(2, 4, 3),
+		Tags:           []string{Leafy},
 	}
 }
 
@@ -192,6 +206,7 @@ func GenerateMushroomField(id int, location *location.Unit) *Node {
 		StaticLocation: location,
 		Food:           NewPool(2, 4, 2),
 		Material:       NewPool(0, 0, 0),
+		Tags:           []string{Leafy},
 	}
 }
 
@@ -203,6 +218,7 @@ func GenerateFruitTree(id int, location *location.Unit) *Node {
 		StaticLocation: location,
 		Food:           NewPool(8, 10, 3),
 		Material:       NewPool(4, 13, 5),
+		Tags:           []string{Leafy, Fruitful},
 	}
 }
 
@@ -215,5 +231,6 @@ func NewCorpse(id int, creatureName string, creatureSize int, at *location.Unit)
 		StaticLocation: at,
 		Food:           NewPool(stock, stock, -1),
 		Material:       NewPool(stock, stock, -1),
+		Tags:           []string{Carcass},
 	}
 }

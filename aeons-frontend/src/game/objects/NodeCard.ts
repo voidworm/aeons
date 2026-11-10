@@ -31,6 +31,7 @@ export class NodeCard extends Card {
       id: dto.id,
       name: dto.name,
       flavor: dto.flavor,
+      effectText: dto.tags.join(' · '),
       ...faceOf(dto),
       artHeight: 136,
       shadow: 'flat',
