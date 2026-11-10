@@ -53,7 +53,7 @@ export class Card extends Phaser.GameObjects.Container {
   private static readonly SHADOW_REACH = 40; // px, covers the lifted shadow's offset and growth
   static readonly PLAY_TRAVEL = 96; // px a cast card travels up the screen while it lands
   static readonly PLAY_DURATION = 900; // ms a cast card takes to settle
-  static readonly HOVER_ZOOM_DELAY = 3000; // ms of uninterrupted hovering before a board card zooms
+  static readonly HOVER_ZOOM_DELAY: number = 3000; // ms of uninterrupted hovering before a board card zooms
   static readonly HOVER_ZOOM_FACTOR = 2.5;
   private static readonly EMPHASIS_FACTOR = 1.15;
   static readonly LIFT_DURATION = 150; // ms

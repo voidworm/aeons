@@ -485,6 +485,15 @@ export class MainScene extends Phaser.Scene {
     this.creatureCards = this.creatureCards.filter((c) => shown.has(c.id));
   }
 
+  private removeNodeCards(state: GameStateDTO) {
+    const shown = new Set(state.nodes.map((n) => n.id));
+    for (const card of this.nodeCards.filter((n) => !shown.has(n.id))) {
+      card.homeLocation?.removeContent(card);
+      card.destroy();
+    }
+    this.nodeCards = this.nodeCards.filter((n) => shown.has(n.id));
+  }
+
   initFirstActivePlayer() {
     this.players[0].setActivePlayer(true);
     this.updateActivePCharacterTo(this.players[0].id);
@@ -560,6 +569,7 @@ export class MainScene extends Phaser.Scene {
       this.locationCards.find((l) => l.id === dto.id)?.setVisibility(dto.visibility);
     }
     this.removeCreatureCards(state);
+    this.removeNodeCards(state);
     const arrivals = new Map<LocationCard, Card[]>(); // what arrives together glides together
     const arriveAt = (to: LocationCard, card: Card) =>
       arrivals.set(to, [...(arrivals.get(to) ?? []), card]);

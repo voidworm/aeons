@@ -13,7 +13,7 @@ export class QuestCard extends Card {
   private static readonly PANEL_PAD = 8;
   private static readonly TEXT_GAP = 8;
   private static readonly MET_COLOR = '#1b5e20';
-  private static readonly HOVER_ZOOM_DELAY = Card.HOVER_ZOOM_DELAY / 2;
+  static readonly HOVER_ZOOM_DELAY = Card.HOVER_ZOOM_DELAY / 2;
   private static readonly INTRO_ZOOM_FACTOR = 2;
   private static readonly INTRO_HOLD = 5000;
   private static readonly INTRO_DELAY = 300; // lets the previous quest leave first
