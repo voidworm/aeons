@@ -1,6 +1,7 @@
 package game
 
 import (
+	"aeons/internal/collecting"
 	"aeons/internal/creature"
 	"aeons/internal/player"
 	"math/rand/v2"
@@ -116,6 +117,18 @@ func (gs *GameState) ResolveRegrowth() {
 	for _, v := range gs.Nodes {
 		v.Tick()
 	}
+	gs.removeDecayedNodes()
+}
+
+func (gs *GameState) removeDecayedNodes() {
+	gs.Nodes = slices.DeleteFunc(gs.Nodes, func(n *collecting.Node) bool {
+		if !n.HasDecayedAway() {
+			return false
+		}
+		delete(gs.KnownNodes, n.ID)
+		gs.Logf("%s has decayed away", n.Name)
+		return true
+	})
 }
 
 // Rest refills the energy of the players. The world acts as if three actions passed, and meanwhile

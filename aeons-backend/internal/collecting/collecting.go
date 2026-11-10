@@ -23,7 +23,7 @@ func (m Mode) Verb() string {
 	return "forages"
 }
 
-// Pool is one kind of stock on a node. A RegrowthTimer of 0 means it never grows back.
+// Pool is one kind of stock on a node. A RegrowthTimer of 0 means it never grows back, a negative one makes it lose a unit every -RegrowthTimer turns.
 type Pool struct {
 	Remaining     int
 	Max           int
@@ -43,8 +43,20 @@ func (p *Pool) Take() {
 	p.Remaining--
 }
 
-// Tick grows one unit back every RegrowthTimer turns, up to Max.
+func (p *Pool) Decays() bool {
+	return p.RegrowthTimer < 0
+}
+
+// Tick grows one unit back every RegrowthTimer turns, up to Max. A decaying pool loses one unit every -RegrowthTimer turns.
 func (p *Pool) Tick() {
+	if p.Decays() {
+		p.ticks++
+		if p.ticks >= -p.RegrowthTimer {
+			p.Remaining = max(p.Remaining-1, 0)
+			p.ticks = 0
+		}
+		return
+	}
 	if p.RegrowthTimer == 0 || p.Remaining >= p.Max {
 		p.ticks = 0
 		return
@@ -57,7 +69,7 @@ func (p *Pool) Tick() {
 }
 
 func (p *Pool) TicksUntilRegrowth() int {
-	if p.RegrowthTimer == 0 || p.Remaining >= p.Max {
+	if p.RegrowthTimer <= 0 || p.Remaining >= p.Max {
 		return 0
 	}
 	return p.RegrowthTimer - p.ticks
@@ -105,6 +117,11 @@ func (n *Node) Snapshot() *Node {
 func (n *Node) Tick() {
 	n.Food.Tick()
 	n.Material.Tick()
+}
+
+// a node whose stocks all decay is gone once they are empty
+func (n *Node) HasDecayedAway() bool {
+	return n.Food.Decays() && n.Material.Decays() && !n.Food.Available() && !n.Material.Available()
 }
 
 func (n *Node) GetTargetType() card.TargetType {
@@ -189,13 +206,14 @@ func GenerateFruitTree(id int, location *location.Unit) *Node {
 	}
 }
 
-// what is left of a defeated creature, it holds nothing yet
-func NewCorpse(id int, creatureName string, at *location.Unit) *Node {
+// what is left of a defeated creature, it holds a third of the creature's size (rounded up) in food and material, both decay by 1 per turn
+func NewCorpse(id int, creatureName string, creatureSize int, at *location.Unit) *Node {
+	stock := (creatureSize + 2) / 3
 	return &Node{
 		ID:             id,
 		Name:           creatureName + " corpse",
 		StaticLocation: at,
-		Food:           NewPool(0, 0, 0),
-		Material:       NewPool(0, 0, 0),
+		Food:           NewPool(stock, stock, -1),
+		Material:       NewPool(stock, stock, -1),
 	}
 }

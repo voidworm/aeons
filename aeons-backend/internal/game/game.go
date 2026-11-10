@@ -41,7 +41,7 @@ func (gs *GameState) ReconcileDefeats() {
 			continue
 		}
 		gs.Logf("%s is defeated", v.NameWithID())
-		gs.Nodes = append(gs.Nodes, collecting.NewCorpse(gs.NextID(), v.Name, v.CurrentLocation))
+		gs.Nodes = append(gs.Nodes, collecting.NewCorpse(gs.NextID(), v.Name, v.Size, v.CurrentLocation))
 	}
 	gs.Creatures = aliveCreatures
 }

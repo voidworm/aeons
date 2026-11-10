@@ -57,6 +57,10 @@ export class NodeCard extends Card {
   }
 
   static stockText(dto: NodeDTO) {
+    const hasFood = dto.food.max > 0;
+    const hasMaterial = dto.material.max > 0;
+    if (hasFood && !hasMaterial) return poolText(dto.food, 'Food');
+    if (hasMaterial && !hasFood) return poolText(dto.material, 'Material');
     return `${poolText(dto.food, 'Food')}    ·    ${poolText(dto.material, 'Material')}`;
   }
 
