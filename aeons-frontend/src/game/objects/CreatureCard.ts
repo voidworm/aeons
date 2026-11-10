@@ -8,12 +8,22 @@ export class CreatureCard extends Card {
   private static readonly FACE_COLOR = 0xad3d2b;
   private static readonly IDENT_LINE_HEIGHT = 16; // the identifier words take the first line of the text box
   private static readonly FACE_FADE_DURATION = 600; // ms, when becoming kindred
+  private static readonly FOOTER_HEIGHT = 19.2;
+  private static readonly SIZE_BADGE_RADIUS = 15;
+  private static readonly SIZE_BADGE_BORDER = 3;
+  private static readonly SIZE_BADGE_FILL = 0xd8c9a3; // the text box colour
+  private static readonly DOT_RADIUS = 5;
+  private static readonly DOT_GAP = 15;
+  private static readonly DOT_EMPTY = 0x8a8a8a;
+  private static readonly DOT_DISTRESSED = 0xc0392b;
+  private static readonly DOT_OUTLINE = 0x2a1809;
   private exhausted = false;
   private shownFaceColor = CreatureCard.FACE_COLOR; // changes along the colour fade
   private faceColorGoal = CreatureCard.FACE_COLOR;
   private faceTween: Phaser.Tweens.Tween | null = null;
   private turnTween: Phaser.Tweens.Tween | null = null;
-  private stats!: Phaser.GameObjects.Text;
+  private sizeBadge: Phaser.GameObjects.Arc | null = null;
+  private distressDots: Phaser.GameObjects.Arc[] = [];
   private maxDistress: number;
   private size: number;
   public kindredOf: number | null = null; // id of the player this creature is kindred to
@@ -41,7 +51,7 @@ export class CreatureCard extends Card {
       shadow: 'flat',
       italicText: true,
       centerTitle: true,
-      footerHeight: 19.2,
+      footerHeight: CreatureCard.FOOTER_HEIGHT,
     });
 
     this.maxDistress = maxDistress;
@@ -69,6 +79,11 @@ export class CreatureCard extends Card {
         onStop: () => resolve(),
       });
     });
+  }
+
+  setFaceColor(color: number): void {
+    super.setFaceColor(color);
+    this.sizeBadge?.setStrokeStyle(CreatureCard.SIZE_BADGE_BORDER, color);
   }
 
   setKindredOf(ownerId: number | null, ownerName: string) {
@@ -116,21 +131,41 @@ export class CreatureCard extends Card {
   }
 
   initFrameDetails(distress: number) {
-    this.stats = this.footer(this.statsText(distress), 'center');
-    this.addFrameDetails(this.stats);
+    this.addFrameDetails(...this.buildSizeBadge(), ...this.buildDistressDots());
+    this.setDistress(distress);
+  }
+
+  // sits on the right edge, where the art meets the text box
+  private buildSizeBadge(): Phaser.GameObjects.GameObject[] {
+    const { SIZE_BADGE_RADIUS, SIZE_BADGE_BORDER, SIZE_BADGE_FILL } = CreatureCard;
+    const x = this.cardWidth - Card.INSET;
+    const y = Card.ART_Y + this.config.artHeight + Card.GAP / 2;
+    this.sizeBadge = new Phaser.GameObjects.Arc(this.scene, x, y, SIZE_BADGE_RADIUS, 0, 360, false, SIZE_BADGE_FILL)
+      .setStrokeStyle(SIZE_BADGE_BORDER, this.shownFaceColor);
+    const number = this.label(x, y, String(this.size), { fontSize: '18px', fontStyle: 'bold' }).setOrigin(0.5);
+    return [this.sizeBadge, number];
+  }
+
+  private buildDistressDots(): Phaser.GameObjects.Arc[] {
+    const { FOOTER_HEIGHT, DOT_RADIUS, DOT_GAP, DOT_EMPTY, DOT_OUTLINE } = CreatureCard;
+    const footerTop = this.cardHeight - Card.INSET - FOOTER_HEIGHT;
+    const y = (footerTop + this.cardHeight - Card.BORDER) / 2;
+    const firstX = this.cardWidth / 2 - ((this.maxDistress - 1) * DOT_GAP) / 2;
+    this.distressDots = Array.from({ length: this.maxDistress }, (_, i) =>
+      new Phaser.GameObjects.Arc(this.scene, firstX + i * DOT_GAP, y, DOT_RADIUS, 0, 360, false, DOT_EMPTY)
+        .setStrokeStyle(1.5, DOT_OUTLINE),
+    );
+    return this.distressDots;
   }
 
   setDistress(distress: number) {
-    this.stats.setText(this.statsText(distress));
+    const { DOT_DISTRESSED, DOT_EMPTY } = CreatureCard;
+    this.distressDots.forEach((dot, i) => dot.setFillStyle(i < distress ? DOT_DISTRESSED : DOT_EMPTY));
   }
 
   // hidden creatures are faded out
   setHidden(hidden: boolean) {
     this.setAlpha(hidden ? 0.3 : 1);
-  }
-
-  private statsText(distress: number): string {
-    return `Size ${this.size} · ${distress}/${this.maxDistress} distress`;
   }
 
   static fromDto(scene: MainScene, x: number, y: number, dto: CreatureDTO) {

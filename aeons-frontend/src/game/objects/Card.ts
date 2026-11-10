@@ -14,6 +14,7 @@ export interface CardConfig {
   flavor: string;
   effectText?: string; // sits at the top of the text box, with the flavor in italics at the bottom
   faceColor: number;
+  faceColorEnd?: number; // blends the face from faceColor on the left into this colour on the right
   artHeight: number;
   shadow: ShadowMode;
   showTextBox?: boolean; // default true; the text box fills the space below the art
@@ -67,6 +68,8 @@ export class Card extends Phaser.GameObjects.Container {
   protected static readonly GAP = 12;
   protected static readonly BOTTOM = Card.HEIGHT - Card.INSET; // 328
   protected static readonly TEXT_PAD = 6.4;
+  private static readonly BLEND_START = 0.3; // share of the face width where a two-coloured face starts to blend
+  private static readonly BLEND_END = 0.7;
   static readonly TARGET_BORDER_WIDTH = 6; // the outline of a card the targeting arrow points at
   protected static readonly CORNER_RADIUS = 10; // 2.5 mm on a 63 x 88 mm card, which is 4 px per mm at 252 x 352
 
@@ -176,16 +179,22 @@ export class Card extends Phaser.GameObjects.Container {
 
   private drawFace(color: number): void {
     const { BORDER, CORNER_RADIUS } = Card;
+    const { faceColorEnd } = this.config;
+    const x = BORDER;
+    const y = BORDER;
+    const w = this.cardWidth - 2 * BORDER;
+    const h = this.cardHeight - 2 * BORDER;
+    const radius = CORNER_RADIUS - BORDER;
+    this.face.clear().fillStyle(color, 1).fillRoundedRect(x, y, w, h, radius);
+    if (faceColorEnd === undefined) return;
+
+    // solid at both ends, blending across the middle
+    const blendStart = x + w * Card.BLEND_START;
+    const blendEnd = x + w * Card.BLEND_END;
+    this.face.fillStyle(faceColorEnd, 1).fillRoundedRect(blendStart, y, x + w - blendStart, h, radius);
     this.face
-      .clear()
-      .fillStyle(color, 1)
-      .fillRoundedRect(
-        BORDER,
-        BORDER,
-        this.cardWidth - 2 * BORDER,
-        this.cardHeight - 2 * BORDER,
-        CORNER_RADIUS - BORDER,
-      );
+      .fillGradientStyle(color, faceColorEnd, color, faceColorEnd, 1)
+      .fillRect(blendStart, y, blendEnd - blendStart, h);
   }
 
   setFaceColor(color: number): void {

@@ -6,6 +6,20 @@ import type { CollectMode, NodeDTO, PoolDTO } from './GameState';
 export const poolText = (pool: PoolDTO, name: string) =>
   pool.max > 0 ? `${pool.remaining} ${name}` : `No ${name}`;
 
+export const FOOD_COLOR = 0xc4551b; // deep orange
+export const MATERIAL_COLOR = 0x3d9a42; // lush green
+const NO_STOCK_COLOR = 0x777777;
+
+// a node is coloured by what it can hold, not by what is left
+function faceOf(dto: NodeDTO): { faceColor: number; faceColorEnd?: number } {
+  const hasFood = dto.food.max > 0;
+  const hasMaterial = dto.material.max > 0;
+  if (hasFood && hasMaterial) return { faceColor: FOOD_COLOR, faceColorEnd: MATERIAL_COLOR };
+  if (hasFood) return { faceColor: FOOD_COLOR };
+  if (hasMaterial) return { faceColor: MATERIAL_COLOR };
+  return { faceColor: NO_STOCK_COLOR };
+}
+
 export class NodeCard extends Card {
   public modes: CollectMode[];
   public dto: NodeDTO; // latest server state of this node
@@ -17,7 +31,7 @@ export class NodeCard extends Card {
       id: dto.id,
       name: dto.name,
       flavor: dto.flavor,
-      faceColor: 0x777777,
+      ...faceOf(dto),
       artHeight: 136,
       shadow: 'flat',
       italicText: true,

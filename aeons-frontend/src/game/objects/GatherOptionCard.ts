@@ -1,7 +1,7 @@
 import type { MainScene } from '../scenes/MainScene';
 import { Card } from './Card';
 import type { CollectMode, NodeDTO } from './GameState';
-import { poolText } from './NodeCard';
+import { FOOD_COLOR, MATERIAL_COLOR, poolText } from './NodeCard';
 
 const LABEL: Record<CollectMode, string> = { harvest: 'Harvest', forage: 'Forage' };
 
@@ -14,7 +14,7 @@ export class GatherOptionCard extends Card {
       id: dto.id,
       name: dto.name,
       flavor: LABEL[mode],
-      faceColor: 0x777777,
+      faceColor: mode === 'harvest' ? FOOD_COLOR : MATERIAL_COLOR,
       artHeight: 136,
       shadow: 'flat',
       centerText: true,
